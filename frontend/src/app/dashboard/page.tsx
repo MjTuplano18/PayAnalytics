@@ -147,7 +147,7 @@ export default function DashboardPage() {
               bank: a.bank,
               amount: a.totalAmount,
             }))}
-            type="pie"
+            type="barh"
             dataKey="amount"
             xAxisKey="bank"
             height={350}
@@ -155,7 +155,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children mb-12">
         <div>
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             Payment Trend Over Time
@@ -178,7 +178,7 @@ export default function DashboardPage() {
               touchpoint: t.touchpoint,
               count: t.count,
             }))}
-            type="pie"
+            type="barh"
             dataKey="count"
             xAxisKey="touchpoint"
             height={300}
@@ -217,6 +217,29 @@ export default function DashboardPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            {/* Totals row - at the top */}
+            <tr className="bg-gray-50 dark:bg-gray-900 font-semibold">
+              <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                Total
+              </td>
+              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                {fmt(fa.totalAccounts)}
+              </td>
+              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                ₱{fmt(fa.totalAmount)}
+              </td>
+              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                {fmt(
+                  fa.bankAnalytics.reduce((s, b) => s + b.debtorSum, 0)
+                )}
+              </td>
+              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                100.0%
+              </td>
+              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                {fmt(fa.totalPayments)}
+              </td>
+            </tr>
             {fa.bankAnalytics.map((b) => (
               <tr
                 key={b.bank}
@@ -242,29 +265,6 @@ export default function DashboardPage() {
                 </td>
               </tr>
             ))}
-            {/* Totals row */}
-            <tr className="bg-gray-50 dark:bg-gray-900 font-semibold">
-              <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                Total
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                {fmt(fa.totalAccounts)}
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                ₱{fmt(fa.totalAmount)}
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                {fmt(
-                  fa.bankAnalytics.reduce((s, b) => s + b.debtorSum, 0)
-                )}
-              </td>
-              <td className="px-4 py-3 text-sm text-right textGRAY-900 dark:text-white">
-                100.0%
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                {fmt(fa.totalPayments)}
-              </td>
-            </tr>
           </tbody>
         </table>
       </div>

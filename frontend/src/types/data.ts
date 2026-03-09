@@ -37,7 +37,7 @@ export interface ParsedData {
   raw: DataRow[];
 }
 
-export type ChartType = "bar" | "line" | "pie" | "area";
+export type ChartType = "bar" | "line" | "pie" | "area" | "barh";
 
 export interface FilterOptions {
   startDate?: string;

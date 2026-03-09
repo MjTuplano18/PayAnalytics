@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { DataProvider } from "@/context/DataContext";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { Sidebar } from "@/components/Sidebar";
-import { TopBar } from "@/components/TopBar";
+import { MainContent } from "@/components/MainContent";
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
@@ -32,10 +32,7 @@ export default function RootLayout({
             <SidebarProvider>
               <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
                 <Sidebar />
-                <div className="lg:ml-64">
-                  <TopBar />
-                  <main className="min-h-[calc(100vh-4rem)]">{children}</main>
-                </div>
+                <MainContent>{children}</MainContent>
               </div>
               <Toaster position="bottom-right" />
             </SidebarProvider>

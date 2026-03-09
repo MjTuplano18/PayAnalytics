@@ -121,6 +121,31 @@ export function DynamicChart({
             <Bar dataKey={dataKey} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
           </BarChart>
         );
+      case "barh":
+        return (
+          <BarChart
+            data={processedData}
+            layout="vertical"
+            margin={{ left: 50, right: 10, top: 5, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis
+              type="number"
+              className="text-muted-foreground"
+              tick={{ fontSize: 12 }}
+              tickFormatter={fmtNum}
+            />
+            <YAxis
+              type="category"
+              dataKey="_shortName"
+              className="text-muted-foreground"
+              tick={{ fontSize: 11 }}
+              width={40}
+            />
+            <Tooltip contentStyle={tooltipStyle} formatter={formatTooltipValue} />
+            <Bar dataKey={dataKey} fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+          </BarChart>
+        );
       case "line":
         return (
           <LineChart data={processedData}>
