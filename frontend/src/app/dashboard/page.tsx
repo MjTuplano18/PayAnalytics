@@ -120,6 +120,72 @@ export default function DashboardPage() {
         })}
       </div>
 
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            Payments per Bank
+          </h3>
+          <DynamicChart
+            data={fa.bankAnalytics.map((a) => ({
+              bank: a.bank,
+              amount: a.totalAmount,
+            }))}
+            type="bar"
+            dataKey="amount"
+            xAxisKey="bank"
+            height={350}
+          />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            Amount Distribution by Bank
+          </h3>
+          <DynamicChart
+            data={fa.bankAnalytics.slice(0, 10).map((a) => ({
+              bank: a.bank,
+              amount: a.totalAmount,
+            }))}
+            type="pie"
+            dataKey="amount"
+            xAxisKey="bank"
+            height={350}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children">
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            Payment Trend Over Time
+          </h3>
+          <DynamicChart
+            data={monthlyTrend}
+            type="area"
+            dataKey="amount"
+            xAxisKey="month"
+            height={300}
+          />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            By Touchpoint
+          </h3>
+          <DynamicChart
+            data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({
+              touchpoint: t.touchpoint,
+              count: t.count,
+            }))}
+            type="pie"
+            dataKey="count"
+            xAxisKey="touchpoint"
+            height={300}
+          />
+        </div>
+      </div>
+
       {/* Bank Analytics Table */}
       <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -192,7 +258,7 @@ export default function DashboardPage() {
                   fa.bankAnalytics.reduce((s, b) => s + b.debtorSum, 0)
                 )}
               </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+              <td className="px-4 py-3 text-sm text-right textGRAY-900 dark:text-white">
                 100.0%
               </td>
               <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
@@ -201,72 +267,6 @@ export default function DashboardPage() {
             </tr>
           </tbody>
         </table>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
-        <div>
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Payments per Bank
-          </h3>
-          <DynamicChart
-            data={fa.bankAnalytics.map((a) => ({
-              bank: a.bank,
-              amount: a.totalAmount,
-            }))}
-            type="bar"
-            dataKey="amount"
-            xAxisKey="bank"
-            height={350}
-          />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Amount Distribution by Bank
-          </h3>
-          <DynamicChart
-            data={fa.bankAnalytics.slice(0, 10).map((a) => ({
-              bank: a.bank,
-              amount: a.totalAmount,
-            }))}
-            type="pie"
-            dataKey="amount"
-            xAxisKey="bank"
-            height={350}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children">
-        <div>
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Payment Trend Over Time
-          </h3>
-          <DynamicChart
-            data={monthlyTrend}
-            type="area"
-            dataKey="amount"
-            xAxisKey="month"
-            height={300}
-          />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            By Touchpoint
-          </h3>
-          <DynamicChart
-            data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({
-              touchpoint: t.touchpoint,
-              count: t.count,
-            }))}
-            type="pie"
-            dataKey="count"
-            xAxisKey="touchpoint"
-            height={300}
-          />
-        </div>
       </div>
     </div>
   );

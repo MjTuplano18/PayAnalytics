@@ -31,7 +31,7 @@ export function TopBar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 px-4 sm:px-8">
+    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 px-4 sm:px-8">
       {/* Left: hamburger + file name */}
       <div className="flex items-center gap-4">
         <button
@@ -42,7 +42,7 @@ export function TopBar() {
           <Menu className="h-5 w-5" />
         </button>
         {fileName && (
-          <span className="hidden sm:inline text-sm text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+          <span className="hidden sm:inline text-sm text-gray-500 dark:text-gray-400 truncate max-w-[500px]">
             {fileName}
           </span>
         )}
