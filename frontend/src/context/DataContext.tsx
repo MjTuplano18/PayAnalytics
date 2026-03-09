@@ -10,6 +10,8 @@ interface DataContextType {
   setRawData: (data: DataRow[]) => void;
   fileName: string;
   setFileName: (name: string) => void;
+  globalSearchQuery: string;
+  setGlobalSearchQuery: (query: string) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -18,10 +20,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<ParsedData | null>(null);
   const [rawData, setRawData] = useState<DataRow[]>([]);
   const [fileName, setFileName] = useState<string>("");
+  const [globalSearchQuery, setGlobalSearchQuery] = useState<string>("");
 
   return (
     <DataContext.Provider
-      value={{ data, setData, rawData, setRawData, fileName, setFileName }}
+      value={{ data, setData, rawData, setRawData, fileName, setFileName, globalSearchQuery, setGlobalSearchQuery }}
     >
       {children}
     </DataContext.Provider>

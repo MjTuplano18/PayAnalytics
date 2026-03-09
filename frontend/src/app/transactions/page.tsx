@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Download, Search } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { Button } from "@/components/ui/button";
@@ -11,13 +11,21 @@ function fmt(n: number): string {
 }
 
 export default function TransactionsPage() {
-  const { data } = useData();
+  const { data, globalSearchQuery, setGlobalSearchQuery } = useData();
   const [searchQuery, setSearchQuery] = useState("");
   const [bankFilter, setBankFilter] = useState("all");
   const [tpFilter, setTpFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const rowsPerPage = 25;
+
+  // Initialize search query from global context
+  useEffect(() => {
+    if (globalSearchQuery) {
+      setSearchQuery(globalSearchQuery);
+      setGlobalSearchQuery(""); // Clear it after using
+    }
+  }, [globalSearchQuery, setGlobalSearchQuery]);
 
   const banks = useMemo(() => {
     if (!data) return [];
