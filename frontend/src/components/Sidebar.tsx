@@ -10,8 +10,11 @@ import {
   BarChart3,
   Upload,
   Menu,
+  Settings,
+  LogOut,
 } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
+import { useAuth } from "@/context/AuthContext";
 
 const menuItems = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -19,11 +22,13 @@ const menuItems = [
   { path: "/customers", icon: UserCheck, label: "Accounts" },
   { path: "/reports", icon: BarChart3, label: "Reports" },
   { path: "/upload", icon: Upload, label: "Upload Data" },
+  { path: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { isOpen, setIsOpen, isCollapsed, toggleCollapsed } = useSidebar();
+  const { user, logout } = useAuth();
 
   const isActive = (path: string) => pathname === path;
 
@@ -88,14 +93,41 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Footer */}
-        {!isCollapsed && (
-          <div className="border-t border-gray-800 p-4">
-            <p className="text-xs text-gray-500 text-center">
-              PayAnalytics v1.0
-            </p>
-          </div>
-        )}
+        {/* Profile & Sign Out */}
+        <div className="border-t border-gray-800 p-4">
+          {user && !isCollapsed && (
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-sm font-semibold text-white">
+                {user.full_name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-sm font-medium text-gray-200">
+                  {user.full_name}
+                </p>
+                <p className="truncate text-xs text-gray-500">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+          )}
+          {user && isCollapsed && (
+            <div className="mb-3 flex justify-center">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-sm font-semibold text-white">
+                {user.full_name.charAt(0).toUpperCase()}
+              </div>
+            </div>
+          )}
+          <button
+            onClick={logout}
+            title={isCollapsed ? "Sign Out" : undefined}
+            className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-gray-400 transition-all duration-200 hover:bg-gray-800 hover:text-white ${
+              isCollapsed ? "justify-center px-2" : ""
+            }`}
+          >
+            <LogOut className="h-5 w-5" />
+            {!isCollapsed && <span className="text-sm font-medium">Sign Out</span>}
+          </button>
+        </div>
       </aside>
     </>
   );
