@@ -1,0 +1,179 @@
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.upload import PaymentRecord, UploadSession
+from app.schemas.upload import PaymentRecordIn
+
+
+class UploadRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def create_session(
+        self,
+        user_id: str,
+        file_name: str,
+        records: list[PaymentRecordIn],
+    ) -> UploadSession:
+        total_amount = sum(r.payment_amount for r in records)
+        upload = UploadSession(
+            user_id=user_id,
+            file_name=file_name,
+            total_records=len(records),
+            total_amount=total_amount,
+        )
+        self.session.add(upload)
+        await self.session.flush()  # get the id before bulk insert
+
+        payment_records = [
+            PaymentRecord(
+                session_id=upload.id,
+                bank=r.bank,
+                account=r.account,
+                touchpoint=r.touchpoint,
+                payment_date=r.payment_date,
+                payment_amount=r.payment_amount,
+                environment=r.environment,
+            )
+            for r in records
+        ]
+        self.session.add_all(payment_records)
+        await self.session.commit()
+        await self.session.refresh(upload)
+        return upload
+
+    async def list_sessions(self, user_id: str) -> list[UploadSession]:
+        result = await self.session.execute(
+            select(UploadSession)
+            .where(UploadSession.user_id == user_id)
+            .order_by(UploadSession.uploaded_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def get_session(self, session_id: str, user_id: str) -> UploadSession | None:
+        result = await self.session.execute(
+            select(UploadSession)
+            .options(selectinload(UploadSession.records))
+            .where(UploadSession.id == session_id, UploadSession.user_id == user_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_transactions(
+        self,
+        session_id: str,
+        user_id: str,
+        bank: str | None = None,
+        touchpoint: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> tuple[int, list[PaymentRecord]]:
+        # Verify the session belongs to this user
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return 0, []
+
+        query = select(PaymentRecord).where(PaymentRecord.session_id == session_id)
+
+        if bank:
+            query = query.where(PaymentRecord.bank == bank)
+        if touchpoint:
+            query = query.where(PaymentRecord.touchpoint == touchpoint)
+        if search:
+            query = query.where(PaymentRecord.account.ilike(f"%{search}%"))
+
+        # Total count
+        count_result = await self.session.execute(
+            select(func.count()).select_from(query.subquery())
+        )
+        total = count_result.scalar_one()
+
+        # Paginated results
+        offset = (page - 1) * page_size
+        query = query.order_by(PaymentRecord.payment_date.desc()).offset(offset).limit(page_size)
+        result = await self.session.execute(query)
+        return total, list(result.scalars().all())
+
+    async def get_dashboard_summary(self, session_id: str, user_id: str) -> dict | None:
+        # Verify session ownership
+        session_check = await self.session.execute(
+            select(UploadSession).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        upload = session_check.scalar_one_or_none()
+        if not upload:
+            return None
+
+        # Total payments and amount
+        totals = await self.session.execute(
+            select(
+                func.count(PaymentRecord.id),
+                func.sum(PaymentRecord.payment_amount),
+                func.count(func.distinct(PaymentRecord.account)),
+                func.count(func.distinct(PaymentRecord.bank)),
+            ).where(PaymentRecord.session_id == session_id)
+        )
+        total_payments, total_amount, total_accounts, total_banks = totals.one()
+        total_amount = total_amount or 0.0
+
+        # Bank breakdown
+        bank_rows = await self.session.execute(
+            select(
+                PaymentRecord.bank,
+                func.count(PaymentRecord.id).label("payment_count"),
+                func.count(func.distinct(PaymentRecord.account)).label("account_count"),
+                func.sum(PaymentRecord.payment_amount).label("total_amount"),
+            )
+            .where(PaymentRecord.session_id == session_id)
+            .group_by(PaymentRecord.bank)
+            .order_by(func.sum(PaymentRecord.payment_amount).desc())
+        )
+        banks = [
+            {
+                "bank": row.bank,
+                "payment_count": row.payment_count,
+                "account_count": row.account_count,
+                "total_amount": row.total_amount or 0.0,
+                "percentage": round((row.total_amount or 0.0) / total_amount * 100, 2) if total_amount else 0,
+            }
+            for row in bank_rows.all()
+        ]
+
+        # Touchpoint breakdown
+        tp_rows = await self.session.execute(
+            select(
+                PaymentRecord.touchpoint,
+                func.count(PaymentRecord.id).label("count"),
+                func.sum(PaymentRecord.payment_amount).label("total_amount"),
+            )
+            .where(PaymentRecord.session_id == session_id)
+            .group_by(PaymentRecord.touchpoint)
+            .order_by(func.count(PaymentRecord.id).desc())
+        )
+        touchpoints = [
+            {
+                "touchpoint": row.touchpoint or "Unknown",
+                "count": row.count,
+                "total_amount": row.total_amount or 0.0,
+                "percentage": round(row.count / total_payments * 100, 2) if total_payments else 0,
+            }
+            for row in tp_rows.all()
+        ]
+
+        return {
+            "total_payments": total_payments or 0,
+            "total_amount": total_amount,
+            "total_accounts": total_accounts or 0,
+            "total_banks": total_banks or 0,
+            "banks": banks,
+            "touchpoints": touchpoints,
+            "session_id": session_id,
+        }

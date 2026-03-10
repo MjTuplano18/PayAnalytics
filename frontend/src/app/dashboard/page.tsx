@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { DollarSign, Users, FileText, Landmark } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useData } from "@/context/DataContext";
+import { useAuth } from "@/context/AuthContext";
 import { DynamicChart } from "@/components/DynamicChart";
 import { DateFilter, DateRange, filterByDateRange } from "@/components/DateFilter";
+import { getDashboardSummary, type DashboardSummary } from "@/lib/api";
 
 /** Format number with commas */
 function fmt(n: number): string {
@@ -13,15 +15,36 @@ function fmt(n: number): string {
 }
 
 export default function DashboardPage() {
-  const { data } = useData();
+  const { data, sessionId } = useData();
+  const { token } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [apiSummary, setApiSummary] = useState<DashboardSummary | null>(null);
+  const [apiLoading, setApiLoading] = useState(false);
+
+  // Fetch backend summary when a sessionId is available
+  const fetchSummary = useCallback(async () => {
+    if (!sessionId || !token) return;
+    setApiLoading(true);
+    try {
+      const summary = await getDashboardSummary(token, sessionId);
+      setApiSummary(summary);
+    } catch {
+      setApiSummary(null);
+    } finally {
+      setApiLoading(false);
+    }
+  }, [sessionId, token]);
+
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
 
   const payments = useMemo(() => {
     if (!data) return [];
     return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate);
   }, [data, dateRange]);
 
-  // Monthly trend (group payments by YYYY-MM)
+  // Monthly trend from in-memory data (API doesn't aggregate by month yet)
   const monthlyTrend = useMemo(() => {
     if (payments.length === 0) return [];
     const map = new Map<string, number>();
@@ -34,8 +57,29 @@ export default function DashboardPage() {
       .map(([month, amount]) => ({ month, amount }));
   }, [payments]);
 
-  // Compute filtered analytics
-  const filteredAnalytics = useMemo(() => {
+  // Use backend summary if available, otherwise compute in-memory
+  const fa = useMemo(() => {
+    if (apiSummary) {
+      return {
+        totalAmount: apiSummary.total_amount,
+        totalAccounts: apiSummary.total_accounts,
+        totalPayments: apiSummary.total_payments,
+        bankAnalytics: apiSummary.banks.map((b) => ({
+          bank: b.bank,
+          accountCount: b.account_count,
+          totalAmount: b.total_amount,
+          debtorSum: 0,
+          percentage: b.percentage,
+          paymentCount: b.payment_count,
+        })),
+        touchpointAnalytics: apiSummary.touchpoints.map((t) => ({
+          touchpoint: t.touchpoint,
+          count: t.count,
+          totalAmount: t.total_amount,
+          percentage: t.percentage,
+        })),
+      };
+    }
     if (payments.length === 0) return null;
     const bankMap = new Map<string, { accountCount: number; totalAmount: number; debtorSum: number; paymentCount: number; accounts: Set<string> }>();
     const tpMap = new Map<string, { count: number; totalAmount: number }>();
@@ -68,9 +112,13 @@ export default function DashboardPage() {
       .sort((a, b) => b.count - a.count);
 
     return { bankAnalytics, touchpointAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: payments.length };
-  }, [payments]);
+  }, [apiSummary, payments]);
+  if (apiLoading) return (
+    <div className="px-4 sm:px-8 py-8 min-h-screen flex items-center justify-center">
+      <p className="text-gray-500 dark:text-gray-400">Loading dashboard from server...</p>
+    </div>
+  );
 
-  const fa = filteredAnalytics;
   if (!fa) return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
       <div className="p-12 rounded-lg text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">

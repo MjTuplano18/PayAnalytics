@@ -90,3 +90,102 @@ export function changePassword(
     body: JSON.stringify(data),
   });
 }
+
+// ─── Upload / Persistence API ────────────────────────────────────────────────
+
+export interface PaymentRecordIn {
+  bank: string;
+  account: string;
+  touchpoint?: string;
+  payment_date?: string;
+  payment_amount: number;
+  environment?: string;
+}
+
+export interface PaymentRecordOut extends PaymentRecordIn {
+  id: string;
+  session_id: string;
+}
+
+export interface UploadSessionOut {
+  id: string;
+  user_id: string;
+  file_name: string;
+  total_records: number;
+  total_amount: number;
+  uploaded_at: string;
+}
+
+export interface UploadSessionDetail extends UploadSessionOut {
+  records: PaymentRecordOut[];
+}
+
+export interface PaginatedTransactions {
+  total: number;
+  page: number;
+  page_size: number;
+  items: PaymentRecordOut[];
+}
+
+export interface BankSummary {
+  bank: string;
+  payment_count: number;
+  account_count: number;
+  total_amount: number;
+  percentage: number;
+}
+
+export interface TouchpointSummary {
+  touchpoint: string;
+  count: number;
+  total_amount: number;
+  percentage: number;
+}
+
+export interface DashboardSummary {
+  total_payments: number;
+  total_amount: number;
+  total_accounts: number;
+  total_banks: number;
+  banks: BankSummary[];
+  touchpoints: TouchpointSummary[];
+  session_id: string | null;
+}
+
+export function saveUpload(
+  token: string,
+  payload: { file_name: string; records: PaymentRecordIn[] }
+) {
+  return apiFetch<UploadSessionOut>("/api/v1/uploads", {
+    method: "POST",
+    token,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listUploads(token: string) {
+  return apiFetch<UploadSessionOut[]>("/api/v1/uploads", { token });
+}
+
+export function getUpload(token: string, sessionId: string) {
+  return apiFetch<UploadSessionDetail>(`/api/v1/uploads/${sessionId}`, { token });
+}
+
+export function getTransactions(
+  token: string,
+  sessionId: string,
+  params: { bank?: string; touchpoint?: string; search?: string; page?: number; page_size?: number } = {}
+) {
+  const qs = new URLSearchParams();
+  if (params.bank) qs.set("bank", params.bank);
+  if (params.touchpoint) qs.set("touchpoint", params.touchpoint);
+  if (params.search) qs.set("search", params.search);
+  if (params.page) qs.set("page", String(params.page));
+  if (params.page_size) qs.set("page_size", String(params.page_size));
+  const query = qs.toString() ? `?${qs}` : "";
+  return apiFetch<PaginatedTransactions>(`/api/v1/uploads/${sessionId}/transactions${query}`, { token });
+}
+
+export function getDashboardSummary(token: string, sessionId: string) {
+  return apiFetch<DashboardSummary>(`/api/v1/uploads/${sessionId}/dashboard`, { token });
+}

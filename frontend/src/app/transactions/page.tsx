@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Download, Search } from "lucide-react";
 import { useData } from "@/context/DataContext";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { DateFilter, DateRange, filterByDateRange } from "@/components/DateFilter";
+import { getTransactions, getDashboardSummary, type PaymentRecordOut } from "@/lib/api";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
 }
 
 export default function TransactionsPage() {
-  const { data, globalSearchQuery, setGlobalSearchQuery } = useData();
+  const { data, sessionId, globalSearchQuery, setGlobalSearchQuery } = useData();
+  const { token } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [bankFilter, setBankFilter] = useState("all");
   const [tpFilter, setTpFilter] = useState("all");
@@ -19,26 +22,70 @@ export default function TransactionsPage() {
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const rowsPerPage = 25;
 
+  // Backend-mode state
+  const [apiRows, setApiRows] = useState<PaymentRecordOut[] | null>(null);
+  const [apiTotal, setApiTotal] = useState(0);
+  const [apiTotalAmount, setApiTotalAmount] = useState(0);
+  const [apiBanks, setApiBanks] = useState<string[]>([]);
+  const [apiTouchpoints, setApiTouchpoints] = useState<string[]>([]);
+  const [apiLoading, setApiLoading] = useState(false);
+
   // Initialize search query from global context
   useEffect(() => {
     if (globalSearchQuery) {
       setSearchQuery(globalSearchQuery);
-      setGlobalSearchQuery(""); // Clear it after using
+      setGlobalSearchQuery("");
     }
   }, [globalSearchQuery, setGlobalSearchQuery]);
 
-  const banks = useMemo(() => {
+  // Fetch filter options from dashboard summary (banks + touchpoints)
+  useEffect(() => {
+    if (!sessionId || !token) return;
+    getDashboardSummary(token, sessionId).then((summary) => {
+      setApiBanks(summary.banks.map((b) => b.bank));
+      setApiTouchpoints(summary.touchpoints.map((t) => t.touchpoint));
+      setApiTotalAmount(summary.total_amount);
+    }).catch(() => {});
+  }, [sessionId, token]);
+
+  // Fetch transactions from backend when sessionId is available
+  const fetchApiTransactions = useCallback(async () => {
+    if (!sessionId || !token) return;
+    setApiLoading(true);
+    try {
+      const result = await getTransactions(token, sessionId, {
+        bank: bankFilter !== "all" ? bankFilter : undefined,
+        touchpoint: tpFilter !== "all" ? tpFilter : undefined,
+        search: searchQuery || undefined,
+        page: currentPage,
+        page_size: rowsPerPage,
+      });
+      setApiRows(result.items);
+      setApiTotal(result.total);
+    } catch {
+      setApiRows(null);
+    } finally {
+      setApiLoading(false);
+    }
+  }, [sessionId, token, bankFilter, tpFilter, searchQuery, currentPage]);
+
+  useEffect(() => {
+    fetchApiTransactions();
+  }, [fetchApiTransactions]);
+
+  // In-memory fallback (used when sessionId is null)
+  const inMemoryBanks = useMemo(() => {
     if (!data) return [];
     return [...new Set(data.payments.map((p) => p.bank))].sort();
   }, [data]);
 
-  const touchpoints = useMemo(() => {
+  const inMemoryTouchpoints = useMemo(() => {
     if (!data) return [];
     return [...new Set(data.payments.map((p) => p.touchpoint))].sort();
   }, [data]);
 
-  const filtered = useMemo(() => {
-    if (!data) return [];
+  const inMemoryFiltered = useMemo(() => {
+    if (sessionId || !data) return [];
     const dateFiltered = filterByDateRange(data.payments, dateRange, (p) => p.paymentDate);
     return dateFiltered.filter((p) => {
       if (bankFilter !== "all" && p.bank !== bankFilter) return false;
@@ -53,32 +100,52 @@ export default function TransactionsPage() {
       }
       return true;
     });
-  }, [data, bankFilter, tpFilter, searchQuery, dateRange]);
+  }, [data, sessionId, bankFilter, tpFilter, searchQuery, dateRange]);
 
-  const filteredTotal = useMemo(
-    () => filtered.reduce((s, p) => s + p.paymentAmount, 0),
-    [filtered]
+  const inMemoryFilteredTotal = useMemo(
+    () => inMemoryFiltered.reduce((s, p) => s + p.paymentAmount, 0),
+    [inMemoryFiltered]
   );
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
-  const paginatedRows = useMemo(() => {
+  const inMemoryTotalPages = Math.max(1, Math.ceil(inMemoryFiltered.length / rowsPerPage));
+  const inMemoryPaginatedRows = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
-    return filtered.slice(start, start + rowsPerPage);
-  }, [filtered, currentPage]);
+    return inMemoryFiltered.slice(start, start + rowsPerPage);
+  }, [inMemoryFiltered, currentPage]);
+
+  // Derived display values (switches between API and in-memory)
+  const usingApi = !!sessionId;
+  const displayBanks = usingApi ? apiBanks : inMemoryBanks;
+  const displayTouchpoints = usingApi ? apiTouchpoints : inMemoryTouchpoints;
+  const displayRows = usingApi
+    ? (apiRows ?? []).map((r) => ({
+        bank: r.bank,
+        paymentDate: r.payment_date,
+        paymentAmount: r.payment_amount,
+        account: r.account,
+        touchpoint: r.touchpoint,
+      }))
+    : inMemoryPaginatedRows.map((p) => ({
+        bank: p.bank,
+        paymentDate: p.paymentDate,
+        paymentAmount: p.paymentAmount,
+        account: p.account,
+        touchpoint: p.touchpoint,
+      }));
+  const displayTotal = usingApi ? apiTotal : inMemoryFiltered.length;
+  const displayTotalAmount = usingApi ? apiTotalAmount : inMemoryFilteredTotal;
+  const displayTotalPages = usingApi ? Math.max(1, Math.ceil(apiTotal / rowsPerPage)) : inMemoryTotalPages;
 
   // Reset to page 1 when filters change
   const resetPage = () => setCurrentPage(1);
 
   const handleExport = () => {
+    const rows = usingApi
+      ? (apiRows ?? []).map((r) => [r.bank, r.payment_date, r.payment_amount.toFixed(2), r.account, r.touchpoint])
+      : inMemoryFiltered.map((p) => [p.bank, p.paymentDate, p.paymentAmount.toFixed(2), p.account, p.touchpoint]);
     const csv = [
       ["Bank", "Payment Date", "Payment Amount", "Account", "Touchpoint"],
-      ...filtered.map((p) => [
-        p.bank,
-        p.paymentDate,
-        p.paymentAmount.toFixed(2),
-        p.account,
-        p.touchpoint,
-      ]),
+      ...rows,
     ]
       .map((row) => row.join(","))
       .join("\n");
@@ -92,7 +159,7 @@ export default function TransactionsPage() {
     URL.revokeObjectURL(url);
   };
 
-  if (!data) {
+  if (!data && !sessionId) {
     return (
       <div className="px-4 sm:px-8 py-8 min-h-screen">
         <div className="p-12 rounded-lg text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
@@ -116,7 +183,7 @@ export default function TransactionsPage() {
               Transactions
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              {fmt(filtered.length)} records &middot; ₱{fmt(filteredTotal)} total
+              {fmt(displayTotal)} records &middot; ₱{fmt(displayTotalAmount)} total
             </p>
           </div>
           <Button
@@ -128,10 +195,12 @@ export default function TransactionsPage() {
           </Button>
         </div>
 
-        {/* Date Filter */}
-        <div className="mb-4">
-          <DateFilter value={dateRange} onChange={(r) => { setDateRange(r); resetPage(); }} />
-        </div>
+        {/* Date Filter — only shown for in-memory mode */}
+        {!usingApi && (
+          <div className="mb-4">
+            <DateFilter value={dateRange} onChange={(r) => { setDateRange(r); resetPage(); }} />
+          </div>
+        )}
 
         {/* Filters */}
         <div className="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
@@ -153,7 +222,7 @@ export default function TransactionsPage() {
               className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="all">All Banks</option>
-              {banks.map((b) => (
+              {displayBanks.map((b) => (
                 <option key={b} value={b}>
                   {b}
                 </option>
@@ -166,7 +235,7 @@ export default function TransactionsPage() {
               className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
               <option value="all">All Touchpoints</option>
-              {touchpoints.map((t) => (
+              {displayTouchpoints.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
@@ -177,6 +246,9 @@ export default function TransactionsPage() {
 
         {/* Table */}
         <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          {apiLoading ? (
+            <div className="p-12 text-center text-gray-500 dark:text-gray-400">Loading transactions...</div>
+          ) : (
           <table className="w-full min-w-[700px]">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
@@ -198,7 +270,7 @@ export default function TransactionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {paginatedRows.map((p, i) => (
+              {displayRows.map((p, i) => (
                 <tr
                   key={`${currentPage}-${i}`}
                   className="hover:bg-purple-50 dark:hover:bg-gray-700/60 transition-colors duration-200"
@@ -224,10 +296,11 @@ export default function TransactionsPage() {
               ))}
             </tbody>
           </table>
+          )}
           {/* Pagination Controls */}
           <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Showing {fmt((currentPage - 1) * rowsPerPage + 1)}&ndash;{fmt(Math.min(currentPage * rowsPerPage, filtered.length))} of {fmt(filtered.length)} records
+              Showing {fmt((currentPage - 1) * rowsPerPage + 1)}&ndash;{fmt(Math.min(currentPage * rowsPerPage, displayTotal))} of {fmt(displayTotal)} records
             </p>
             <div className="flex items-center gap-1">
               <button
@@ -249,7 +322,7 @@ export default function TransactionsPage() {
               {(() => {
                 const pages: number[] = [];
                 let start = Math.max(1, currentPage - 2);
-                let end = Math.min(totalPages, start + 4);
+                let end = Math.min(displayTotalPages, start + 4);
                 start = Math.max(1, end - 4);
                 for (let i = start; i <= end; i++) pages.push(i);
                 return pages.map((pg) => (
@@ -268,15 +341,15 @@ export default function TransactionsPage() {
               })()}
 
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(displayTotalPages, p + 1))}
+                disabled={currentPage === displayTotalPages}
                 className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-purple-50 hover:border-purple-400 hover:text-purple-700 dark:hover:bg-purple-900/40 dark:hover:border-purple-500 dark:hover:text-purple-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Next
               </button>
               <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(displayTotalPages)}
+                disabled={currentPage === displayTotalPages}
                 className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-purple-50 hover:border-purple-400 hover:text-purple-700 dark:hover:bg-purple-900/40 dark:hover:border-purple-500 dark:hover:text-purple-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Last

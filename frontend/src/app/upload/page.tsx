@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useData } from "@/context/DataContext";
+import { useAuth } from "@/context/AuthContext";
 import { parseExcelFile, generateMockData } from "@/utils/excelParser";
+import { saveUpload } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function UploadPage() {
@@ -16,7 +18,8 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const { setData, setRawData, setFileName } = useData();
+  const { setData, setRawData, setFileName, setSessionId } = useData();
+  const { token } = useAuth();
 
   const handleFileUpload = async (file: File) => {
     setUploading(true);
@@ -28,9 +31,31 @@ export default function UploadPage() {
       setData(parsedData);
       setRawData(parsedData.raw);
       setFileName(file.name);
-      setUploadSuccess(true);
-      toast.success("File uploaded successfully!");
 
+      // Persist to backend if authenticated
+      if (token) {
+        try {
+          const records = parsedData.payments.map((p) => ({
+            bank: p.bank,
+            account: p.account,
+            touchpoint: p.touchpoint,
+            payment_date: p.paymentDate,
+            payment_amount: p.paymentAmount,
+            environment: p.environment,
+          }));
+          const saved = await saveUpload(token, { file_name: file.name, records });
+          setSessionId(saved.id);
+          toast.success(`File uploaded & saved! ${saved.total_records} records stored.`);
+        } catch {
+          // Backend save failed — still work in-memory
+          setSessionId(null);
+          toast.success("File loaded locally. (Sync to server failed — working offline.)");
+        }
+      } else {
+        toast.success("File uploaded successfully!");
+      }
+
+      setUploadSuccess(true);
       setTimeout(() => {
         router.push("/dashboard");
       }, 1500);
@@ -73,6 +98,7 @@ export default function UploadPage() {
     setData(mockData);
     setRawData(mockData.raw);
     setFileName("mock_data.xlsx");
+    setSessionId(null); // mock data is not persisted
     toast.success("Mock data loaded successfully!");
     setTimeout(() => {
       router.push("/dashboard");

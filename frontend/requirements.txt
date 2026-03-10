@@ -1,0 +1,80 @@
+# ============================================================
+# PayAnalytics Frontend – Package Requirements
+# ============================================================
+# Node.js equivalent of a Python requirements.txt.
+# The actual lockfile for reproducible installs is package-lock.json.
+#
+# To install all dependencies, run:
+#   npm install
+#
+# To start the development server:
+#   npm run dev   (runs on http://localhost:3000)
+# ============================================================
+
+# ----- Core Framework -----
+next@16.1.6                    # Next.js App Router framework
+react@19.2.3                   # React core
+react-dom@19.2.3               # React DOM renderer
+
+# ----- UI Component Library (Radix UI primitives) -----
+@radix-ui/react-accordion      # Accordion component
+@radix-ui/react-alert-dialog   # Alert dialog modal
+@radix-ui/react-avatar         # Avatar / profile image
+@radix-ui/react-checkbox       # Checkbox input
+@radix-ui/react-collapsible    # Collapsible panel
+@radix-ui/react-dialog         # Generic dialog/modal
+@radix-ui/react-dropdown-menu  # Dropdown menu
+@radix-ui/react-label          # Form label
+@radix-ui/react-popover        # Popover tooltip
+@radix-ui/react-progress       # Progress bar
+@radix-ui/react-scroll-area    # Custom scrollbar area
+@radix-ui/react-select         # Select / combobox
+@radix-ui/react-separator      # Horizontal/vertical divider
+@radix-ui/react-slider         # Range slider
+@radix-ui/react-slot           # Slot utility for composition
+@radix-ui/react-switch         # Toggle switch
+@radix-ui/react-tabs           # Tab navigation
+@radix-ui/react-toggle         # Toggle button
+@radix-ui/react-toggle-group   # Group of toggle buttons
+@radix-ui/react-tooltip        # Tooltip
+
+# ----- Styling -----
+tailwind-merge                 # Merge Tailwind classes safely
+tw-animate-css                 # Tailwind animation utilities
+clsx                           # Conditional classnames helper
+class-variance-authority       # CVA – typed variant styles
+
+# ----- Charts & Data Visualization -----
+recharts                       # Responsive chart library (bar, line, pie, etc.)
+@xyflow/react                  # React Flow – node/edge flowchart builder
+
+# ----- Forms -----
+react-hook-form                # Performant form state management
+input-otp                      # OTP / pin input component
+
+# ----- Date Handling -----
+date-fns                       # Date utility library
+react-day-picker               # Calendar / date picker UI
+
+# ----- Notifications -----
+sonner                         # Toast notification system
+next-themes                    # Dark/light theme support
+
+# ----- Data / File Handling -----
+xlsx                           # Read/write Excel (.xlsx) files
+
+# ----- Carousel / Panels -----
+embla-carousel-react           # Embla carousel
+react-resizable-panels         # Resizable split-pane layout
+vaul                           # Drawer (slide-up panel) component
+cmdk                           # Command palette component
+lucide-react                   # Icon library (SVG icons)
+
+# ----- Dev Dependencies -----
+typescript                     # TypeScript compiler
+@types/node                    # Node.js type definitions
+@types/react                   # React type definitions
+@types/react-dom               # React DOM type definitions
+eslint                         # JavaScript/TypeScript linter
+eslint-config-next             # ESLint rules for Next.js
+@tailwindcss/postcss           # Tailwind CSS PostCSS plugin

@@ -14,6 +14,7 @@ pydantic-settings>=2.6.0
 # Authentication
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0,<5.0.0  # bcrypt 5.x is incompatible with passlib 1.7.4
 
 # File Handling
 python-multipart>=0.0.12
