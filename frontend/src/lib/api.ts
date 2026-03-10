@@ -204,3 +204,7 @@ export interface AuditLogEntry {
 export function getAuditLog(token: string) {
   return apiFetch<AuditLogEntry[]>("/api/v1/uploads/admin/audit-log", { token });
 }
+
+export function deleteUpload(token: string, sessionId: string) {
+  return apiFetch<void>(`/api/v1/uploads/${sessionId}`, { method: "DELETE", token });
+}

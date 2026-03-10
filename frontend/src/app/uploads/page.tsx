@@ -6,7 +6,7 @@ import { History, FileSpreadsheet, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useData } from "@/context/DataContext";
-import { listUploads, getUpload, type UploadSessionOut } from "@/lib/api";
+import { listUploads, getUpload, deleteUpload, type UploadSessionOut } from "@/lib/api";
 import { ParsedData } from "@/types/data";
 import { toast } from "sonner";
 
@@ -32,6 +32,8 @@ export default function UploadsPage() {
   const [sessions, setSessions] = useState<UploadSessionOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
     if (!token) return;
@@ -132,6 +134,27 @@ export default function UploadsPage() {
     }
   };
 
+  const handleDelete = async (session: UploadSessionOut) => {
+    if (!token) return;
+    setDeleting(session.id);
+    setConfirmDelete(null);
+    try {
+      await deleteUpload(token, session.id);
+      toast.success(`"${session.file_name}" deleted`);
+      // If the deleted session was active, clear it
+      if (session.id === sessionId) {
+        setSessionId(null);
+        setData(null);
+        setFileName("");
+      }
+      setSessions((prev) => prev.filter((s) => s.id !== session.id));
+    } catch {
+      toast.error("Failed to delete upload session");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="px-4 sm:px-8 py-8 min-h-screen flex items-center justify-center">
@@ -188,18 +211,48 @@ export default function UploadsPage() {
                       <span>{fmtDate(s.uploaded_at)}</span>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => handleRestore(s)}
-                    disabled={restoring === s.id}
-                    className={`flex-shrink-0 flex items-center gap-2 ${
-                      isActive
-                        ? "bg-purple-600 hover:bg-purple-700 text-white"
-                        : "bg-gray-100 dark:bg-gray-700 hover:bg-purple-50 dark:hover:bg-purple-900/30 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
-                    }`}
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    {restoring === s.id ? "Restoring..." : isActive ? "Reload" : "Restore"}
-                  </Button>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button
+                      onClick={() => handleRestore(s)}
+                      disabled={restoring === s.id || deleting === s.id}
+                      className={`flex items-center gap-2 ${
+                        isActive
+                          ? "bg-purple-600 hover:bg-purple-700 text-white"
+                          : "bg-gray-100 dark:bg-gray-700 hover:bg-purple-50 dark:hover:bg-purple-900/30 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
+                      }`}
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      {restoring === s.id ? "Restoring..." : isActive ? "Reload" : "Restore"}
+                    </Button>
+
+                    {confirmDelete === s.id ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Delete?</span>
+                        <Button
+                          onClick={() => handleDelete(s)}
+                          disabled={deleting === s.id}
+                          className="h-8 px-3 text-xs bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          {deleting === s.id ? "Deleting..." : "Yes"}
+                        </Button>
+                        <Button
+                          onClick={() => setConfirmDelete(null)}
+                          className="h-8 px-3 text-xs bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-100"
+                        >
+                          No
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        onClick={() => setConfirmDelete(s.id)}
+                        disabled={restoring === s.id || deleting === s.id}
+                        title="Delete this upload session"
+                        className="h-9 w-9 p-0 flex items-center justify-center bg-transparent hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 border border-gray-200 dark:border-gray-600 hover:border-red-300 dark:hover:border-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             );

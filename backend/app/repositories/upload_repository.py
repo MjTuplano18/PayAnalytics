@@ -69,6 +69,40 @@ class UploadRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_session_any_user(self, session_id: str) -> UploadSession | None:
+        """Admin: get session regardless of owner."""
+        result = await self.session.execute(
+            select(UploadSession).where(UploadSession.id == session_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def delete_session(self, session_id: str, user_id: str) -> bool:
+        """Delete a session owned by user_id. Returns True if deleted."""
+        session = await self.session.execute(
+            select(UploadSession).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        obj = session.scalar_one_or_none()
+        if obj is None:
+            return False
+        await self.session.delete(obj)
+        await self.session.commit()
+        return True
+
+    async def delete_session_admin(self, session_id: str) -> bool:
+        """Admin: delete any session regardless of owner."""
+        result = await self.session.execute(
+            select(UploadSession).where(UploadSession.id == session_id)
+        )
+        obj = result.scalar_one_or_none()
+        if obj is None:
+            return False
+        await self.session.delete(obj)
+        await self.session.commit()
+        return True
+
     async def get_transactions(
         self,
         session_id: str,

@@ -107,6 +107,25 @@ async def get_dashboard(
     return DashboardSummary(**summary)
 
 
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_upload(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Delete an upload session. Admins can delete any session; users can only delete their own."""
+    repo = UploadRepository(db)
+    if current_user.is_superuser:
+        deleted = await repo.delete_session_admin(session_id)
+    else:
+        deleted = await repo.delete_session(session_id, current_user.id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Upload session not found or you are not authorized to delete it.",
+        )
+
+
 @router.get("/admin/audit-log", response_model=list[AuditLogEntry])
 async def get_audit_log(
     current_user: User = Depends(get_current_user),

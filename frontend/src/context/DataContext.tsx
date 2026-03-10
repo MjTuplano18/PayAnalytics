@@ -5,7 +5,7 @@ import { ParsedData, DataRow } from "@/types/data";
 
 interface DataContextType {
   data: ParsedData | null;
-  setData: (data: ParsedData) => void;
+  setData: (data: ParsedData | null) => void;
   rawData: DataRow[];
   setRawData: (data: DataRow[]) => void;
   fileName: string;

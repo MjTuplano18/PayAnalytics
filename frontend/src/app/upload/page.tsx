@@ -46,10 +46,11 @@ export default function UploadPage() {
           const saved = await saveUpload(token, { file_name: file.name, records });
           setSessionId(saved.id);
           toast.success(`File uploaded & saved! ${saved.total_records} records stored.`);
-        } catch {
+        } catch (backendErr) {
           // Backend save failed — still work in-memory
           setSessionId(null);
-          toast.success("File loaded locally. (Sync to server failed — working offline.)");
+          const msg = backendErr instanceof Error ? backendErr.message : "Unknown error";
+          toast.warning(`File loaded locally — server sync failed: ${msg}. Make sure the backend is running.`);
         }
       } else {
         toast.success("File uploaded successfully!");
