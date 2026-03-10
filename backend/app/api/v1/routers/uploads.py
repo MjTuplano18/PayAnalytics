@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.repositories.upload_repository import UploadRepository
 from app.schemas.upload import (
+    AuditLogEntry,
     DashboardSummary,
     PaginatedTransactions,
     UploadSessionCreate,
@@ -104,3 +105,28 @@ async def get_dashboard(
     if not summary:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
     return DashboardSummary(**summary)
+
+
+@router.get("/admin/audit-log", response_model=list[AuditLogEntry])
+async def get_audit_log(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[AuditLogEntry]:
+    """Admin only: list all upload sessions across all users."""
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only.")
+    repo = UploadRepository(db)
+    sessions = await repo.list_all_sessions()
+    return [
+        AuditLogEntry(
+            id=s.id,
+            file_name=s.file_name,
+            total_records=s.total_records,
+            total_amount=s.total_amount,
+            uploaded_at=s.uploaded_at,
+            user_id=s.user_id,
+            user_email=s.user.email if s.user else "unknown",
+            user_name=s.user.full_name if s.user else "unknown",
+        )
+        for s in sessions
+    ]

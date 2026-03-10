@@ -12,7 +12,7 @@ function fmt(n: number): string {
 }
 
 export default function AccountsPage() {
-  const { data } = useData();
+  const { data, sessionId } = useData();
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const rowsPerPage = 25;
@@ -58,7 +58,9 @@ export default function AccountsPage() {
             No Data Available
           </h2>
           <p className="text-gray-600 dark:text-gray-400">
-            Please upload an Excel file to view account data
+            {sessionId
+              ? "Restoring session data — please wait or go to Upload History to reload."
+              : "Please upload an Excel file to view account data"}
           </p>
         </div>
       </div>

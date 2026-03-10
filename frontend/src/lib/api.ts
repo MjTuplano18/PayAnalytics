@@ -189,3 +189,18 @@ export function getTransactions(
 export function getDashboardSummary(token: string, sessionId: string) {
   return apiFetch<DashboardSummary>(`/api/v1/uploads/${sessionId}/dashboard`, { token });
 }
+
+export interface AuditLogEntry {
+  id: string;
+  file_name: string;
+  total_records: number;
+  total_amount: number;
+  uploaded_at: string;
+  user_id: string;
+  user_email: string;
+  user_name: string;
+}
+
+export function getAuditLog(token: string) {
+  return apiFetch<AuditLogEntry[]>("/api/v1/uploads/admin/audit-log", { token });
+}

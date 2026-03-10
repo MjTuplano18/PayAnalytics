@@ -69,3 +69,16 @@ class DashboardSummary(BaseModel):
     banks: list[BankSummary]
     touchpoints: list[TouchpointSummary]
     session_id: str | None = None
+
+
+class AuditLogEntry(BaseModel):
+    id: str
+    file_name: str
+    total_records: int
+    total_amount: float
+    uploaded_at: datetime
+    user_id: str
+    user_email: str
+    user_name: str
+
+    model_config = {"from_attributes": True}

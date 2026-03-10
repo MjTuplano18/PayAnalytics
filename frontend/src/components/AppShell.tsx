@@ -1,13 +1,71 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { DataProvider } from "@/context/DataContext";
+import { useData } from "@/context/DataContext";
 import { SidebarProvider } from "@/context/SidebarContext";
 import { Sidebar } from "@/components/Sidebar";
 import { MainContent } from "@/components/MainContent";
 import { Toaster } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getUpload } from "@/lib/api";
+import { ParsedData } from "@/types/data";
+
+/** Silently restores session data from backend on page refresh */
+function SessionRestorer() {
+  const { token } = useAuth();
+  const { sessionId, setSessionId, data, setData, setFileName } = useData();
+
+  useEffect(() => {
+    if (!sessionId || !token || data) return; // nothing to do
+
+    getUpload(token, sessionId).then((detail) => {
+      const payments = detail.records.map((r) => ({
+        bank: r.bank,
+        paymentDate: r.payment_date ?? "",
+        paymentAmount: r.payment_amount,
+        account: r.account,
+        touchpoint: r.touchpoint ?? "",
+        environment: r.environment,
+      }));
+
+      const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
+      const tpMap = new Map<string, { count: number; totalAmount: number }>();
+      let totalAmount = 0;
+      const allAccounts = new Set<string>();
+
+      for (const p of payments) {
+        totalAmount += p.paymentAmount;
+        allAccounts.add(p.account);
+        if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
+        const b = bankMap.get(p.bank)!;
+        b.totalAmount += p.paymentAmount; b.paymentCount++; b.accounts.add(p.account);
+        if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
+        const t = tpMap.get(p.touchpoint)!;
+        t.count++; t.totalAmount += p.paymentAmount;
+      }
+
+      const bankAnalytics = Array.from(bankMap.entries())
+        .map(([bank, d]) => ({ bank, accountCount: d.accounts.size, totalAmount: d.totalAmount, debtorSum: 0, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount }))
+        .sort((a, b) => b.totalAmount - a.totalAmount);
+
+      const touchpointAnalytics = Array.from(tpMap.entries())
+        .map(([tp, d]) => ({ touchpoint: tp, count: d.count, totalAmount: d.totalAmount, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0 }))
+        .sort((a, b) => b.count - a.count);
+
+      const parsed: ParsedData = { payments, bankAnalytics, touchpointAnalytics, totalAccounts: allAccounts.size, totalAmount, totalPayments: payments.length, raw: [] };
+      setData(parsed);
+      setFileName(detail.file_name);
+    }).catch(() => {
+      // Session no longer valid — clear the stale id
+      setSessionId(null);
+    });
+  }, [sessionId, token, data]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  return null;
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -73,6 +131,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Authenticated layout
   return (
     <DataProvider>
+      <SessionRestorer />
       <SidebarProvider>
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
           <Sidebar />

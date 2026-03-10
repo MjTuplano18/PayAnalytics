@@ -12,6 +12,7 @@ import {
   Menu,
   Settings,
   LogOut,
+  History,
 } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context/AuthContext";
@@ -22,6 +23,7 @@ const menuItems = [
   { path: "/customers", icon: UserCheck, label: "Accounts" },
   { path: "/reports", icon: BarChart3, label: "Reports" },
   { path: "/upload", icon: Upload, label: "Upload Data" },
+  { path: "/uploads", icon: History, label: "Upload History" },
   { path: "/settings", icon: Settings, label: "Settings" },
 ];
 

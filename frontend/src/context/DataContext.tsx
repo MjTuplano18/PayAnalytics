@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { ParsedData, DataRow } from "@/types/data";
 
 interface DataContextType {
@@ -24,7 +24,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [rawData, setRawData] = useState<DataRow[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>("");
-  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Initialise sessionId from localStorage so it survives page refresh
+  const [sessionId, setSessionIdState] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sessionId") ?? null;
+    }
+    return null;
+  });
+
+  const setSessionId = (id: string | null) => {
+    setSessionIdState(id);
+    if (typeof window !== "undefined") {
+      if (id) {
+        localStorage.setItem("sessionId", id);
+      } else {
+        localStorage.removeItem("sessionId");
+      }
+    }
+  };
 
   return (
     <DataContext.Provider

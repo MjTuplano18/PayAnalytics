@@ -51,6 +51,16 @@ class UploadRepository:
         )
         return list(result.scalars().all())
 
+    async def list_all_sessions(self, limit: int = 500) -> list[UploadSession]:
+        """Admin: list ALL upload sessions across all users, with user relationship."""
+        result = await self.session.execute(
+            select(UploadSession)
+            .options(selectinload(UploadSession.user))
+            .order_by(UploadSession.uploaded_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def get_session(self, session_id: str, user_id: str) -> UploadSession | None:
         result = await self.session.execute(
             select(UploadSession)
