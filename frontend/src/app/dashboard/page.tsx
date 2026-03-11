@@ -51,14 +51,19 @@ export default function DashboardPage() {
         totalAmount: apiSummary.total_amount,
         totalAccounts: apiSummary.total_accounts,
         totalPayments: apiSummary.total_payments,
-        bankAnalytics: apiSummary.banks.map((b) => ({
-          bank: b.bank,
-          accountCount: b.account_count,
-          totalAmount: b.total_amount,
-          debtorSum: 0,
-          percentage: b.percentage,
-          paymentCount: b.payment_count,
-        })),
+        bankAnalytics: apiSummary.banks.map((b) => {
+          // compute debtorSum from in-memory data for this bank
+          const bankPayments = (data?.payments ?? []).filter((p) => p.bank === b.bank);
+          const debtorSum = bankPayments.reduce((s, p) => s + (Number(p.account) || 0), 0);
+          return {
+            bank: b.bank,
+            accountCount: b.account_count,
+            totalAmount: b.total_amount,
+            debtorSum,
+            percentage: b.percentage,
+            paymentCount: b.payment_count,
+          };
+        }),
         touchpointAnalytics: apiSummary.touchpoints.map((t) => ({
           touchpoint: t.touchpoint,
           count: t.count,
@@ -116,7 +121,7 @@ export default function DashboardPage() {
     { label: "Total Payment Amount", value: `₱${fmt(fa.totalAmount)}`, icon: DollarSign, iconBg: "bg-teal-500" },
     { label: "Count of Accounts", value: fmt(fa.totalAccounts), icon: Users, iconBg: "bg-teal-600" },
     { label: "Total Transactions", value: fmt(fa.totalPayments), icon: FileText, iconBg: "bg-teal-500" },
-    { label: "Banks / Portfolios", value: fmt(fa.bankAnalytics.length), icon: Landmark, iconBg: "bg-orange-500" },
+    { label: "Banks / Portfolios", value: fmt(fa.bankAnalytics.length), icon: Landmark, iconBg: "bg-teal-700" },
   ];
 
   return (
@@ -305,9 +310,7 @@ export default function DashboardPage() {
                 ₱{fmt(fa.totalAmount)}
               </td>
               <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                {fmt(
-                  fa.bankAnalytics.reduce((s, b) => s + b.debtorSum, 0)
-                )}
+                {fmt(fa.bankAnalytics.reduce((s, b) => s + b.debtorSum, 0))}
               </td>
               <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
                 100.0%
