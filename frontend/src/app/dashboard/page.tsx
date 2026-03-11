@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { DynamicChart } from "@/components/DynamicChart";
-import { DateFilter, DateRange, filterByDateRange } from "@/components/DateFilter";
+import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
 import { type DashboardSummary } from "@/lib/api";
 import { useDashboard } from "@/lib/queries";
 
@@ -19,12 +19,13 @@ export default function DashboardPage() {
   const { data, sessionId } = useData();
   const { token } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const { data: apiSummary, isLoading: apiLoading } = useDashboard(token, sessionId);
 
   const payments = useMemo(() => {
     if (!data) return [];
-    return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate);
-  }, [data, dateRange]);
+    return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
+  }, [data, dateRange, customRange]);
 
   // Monthly trend from in-memory data (API doesn't aggregate by month yet)
   const monthlyTrend = useMemo(() => {
@@ -122,7 +123,11 @@ export default function DashboardPage() {
       {/* Date Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
-        <DateFilter value={dateRange} onChange={setDateRange} />
+        <DateFilter
+          value={dateRange}
+          onChange={(r, c) => { setDateRange(r); setCustomRange(c); }}
+          customRange={customRange}
+        />
       </div>
 
       {/* Metric Cards */}

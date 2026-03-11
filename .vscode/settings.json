@@ -3,5 +3,5 @@
   "python.analysis.extraPaths": [
     "${workspaceFolder}/backend"
   ],
-  "tasksync.autopilot": true
+  "tasksync.autopilot": false
 }

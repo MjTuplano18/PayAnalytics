@@ -5,7 +5,7 @@ import { Download, Search } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { DateFilter, DateRange, filterByDateRange } from "@/components/DateFilter";
+import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
 import { getTransactions, getDashboardSummary, type PaymentRecordOut } from "@/lib/api";
 import { useDashboard, useTransactions } from "@/lib/queries";
 
@@ -21,6 +21,7 @@ export default function TransactionsPage() {
   const [tpFilter, setTpFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const rowsPerPage = 25;
 
   // Backend-mode state using TanStack Query (cached, no redundant Neon fetches)
@@ -61,7 +62,7 @@ export default function TransactionsPage() {
 
   const inMemoryFiltered = useMemo(() => {
     if (sessionId || !data) return [];
-    const dateFiltered = filterByDateRange(data.payments, dateRange, (p) => p.paymentDate);
+    const dateFiltered = filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
     return dateFiltered.filter((p) => {
       if (bankFilter !== "all" && p.bank !== bankFilter) return false;
       if (tpFilter !== "all" && p.touchpoint !== tpFilter) return false;
@@ -75,7 +76,7 @@ export default function TransactionsPage() {
       }
       return true;
     });
-  }, [data, sessionId, bankFilter, tpFilter, searchQuery, dateRange]);
+  }, [data, sessionId, bankFilter, tpFilter, searchQuery, dateRange, customRange]);
 
   const inMemoryFilteredTotal = useMemo(
     () => inMemoryFiltered.reduce((s, p) => s + p.paymentAmount, 0),
@@ -173,7 +174,11 @@ export default function TransactionsPage() {
         {/* Date Filter — only shown for in-memory mode */}
         {!usingApi && (
           <div className="mb-4">
-            <DateFilter value={dateRange} onChange={(r) => { setDateRange(r); resetPage(); }} />
+            <DateFilter
+              value={dateRange}
+              onChange={(r, c) => { setDateRange(r); setCustomRange(c); resetPage(); }}
+              customRange={customRange}
+            />
           </div>
         )}
 

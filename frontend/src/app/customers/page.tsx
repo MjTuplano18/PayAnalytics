@@ -5,7 +5,7 @@ import { Users, DollarSign, FileText } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { Card } from "@/components/ui/card";
 import { DynamicChart } from "@/components/DynamicChart";
-import { DateFilter, DateRange, filterByDateRange } from "@/components/DateFilter";
+import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -15,13 +15,14 @@ export default function AccountsPage() {
   const { data, sessionId } = useData();
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const rowsPerPage = 25;
 
   // Filter payments by date range first
   const payments = useMemo(() => {
     if (!data) return [];
-    return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate);
-  }, [data, dateRange]);
+    return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
+  }, [data, dateRange, customRange]);
 
   // Account-level analytics (aggregate by debtor_id/account)
   const accountData = useMemo(() => {
@@ -110,7 +111,11 @@ export default function AccountsPage() {
               Debtor account analytics
             </p>
           </div>
-          <DateFilter value={dateRange} onChange={(r) => { setDateRange(r); setCurrentPage(1); }} />
+          <DateFilter
+            value={dateRange}
+            onChange={(r, c) => { setDateRange(r); setCustomRange(c); setCurrentPage(1); }}
+            customRange={customRange}
+          />
         </div>
       </div>
 
