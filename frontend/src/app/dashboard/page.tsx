@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { DollarSign, Users, FileText, Landmark } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { DynamicChart } from "@/components/DynamicChart";
@@ -44,7 +45,7 @@ export default function DashboardPage() {
   // When a date filter is active, always compute in-memory from filtered payments
   const isFiltered = dateRange !== "all";
 
-  const fa = useMemo(() => {
+  const rawFa = useMemo(() => {
     if (apiSummary && !isFiltered) {
       return {
         totalAmount: apiSummary.total_amount,
@@ -99,20 +100,17 @@ export default function DashboardPage() {
 
     return { bankAnalytics, touchpointAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: payments.length };
   }, [apiSummary, payments, isFiltered]);
-  if (apiLoading) return (
-    <div className="px-4 sm:px-8 py-8 min-h-screen flex items-center justify-center">
-      <p className="text-gray-500 dark:text-gray-400">Loading dashboard from server...</p>
-    </div>
-  );
 
-  if (!fa) return (
-    <div className="px-4 sm:px-8 py-8 min-h-screen">
-      <div className="p-12 rounded-lg text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-        <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">No Data Available</h2>
-        <p className="text-gray-600 dark:text-gray-400">Please upload an Excel file to view analytics</p>
-      </div>
-    </div>
-  );
+  // Fallback empty analytics object so layout always renders
+  const fa = rawFa ?? {
+    totalAmount: 0,
+    totalAccounts: 0,
+    totalPayments: 0,
+    bankAnalytics: [],
+    touchpointAnalytics: [],
+  };
+
+  const noData = !rawFa && !apiLoading;
 
   const metricCards = [
     { label: "Total Payment Amount", value: `₱${fmt(fa.totalAmount)}`, icon: DollarSign, iconBg: "bg-teal-500" },
@@ -135,28 +133,45 @@ export default function DashboardPage() {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
-        {metricCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Card
-              key={card.label}
-              className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {card.label}
-                </span>
-                <div className={`p-2 ${card.iconBg} rounded-lg`}>
-                  <Icon className="w-5 h-5 text-white" />
+        {apiLoading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-9 w-9 rounded-lg" />
                 </div>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {card.value}
-              </div>
-            </Card>
-          );
-        })}
+                <Skeleton className="h-8 w-24 mt-2" />
+              </Card>
+            ))
+          : metricCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <Card
+                  key={card.label}
+                  className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {card.label}
+                    </span>
+                    <div className={`p-2 ${card.iconBg} rounded-lg`}>
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {card.value}
+                  </div>
+                </Card>
+              );
+            })}
       </div>
+
+      {/* No data notice when a date filter yields no results */}
+      {noData && (
+        <div className="mb-6 p-4 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20 text-sm text-teal-700 dark:text-teal-300 text-center">
+          No records found for the selected time range. Upload data or try a different filter.
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
@@ -164,6 +179,9 @@ export default function DashboardPage() {
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             Payments per Bank
           </h3>
+          {apiLoading ? (
+            <Skeleton className="h-[350px] w-full rounded-xl" />
+          ) : (
           <DynamicChart
             data={fa.bankAnalytics.map((a) => ({
               bank: a.bank,
@@ -174,12 +192,16 @@ export default function DashboardPage() {
             xAxisKey="bank"
             height={350}
           />
+          )}
         </div>
 
         <div>
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             Amount Distribution by Bank
           </h3>
+          {apiLoading ? (
+            <Skeleton className="h-[350px] w-full rounded-xl" />
+          ) : (
           <DynamicChart
             data={fa.bankAnalytics.slice(0, 10).map((a) => ({
               bank: a.bank,
@@ -190,6 +212,7 @@ export default function DashboardPage() {
             xAxisKey="bank"
             height={350}
           />
+          )}
         </div>
       </div>
 
@@ -198,6 +221,9 @@ export default function DashboardPage() {
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             Payment Trend Over Time
           </h3>
+          {apiLoading ? (
+            <Skeleton className="h-[300px] w-full rounded-xl" />
+          ) : (
           <DynamicChart
             data={monthlyTrend}
             type="area"
@@ -205,12 +231,16 @@ export default function DashboardPage() {
             xAxisKey="month"
             height={300}
           />
+          )}
         </div>
 
         <div>
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             By Touchpoint
           </h3>
+          {apiLoading ? (
+            <Skeleton className="h-[300px] w-full rounded-xl" />
+          ) : (
           <DynamicChart
             data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({
               touchpoint: t.touchpoint,
@@ -221,10 +251,18 @@ export default function DashboardPage() {
             xAxisKey="touchpoint"
             height={300}
           />
+          )}
         </div>
       </div>
-
       {/* Bank Analytics Table */}
+      {apiLoading ? (
+        <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-8 p-6">
+          <Skeleton className="h-6 w-40 mb-4" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />
+          ))}
+        </div>
+      ) : (
       <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -306,6 +344,7 @@ export default function DashboardPage() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }

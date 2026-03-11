@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, ChevronDown, X } from "lucide-react";
 import { type DateRange as DayPickerRange } from "react-day-picker";
 import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
@@ -32,6 +32,13 @@ export function DateFilter({ value, onChange, customRange }: DateFilterProps) {
   const [selected, setSelected] = useState<DayPickerRange | undefined>(
     customRange ? { from: customRange.from, to: customRange.to } : undefined
   );
+
+  // When calendar opens, restore selection from current customRange so user sees their prior selection
+  useEffect(() => {
+    if (calendarOpen) {
+      setSelected(customRange ? { from: customRange.from, to: customRange.to } : undefined);
+    }
+  }, [calendarOpen]);
 
   const handleDayPickerSelect = (range: DayPickerRange | undefined) => {
     setSelected(range);

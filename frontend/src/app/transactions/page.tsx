@@ -5,6 +5,7 @@ import { Download, Search } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
 import { getTransactions, getDashboardSummary, type PaymentRecordOut } from "@/lib/api";
 import { useDashboard, useTransactions } from "@/lib/queries";
@@ -227,7 +228,11 @@ export default function TransactionsPage() {
         {/* Table */}
         <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           {apiLoading ? (
-            <div className="p-12 text-center text-gray-500 dark:text-gray-400">Loading transactions...</div>
+            <div className="p-4">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full mb-2 rounded-md" />
+              ))}
+            </div>
           ) : (
           <table className="w-full min-w-[700px]">
             <thead className="bg-gray-50 dark:bg-gray-900">
