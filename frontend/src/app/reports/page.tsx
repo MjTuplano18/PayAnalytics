@@ -144,7 +144,7 @@ export default function ReportsPage() {
             <Button
               onClick={() => handleExport("excel")}
               disabled={exporting}
-              className="flex-1 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700 hover:shadow-md transition-all duration-300 disabled:opacity-50"
+              className="flex-1 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/40 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-700 hover:shadow-md transition-all duration-300 disabled:opacity-50"
             >
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               {exporting ? "Exporting..." : "Export to Excel"}
@@ -152,7 +152,7 @@ export default function ReportsPage() {
             <Button
               onClick={() => handleExport("csv")}
               disabled={exporting}
-              className="flex-1 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700 hover:shadow-md transition-all duration-300 disabled:opacity-50"
+              className="flex-1 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/40 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-700 hover:shadow-md transition-all duration-300 disabled:opacity-50"
             >
               <Download className="w-4 h-4 mr-2" />
               {exporting ? "Exporting..." : "Export to CSV"}
@@ -164,7 +164,7 @@ export default function ReportsPage() {
         {data && data.bankAnalytics.length > 0 && (
           <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-purple-500" />
+              <BarChart3 className="w-5 h-5 text-teal-500" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Bank Summary</h3>
             </div>
             <table className="w-full min-w-[500px]">
@@ -178,7 +178,7 @@ export default function ReportsPage() {
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {data.bankAnalytics.map((b) => (
-                  <tr key={b.bank} className="hover:bg-purple-50 dark:hover:bg-gray-700/60 transition-colors">
+                  <tr key={b.bank} className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{b.bank}</td>
                     <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.paymentCount)}</td>
                     <td className="px-4 py-3 text-sm text-right text-green-600 dark:text-green-400 font-medium">₱{fmt(b.totalAmount)}</td>

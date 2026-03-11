@@ -123,7 +123,7 @@ export default function UploadPage() {
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Data Type
           </h3>
-          <select className="w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500">
+          <select className="w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500">
             <option>Transaction</option>
           </select>
           <Button className="mt-4 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-950 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700">
@@ -134,7 +134,7 @@ export default function UploadPage() {
 
         {/* Upload Area */}
         <Card
-          className="p-8 sm:p-12 border-2 border-dashed bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-center cursor-pointer hover:border-purple-500 hover:shadow-lg transition-all duration-300 animate-fade-in-up"
+          className="p-8 sm:p-12 border-2 border-dashed bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-center cursor-pointer hover:border-teal-500 hover:shadow-lg transition-all duration-300 animate-fade-in-up"
           style={{ animationDelay: '0.15s' }}
           onDrop={handleFileDrop}
           onDragOver={(e) => e.preventDefault()}
@@ -148,7 +148,7 @@ export default function UploadPage() {
             Supports CSV, XLSX, and JSON files
           </p>
           <Button
-            className="bg-purple-600 hover:bg-purple-700 text-white"
+            className="bg-teal-600 hover:bg-teal-700 text-white"
             disabled={uploading}
           >
             {uploading ? "Uploading..." : "Browse Files"}
@@ -165,7 +165,7 @@ export default function UploadPage() {
         {/* Import Instructions */}
         <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mt-6 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
           <div className="flex items-start gap-2 mb-4">
-            <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
             <div>
               <h4 className="text-gray-900 dark:text-white font-semibold mb-2">
                 Import Instructions

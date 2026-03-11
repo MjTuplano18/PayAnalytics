@@ -211,7 +211,7 @@ export function TopBar() {
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               onFocus={() => searchQuery && setShowResults(true)}
-              className="w-full rounded-lg border bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-700 py-2 pl-10 pr-4 text-sm text-gray-900 dark:text-gray-200 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full rounded-lg border bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-700 py-2 pl-10 pr-4 text-sm text-gray-900 dark:text-gray-200 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
             {searchQuery && (
               <button

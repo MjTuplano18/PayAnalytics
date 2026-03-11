@@ -27,8 +27,8 @@ export function DateFilter({ value, onChange }: DateFilterProps) {
           onClick={() => onChange(opt.value)}
           className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all duration-200 ${
             value === opt.value
-              ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-              : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 hover:bg-purple-50 hover:border-purple-400 hover:text-purple-700 dark:hover:bg-purple-900/40 dark:hover:border-purple-500 dark:hover:text-purple-200"
+              ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+              : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200"
           }`}
         >
           {opt.label}

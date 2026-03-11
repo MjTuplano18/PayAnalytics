@@ -163,7 +163,7 @@ export default function TransactionsPage() {
           </div>
           <Button
             onClick={handleExport}
-            className="bg-purple-600 hover:bg-purple-700 text-white self-start sm:self-auto"
+            className="bg-teal-600 hover:bg-teal-700 text-white self-start sm:self-auto"
           >
             <Download className="w-4 h-4 mr-2" />
             Export CSV
@@ -187,14 +187,14 @@ export default function TransactionsPage() {
                 placeholder="Search bank, account, touchpoint..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); resetPage(); }}
-                className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
 
             <select
               value={bankFilter}
               onChange={(e) => { setBankFilter(e.target.value); resetPage(); }}
-              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
               <option value="all">All Banks</option>
               {displayBanks.map((b) => (
@@ -207,7 +207,7 @@ export default function TransactionsPage() {
             <select
               value={tpFilter}
               onChange={(e) => { setTpFilter(e.target.value); resetPage(); }}
-              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
               <option value="all">All Touchpoints</option>
               {displayTouchpoints.map((t) => (
@@ -248,7 +248,7 @@ export default function TransactionsPage() {
               {displayRows.map((p, i) => (
                 <tr
                   key={`${currentPage}-${i}`}
-                  className="hover:bg-purple-50 dark:hover:bg-gray-700/60 transition-colors duration-200"
+                  className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200"
                 >
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
                     {p.bank}
@@ -263,7 +263,7 @@ export default function TransactionsPage() {
                     {p.account}
                   </td>
                   <td className="px-4 py-3 text-sm whitespace-nowrap">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
                       {p.touchpoint}
                     </span>
                   </td>
@@ -281,14 +281,14 @@ export default function TransactionsPage() {
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-purple-50 hover:border-purple-400 hover:text-purple-700 dark:hover:bg-purple-900/40 dark:hover:border-purple-500 dark:hover:text-purple-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 First
               </button>
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-purple-50 hover:border-purple-400 hover:text-purple-700 dark:hover:bg-purple-900/40 dark:hover:border-purple-500 dark:hover:text-purple-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Prev
               </button>
@@ -306,8 +306,8 @@ export default function TransactionsPage() {
                     onClick={() => setCurrentPage(pg)}
                     className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${
                       pg === currentPage
-                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                        : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-purple-50 hover:border-purple-400 hover:text-purple-700 dark:hover:bg-purple-900/40 dark:hover:border-purple-500 dark:hover:text-purple-200"
+                        ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+                        : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200"
                     }`}
                   >
                     {pg}
@@ -318,14 +318,14 @@ export default function TransactionsPage() {
               <button
                 onClick={() => setCurrentPage((p) => Math.min(displayTotalPages, p + 1))}
                 disabled={currentPage === displayTotalPages}
-                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-purple-50 hover:border-purple-400 hover:text-purple-700 dark:hover:bg-purple-900/40 dark:hover:border-purple-500 dark:hover:text-purple-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Next
               </button>
               <button
                 onClick={() => setCurrentPage(displayTotalPages)}
                 disabled={currentPage === displayTotalPages}
-                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-purple-50 hover:border-purple-400 hover:text-purple-700 dark:hover:bg-purple-900/40 dark:hover:border-purple-500 dark:hover:text-purple-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Last
               </button>

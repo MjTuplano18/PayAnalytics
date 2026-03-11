@@ -45,7 +45,7 @@ export function DataFlowchart({
         sourcePosition: Position.Bottom,
         style: {
           ...nodeBase,
-          background: "#8b5cf6",
+          background: "#14b8a6",
           color: "#ffffff",
           border: "none",
           fontWeight: 600,
@@ -77,7 +77,7 @@ export function DataFlowchart({
             source: `month-${index - 1}`,
             target: `month-${index}`,
             animated: true,
-            style: { stroke: "#8b5cf6" },
+            style: { stroke: "#14b8a6" },
           });
         } else {
           edges.push({
@@ -85,7 +85,7 @@ export function DataFlowchart({
             source: "start",
             target: "month-0",
             animated: true,
-            style: { stroke: "#8b5cf6" },
+            style: { stroke: "#14b8a6" },
           });
         }
       });

@@ -92,7 +92,7 @@ function ChangePasswordSection({ token }: { token: string | null }) {
   return (
     <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
       <div className="flex items-center gap-2 mb-4">
-        <Lock className="h-5 w-5 text-purple-400" />
+        <Lock className="h-5 w-5 text-teal-400" />
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           Change Password
         </h2>
@@ -155,7 +155,7 @@ function ChangePasswordSection({ token }: { token: string | null }) {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-md bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="rounded-md bg-gradient-to-r from-teal-500 to-cyan-400 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {isSubmitting ? "Updating…" : "Update Password"}
         </button>
@@ -229,14 +229,14 @@ function UserManagementSection({
     <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-purple-400" />
+          <Shield className="h-5 w-5 text-teal-400" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             User Management
           </h2>
         </div>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="flex items-center gap-1.5 rounded-md bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="flex items-center gap-1.5 rounded-md bg-gradient-to-r from-teal-500 to-cyan-400 px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
           <Plus className="h-4 w-4" />
           Add User
@@ -290,7 +290,7 @@ function UserManagementSection({
             <button
               type="submit"
               disabled={isCreating}
-              className="rounded-md bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="rounded-md bg-gradient-to-r from-teal-500 to-cyan-400 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {isCreating ? "Creating…" : "Create Account"}
             </button>
@@ -337,13 +337,13 @@ function UserManagementSection({
               >
                 <td className="py-3">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-xs font-semibold text-white">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-xs font-semibold text-white">
                       {u.full_name.charAt(0).toUpperCase()}
                     </div>
                     <span className="text-gray-900 dark:text-gray-200">
                       {u.full_name}
                       {u.id === currentUserId && (
-                        <span className="ml-1.5 text-xs text-purple-400">(you)</span>
+                        <span className="ml-1.5 text-xs text-teal-400">(you)</span>
                       )}
                     </span>
                   </div>
@@ -401,7 +401,7 @@ function AuditLogSection({ token }: { token: string | null }) {
   return (
     <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
       <div className="flex items-center gap-2 mb-4">
-        <ClipboardList className="h-5 w-5 text-purple-400" />
+        <ClipboardList className="h-5 w-5 text-teal-400" />
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Audit Log</h2>
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
@@ -430,7 +430,7 @@ function AuditLogSection({ token }: { token: string | null }) {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {entries.map((e) => (
-                <tr key={e.id} className="hover:bg-purple-50 dark:hover:bg-gray-700/50 transition-colors">
+                <tr key={e.id} className="hover:bg-teal-50 dark:hover:bg-gray-700/50 transition-colors">
                   <td className="py-2.5">
                     <div className="font-medium text-gray-900 dark:text-white">{e.user_name}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">{e.user_email}</div>

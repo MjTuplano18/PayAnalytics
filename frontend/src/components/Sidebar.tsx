@@ -53,7 +53,7 @@ export function Sidebar() {
         {/* Logo + Toggle button */}
         <div className="flex items-center justify-between p-6">
           {!isCollapsed && (
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent">
               PayAnalytics
             </h1>
           )}
@@ -82,7 +82,7 @@ export function Sidebar() {
                   isCollapsed ? "justify-center px-2" : ""
                 } ${
                   active
-                    ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+                    ? "bg-teal-600 text-white shadow-lg shadow-teal-600/30"
                     : "text-gray-400 hover:bg-gray-800 hover:text-white hover:translate-x-1"
                 }`}
               >
@@ -99,7 +99,7 @@ export function Sidebar() {
         <div className="border-t border-gray-800 p-4">
           {user && !isCollapsed && (
             <div className="mb-3 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-sm font-semibold text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-sm font-semibold text-white">
                 {user.full_name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -114,7 +114,7 @@ export function Sidebar() {
           )}
           {user && isCollapsed && (
             <div className="mb-3 flex justify-center">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-sm font-semibold text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-sm font-semibold text-white">
                 {user.full_name.charAt(0).toUpperCase()}
               </div>
             </div>

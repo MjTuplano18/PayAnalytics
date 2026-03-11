@@ -166,7 +166,7 @@ export default function UploadsPage() {
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
       <div className="mb-6 flex items-center gap-3">
-        <History className="w-7 h-7 text-purple-500" />
+        <History className="w-7 h-7 text-teal-500" />
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Upload History</h1>
           <p className="text-gray-600 dark:text-gray-400">Restore a previous upload session</p>
@@ -188,8 +188,8 @@ export default function UploadsPage() {
                 key={s.id}
                 className={`rounded-lg border p-5 bg-white dark:bg-gray-800 transition-all duration-200 ${
                   isActive
-                    ? "border-purple-500 ring-1 ring-purple-400/40 shadow-purple-100 dark:shadow-none"
-                    : "border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600"
+                    ? "border-teal-500 ring-1 ring-teal-400/40 shadow-teal-100 dark:shadow-none"
+                    : "border-gray-200 dark:border-gray-700 hover:border-teal-300 dark:hover:border-teal-600"
                 }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -200,7 +200,7 @@ export default function UploadsPage() {
                         {s.file_name}
                       </span>
                       {isActive && (
-                        <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 rounded-full">
+                        <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 rounded-full">
                           Active
                         </span>
                       )}
@@ -217,8 +217,8 @@ export default function UploadsPage() {
                       disabled={restoring === s.id || deleting === s.id}
                       className={`flex items-center gap-2 ${
                         isActive
-                          ? "bg-purple-600 hover:bg-purple-700 text-white"
-                          : "bg-gray-100 dark:bg-gray-700 hover:bg-purple-50 dark:hover:bg-purple-900/30 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
+                          ? "bg-teal-600 hover:bg-teal-700 text-white"
+                          : "bg-gray-100 dark:bg-gray-700 hover:bg-teal-50 dark:hover:bg-teal-900/30 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
                       }`}
                     >
                       <RotateCcw className="w-4 h-4" />

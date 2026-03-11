@@ -111,9 +111,9 @@ export default function DashboardPage() {
   );
 
   const metricCards = [
-    { label: "Total Payment Amount", value: `₱${fmt(fa.totalAmount)}`, icon: DollarSign, iconBg: "bg-green-500" },
-    { label: "Count of Accounts", value: fmt(fa.totalAccounts), icon: Users, iconBg: "bg-blue-500" },
-    { label: "Total Transactions", value: fmt(fa.totalPayments), icon: FileText, iconBg: "bg-purple-500" },
+    { label: "Total Payment Amount", value: `₱${fmt(fa.totalAmount)}`, icon: DollarSign, iconBg: "bg-teal-500" },
+    { label: "Count of Accounts", value: fmt(fa.totalAccounts), icon: Users, iconBg: "bg-teal-600" },
+    { label: "Total Transactions", value: fmt(fa.totalPayments), icon: FileText, iconBg: "bg-teal-500" },
     { label: "Banks / Portfolios", value: fmt(fa.bankAnalytics.length), icon: Landmark, iconBg: "bg-orange-500" },
   ];
 
@@ -273,7 +273,7 @@ export default function DashboardPage() {
             {fa.bankAnalytics.map((b) => (
               <tr
                 key={b.bank}
-                className="hover:bg-purple-50 dark:hover:bg-gray-700/60 transition-colors duration-200"
+                className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200"
               >
                 <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
                   {b.bank}

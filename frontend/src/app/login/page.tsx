@@ -37,14 +37,14 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-950 px-4">
       {/* Background decoration */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-purple-500/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-pink-500/10 blur-3xl" />
+        <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-teal-500/10 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-teal-400/10 blur-3xl" />
       </div>
 
       <Card className="relative z-10 w-full max-w-md border-gray-800 bg-gray-900 p-8 shadow-2xl">
         {/* Brand */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent">
             PayAnalytics
           </h1>
           <p className="mt-2 text-sm text-gray-400">
@@ -75,7 +75,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="border-gray-700 bg-gray-800 pl-10 text-gray-100 placeholder:text-gray-500 focus-visible:border-purple-500 focus-visible:ring-purple-500/30"
+                className="border-gray-700 bg-gray-800 pl-10 text-gray-100 placeholder:text-gray-500 focus-visible:border-teal-500 focus-visible:ring-teal-500/30"
               />
             </div>
           </div>
@@ -95,7 +95,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="border-gray-700 bg-gray-800 pl-10 pr-10 text-gray-100 placeholder:text-gray-500 focus-visible:border-purple-500 focus-visible:ring-purple-500/30"
+                className="border-gray-700 bg-gray-800 pl-10 pr-10 text-gray-100 placeholder:text-gray-500 focus-visible:border-teal-500 focus-visible:ring-teal-500/30"
               />
               <button
                 type="button"
@@ -116,7 +116,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-md bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="w-full rounded-md bg-gradient-to-r from-teal-500 to-cyan-400 px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {isSubmitting ? "Signing in…" : "Sign In"}
           </button>
