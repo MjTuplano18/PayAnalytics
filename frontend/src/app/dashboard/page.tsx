@@ -40,9 +40,12 @@ export default function DashboardPage() {
       .map(([month, amount]) => ({ month, amount }));
   }, [payments]);
 
-  // Use backend summary if available, otherwise compute in-memory
+  // Use backend summary only when showing all data (no date filter active)
+  // When a date filter is active, always compute in-memory from filtered payments
+  const isFiltered = dateRange !== "all";
+
   const fa = useMemo(() => {
-    if (apiSummary) {
+    if (apiSummary && !isFiltered) {
       return {
         totalAmount: apiSummary.total_amount,
         totalAccounts: apiSummary.total_accounts,
@@ -95,7 +98,7 @@ export default function DashboardPage() {
       .sort((a, b) => b.count - a.count);
 
     return { bankAnalytics, touchpointAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: payments.length };
-  }, [apiSummary, payments]);
+  }, [apiSummary, payments, isFiltered]);
   if (apiLoading) return (
     <div className="px-4 sm:px-8 py-8 min-h-screen flex items-center justify-center">
       <p className="text-gray-500 dark:text-gray-400">Loading dashboard from server...</p>
