@@ -80,5 +80,7 @@ class AuditLogEntry(BaseModel):
     user_id: str
     user_email: str
     user_name: str
+    user_email: str
+    user_name: str
 
     model_config = {"from_attributes": True}

@@ -67,7 +67,7 @@ export default function ReportsPage() {
 
       const fileName = `payanalytics_report_${new Date().toISOString().split("T")[0]}`;
       if (format === "excel") {
-        exportToExcel(exportData, fileName);
+        await exportToExcel(exportData, fileName);
         toast.success(`Exported ${fmt(exportData.length)} records to Excel`);
       } else {
         exportToCSV(exportData, fileName);

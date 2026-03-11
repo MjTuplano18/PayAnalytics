@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Download, Search } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { DateFilter, DateRange, filterByDateRange } from "@/components/DateFilter";
 import { getTransactions, getDashboardSummary, type PaymentRecordOut } from "@/lib/api";
+import { useDashboard, useTransactions } from "@/lib/queries";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -22,56 +23,30 @@ export default function TransactionsPage() {
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const rowsPerPage = 25;
 
-  // Backend-mode state
-  const [apiRows, setApiRows] = useState<PaymentRecordOut[] | null>(null);
-  const [apiTotal, setApiTotal] = useState(0);
-  const [apiTotalAmount, setApiTotalAmount] = useState(0);
-  const [apiBanks, setApiBanks] = useState<string[]>([]);
-  const [apiTouchpoints, setApiTouchpoints] = useState<string[]>([]);
-  const [apiLoading, setApiLoading] = useState(false);
+  // Backend-mode state using TanStack Query (cached, no redundant Neon fetches)
+  const { data: dashSummary } = useDashboard(token, sessionId);
+  const apiFilters = {
+    bank: bankFilter !== "all" ? bankFilter : undefined,
+    touchpoint: tpFilter !== "all" ? tpFilter : undefined,
+    search: searchQuery || undefined,
+    page: currentPage,
+    page_size: rowsPerPage,
+  };
+  const { data: txPage, isFetching: apiLoading } = useTransactions(token, sessionId, apiFilters);
 
-  // Initialize search query from global context
+  const apiRows = txPage?.items ?? null;
+  const apiTotal = txPage?.total ?? 0;
+  const apiTotalAmount = dashSummary?.total_amount ?? 0;
+  const apiBanks = dashSummary?.banks.map((b) => b.bank) ?? [];
+  const apiTouchpoints = dashSummary?.touchpoints.map((t) => t.touchpoint) ?? [];
+
+  // Initialize search query from global context (e.g. nav bar search)
   useEffect(() => {
     if (globalSearchQuery) {
       setSearchQuery(globalSearchQuery);
       setGlobalSearchQuery("");
     }
   }, [globalSearchQuery, setGlobalSearchQuery]);
-
-  // Fetch filter options from dashboard summary (banks + touchpoints)
-  useEffect(() => {
-    if (!sessionId || !token) return;
-    getDashboardSummary(token, sessionId).then((summary) => {
-      setApiBanks(summary.banks.map((b) => b.bank));
-      setApiTouchpoints(summary.touchpoints.map((t) => t.touchpoint));
-      setApiTotalAmount(summary.total_amount);
-    }).catch(() => {});
-  }, [sessionId, token]);
-
-  // Fetch transactions from backend when sessionId is available
-  const fetchApiTransactions = useCallback(async () => {
-    if (!sessionId || !token) return;
-    setApiLoading(true);
-    try {
-      const result = await getTransactions(token, sessionId, {
-        bank: bankFilter !== "all" ? bankFilter : undefined,
-        touchpoint: tpFilter !== "all" ? tpFilter : undefined,
-        search: searchQuery || undefined,
-        page: currentPage,
-        page_size: rowsPerPage,
-      });
-      setApiRows(result.items);
-      setApiTotal(result.total);
-    } catch {
-      setApiRows(null);
-    } finally {
-      setApiLoading(false);
-    }
-  }, [sessionId, token, bankFilter, tpFilter, searchQuery, currentPage]);
-
-  useEffect(() => {
-    fetchApiTransactions();
-  }, [fetchApiTransactions]);
 
   // In-memory fallback (used when sessionId is null)
   const inMemoryBanks = useMemo(() => {

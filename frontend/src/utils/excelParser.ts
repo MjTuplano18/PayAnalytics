@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import {
   ParsedData,
   DataRow,
@@ -33,54 +33,89 @@ function findColumn(
   });
 }
 
-/** Convert Excel serial date number to a readable date string */
+/** Convert Excel date values to a readable date string */
 function formatDate(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString().split("T")[0];
+  }
   if (typeof value === "number" && value > 30000 && value < 100000) {
-    // Excel serial date
+    // Excel serial date fallback
     const date = new Date((value - 25569) * 86400 * 1000);
     return date.toISOString().split("T")[0];
   }
   return String(value || "");
 }
 
-export function parseExcelFile(file: File): Promise<ParsedData> {
+/** Extract a plain value from an ExcelJS cell value */
+function extractCellValue(
+  cellValue: ExcelJS.CellValue
+): string | number | Date {
+  if (cellValue === null || cellValue === undefined) return "";
+  if (
+    typeof cellValue === "string" ||
+    typeof cellValue === "number" ||
+    cellValue instanceof Date
+  ) {
+    return cellValue;
+  }
+  if (typeof cellValue === "boolean") return cellValue ? "TRUE" : "FALSE";
+  // Formula result
+  if (typeof cellValue === "object" && "result" in cellValue) {
+    const r = (cellValue as ExcelJS.CellFormulaValue).result;
+    return extractCellValue(r as ExcelJS.CellValue);
+  }
+  // Rich text
+  if (typeof cellValue === "object" && "richText" in cellValue) {
+    return (cellValue as ExcelJS.CellRichTextValue).richText
+      .map((r) => r.text)
+      .join("");
+  }
+  return String(cellValue);
+}
+
+export async function parseExcelFile(file: File): Promise<ParsedData> {
   validateFile(file);
 
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(arrayBuffer);
 
-    reader.onload = (e) => {
-      try {
-        const data = e.target?.result;
-        if (!data) {
-          reject(new Error("Failed to read file"));
-          return;
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) {
+    throw new Error("No sheets found in the workbook");
+  }
+
+  const headers: string[] = [];
+  const jsonData: DataRow[] = [];
+
+  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber === 1) {
+      (row.values as ExcelJS.CellValue[]).forEach((val, idx) => {
+        if (idx > 0) {
+          headers[idx - 1] = String(extractCellValue(val) ?? "");
         }
-        const workbook = XLSX.read(data, { type: "array" });
-
-        const firstSheetName = workbook.SheetNames[0];
-        if (!firstSheetName) {
-          reject(new Error("No sheets found in the workbook"));
-          return;
+      });
+    } else {
+      const rowData: DataRow = {};
+      (row.values as ExcelJS.CellValue[]).forEach((val, idx) => {
+        if (idx > 0) {
+          const header = headers[idx - 1];
+          if (header) {
+            rowData[header] = extractCellValue(val);
+          }
         }
-        const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData: DataRow[] = XLSX.utils.sheet_to_json(worksheet);
-
-        if (jsonData.length === 0) {
-          reject(new Error("The uploaded file contains no data"));
-          return;
-        }
-
-        const parsedData = categorizePaymentData(jsonData);
-        resolve(parsedData);
-      } catch (error) {
-        reject(error);
+      });
+      if (Object.keys(rowData).length > 0) {
+        jsonData.push(rowData);
       }
-    };
-
-    reader.onerror = () => reject(new Error("Failed to read the file"));
-    reader.readAsArrayBuffer(file);
+    }
   });
+
+  if (jsonData.length === 0) {
+    throw new Error("The uploaded file contains no data");
+  }
+
+  return categorizePaymentData(jsonData);
 }
 
 function categorizePaymentData(data: DataRow[]): ParsedData {

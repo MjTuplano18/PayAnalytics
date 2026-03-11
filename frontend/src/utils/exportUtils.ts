@@ -1,28 +1,58 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { DataRow } from "@/types/data";
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 100);
 }
 
-export function exportToExcel(
+export async function exportToExcel(
   data: DataRow[],
   fileName: string = "report"
-): void {
+): Promise<void> {
+  if (data.length === 0) return;
   const safeName = sanitizeFileName(fileName);
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
-  XLSX.writeFile(workbook, `${safeName}.xlsx`);
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Report");
+
+  const keys = Object.keys(data[0]);
+  worksheet.columns = keys.map((key) => ({ header: key, key }));
+  worksheet.addRows(data as Record<string, string | number | Date>[]);
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", `${safeName}.xlsx`);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export function exportToCSV(
   data: DataRow[],
   fileName: string = "report"
 ): void {
+  if (data.length === 0) return;
   const safeName = sanitizeFileName(fileName);
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const csv = XLSX.utils.sheet_to_csv(worksheet);
+  const keys = Object.keys(data[0]);
+
+  const escapeCell = (val: unknown): string => {
+    const str = String(val ?? "");
+    return str.includes(",") || str.includes('"') || str.includes("\n")
+      ? `"${str.replace(/"/g, '""')}"`
+      : str;
+  };
+
+  const csvRows = [
+    keys.map(escapeCell).join(","),
+    ...data.map((row) => keys.map((k) => escapeCell(row[k])).join(",")),
+  ];
+  const csv = csvRows.join("\n");
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");

@@ -9,6 +9,7 @@ from app.schemas.upload import (
     AuditLogEntry,
     DashboardSummary,
     PaginatedTransactions,
+    PaymentRecordOut,
     UploadSessionCreate,
     UploadSessionDetail,
     UploadSessionOut,
@@ -89,7 +90,7 @@ async def get_transactions(
         total=total,
         page=page,
         page_size=page_size,
-        items=[r.__dict__ for r in records],  # type: ignore[arg-type]
+        items=[PaymentRecordOut.model_validate(r) for r in records],
     )
 
 

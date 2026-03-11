@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { DollarSign, Users, FileText, Landmark } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { DynamicChart } from "@/components/DynamicChart";
 import { DateFilter, DateRange, filterByDateRange } from "@/components/DateFilter";
-import { getDashboardSummary, type DashboardSummary } from "@/lib/api";
+import { type DashboardSummary } from "@/lib/api";
+import { useDashboard } from "@/lib/queries";
 
 /** Format number with commas */
 function fmt(n: number): string {
@@ -18,26 +19,7 @@ export default function DashboardPage() {
   const { data, sessionId } = useData();
   const { token } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange>("all");
-  const [apiSummary, setApiSummary] = useState<DashboardSummary | null>(null);
-  const [apiLoading, setApiLoading] = useState(false);
-
-  // Fetch backend summary when a sessionId is available
-  const fetchSummary = useCallback(async () => {
-    if (!sessionId || !token) return;
-    setApiLoading(true);
-    try {
-      const summary = await getDashboardSummary(token, sessionId);
-      setApiSummary(summary);
-    } catch {
-      setApiSummary(null);
-    } finally {
-      setApiLoading(false);
-    }
-  }, [sessionId, token]);
-
-  useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
+  const { data: apiSummary, isLoading: apiLoading } = useDashboard(token, sessionId);
 
   const payments = useMemo(() => {
     if (!data) return [];
@@ -226,7 +208,7 @@ export default function DashboardPage() {
               touchpoint: t.touchpoint,
               count: t.count,
             }))}
-            type="barh"
+            type="pie"
             dataKey="count"
             xAxisKey="touchpoint"
             height={300}

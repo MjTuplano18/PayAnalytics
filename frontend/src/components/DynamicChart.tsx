@@ -30,29 +30,40 @@ interface DynamicChartProps {
   title?: string;
 }
 
+/** Brand palette — 12 slots for multi-series / pie charts */
 const COLORS = [
-  "#8b5cf6",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#3b82f6",
-  "#ec4899",
-  "#06b6d4",
-  "#84cc16",
-  "#f97316",
-  "#6366f1",
-  "#14b8a6",
-  "#e11d48",
+  "#14b8a6", // teal
+  "#5eead4", // light teal
+  "#0d9488", // dark teal
+  "#90E0D7", // soft teal-blue (IB SMS slot)
+  "#0f766e", // deep teal
+  "#2dd4bf", // medium teal
+  "#ccfbf1", // pale teal
+  "#e0faf6", // off-white teal
+  "#115e59", // forest teal
+  "#a0ece3", // soft light teal
+  "#a7f3d0", // mint
+  "#4dcfbb", // medium-light teal
 ];
+
+const BRAND = "#14b8a6";
+const BRAND_SECONDARY = "#0d9488";
 
 /** Truncate long labels for chart axes/legends */
 function truncate(str: string, max: number): string {
   return str.length > max ? str.slice(0, max) + "…" : str;
 }
 
-/** Format number with commas */
+/** Format number with compact abbreviations (1K, 4M, 2B, etc.) */
 function fmtNum(value: number): string {
-  return value.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000_000)
+    return `${(value / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
+  if (abs >= 1_000_000)
+    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  if (abs >= 1_000)
+    return `${(value / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return String(Math.round(value));
 }
 
 export function DynamicChart({
@@ -84,9 +95,9 @@ export function DynamicChart({
   }
 
   const tooltipStyle = {
-    backgroundColor: "var(--card)",
-    border: "1px solid var(--border)",
-    color: "var(--foreground)",
+    backgroundColor: "#1e293b",
+    border: "1px solid #334155",
+    color: "#ffffff",
     borderRadius: "8px",
     fontSize: "13px",
   };
@@ -102,6 +113,12 @@ export function DynamicChart({
       case "bar":
         return (
           <BarChart data={processedData} margin={{ bottom: 60 }}>
+            <defs>
+              <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#0d9488" stopOpacity={1} />
+                <stop offset="100%" stopColor="#5eead4" stopOpacity={0.8} />
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
             <XAxis
               dataKey="_shortName"
@@ -117,8 +134,16 @@ export function DynamicChart({
               tick={{ fontSize: 12 }}
               tickFormatter={fmtNum}
             />
-            <Tooltip contentStyle={tooltipStyle} formatter={formatTooltipValue} />
-            <Bar dataKey={dataKey} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+            <Tooltip
+              contentStyle={tooltipStyle}
+              formatter={formatTooltipValue}
+              cursor={{ fill: "rgba(209, 213, 219, 0.08)" }}
+            />
+            <Bar
+              dataKey={dataKey}
+              fill="url(#barGradient)"
+              radius={[4, 4, 0, 0]}
+            />
           </BarChart>
         );
       case "barh":
@@ -128,6 +153,12 @@ export function DynamicChart({
             layout="vertical"
             margin={{ left: 50, right: 10, top: 5, bottom: 5 }}
           >
+            <defs>
+              <linearGradient id="barhGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#0d9488" stopOpacity={1} />
+                <stop offset="100%" stopColor="#5eead4" stopOpacity={0.8} />
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
             <XAxis
               type="number"
@@ -142,8 +173,16 @@ export function DynamicChart({
               tick={{ fontSize: 11 }}
               width={40}
             />
-            <Tooltip contentStyle={tooltipStyle} formatter={formatTooltipValue} />
-            <Bar dataKey={dataKey} fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+            <Tooltip
+              contentStyle={tooltipStyle}
+              formatter={formatTooltipValue}
+              cursor={{ fill: "rgba(209, 213, 219, 0.08)" }}
+            />
+            <Bar
+              dataKey={dataKey}
+              fill="url(#barhGradient)"
+              radius={[0, 4, 4, 0]}
+            />
           </BarChart>
         );
       case "line":
@@ -165,10 +204,10 @@ export function DynamicChart({
             <Line
               type="monotone"
               dataKey={dataKey}
-              stroke="#8b5cf6"
+              stroke={BRAND}
               strokeWidth={2}
-              dot={{ fill: "#8b5cf6", r: 4 }}
-              activeDot={{ r: 6 }}
+              dot={{ fill: BRAND, r: 4 }}
+              activeDot={{ r: 6, fill: BRAND }}
             />
           </LineChart>
         );
@@ -176,9 +215,9 @@ export function DynamicChart({
         return (
           <AreaChart data={processedData}>
             <defs>
-              <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+              <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.85} />
+                <stop offset="100%" stopColor="#ffffff" stopOpacity={0.02} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -192,14 +231,19 @@ export function DynamicChart({
               tick={{ fontSize: 12 }}
               tickFormatter={fmtNum}
             />
-            <Tooltip contentStyle={tooltipStyle} formatter={formatTooltipValue} />
+            <Tooltip
+              contentStyle={tooltipStyle}
+              formatter={formatTooltipValue}
+              cursor={{ fill: "rgba(209, 213, 219, 0.08)" }}
+            />
             <Legend />
             <Area
               type="monotone"
               dataKey={dataKey}
-              stroke="#8b5cf6"
-              fill="url(#colorGradient)"
+              stroke={BRAND}
+              fill="url(#areaGradient)"
               strokeWidth={2}
+              activeDot={{ r: 6, fill: BRAND }}
             />
           </AreaChart>
         );
@@ -215,7 +259,6 @@ export function DynamicChart({
                 `${((percent ?? 0) * 100).toFixed(1)}%`
               }
               outerRadius={Math.min(height / 3, 120)}
-              fill="#8884d8"
               dataKey={dataKey}
               nameKey={xAxisKey}
             >
@@ -244,9 +287,9 @@ export function DynamicChart({
   };
 
   return (
-    <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+    <div className="rounded-lg bg-card p-4">
       {title && (
-        <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
+        <h3 className="mb-4 text-lg font-semibold font-display text-foreground">
           {title}
         </h3>
       )}
