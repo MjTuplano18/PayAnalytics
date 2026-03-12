@@ -11,6 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { parseExcelFile, generateMockData } from "@/utils/excelParser";
 import { saveUpload } from "@/lib/api";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
@@ -20,6 +21,7 @@ export default function UploadPage() {
   const router = useRouter();
   const { setData, setRawData, setFileName, setSessionId } = useData();
   const { token } = useAuth();
+  const queryClient = useQueryClient();
 
   const handleFileUpload = async (file: File) => {
     setUploading(true);
@@ -45,6 +47,8 @@ export default function UploadPage() {
           }));
           const saved = await saveUpload(token, { file_name: file.name, records });
           setSessionId(saved.id);
+          // Immediately refresh the uploads list in cache so other pages see the new file
+          await queryClient.invalidateQueries({ queryKey: ["uploads"] });
           toast.success(`File uploaded & saved! ${saved.total_records} records stored.`);
         } catch (backendErr) {
           // Backend save failed — still work in-memory

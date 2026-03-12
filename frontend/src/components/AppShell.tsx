@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getUpload } from "@/lib/api";
 import { ParsedData } from "@/types/data";
+import { useUploadEvents } from "@/lib/useUploadEvents";
 
 /** Silently restores session data from backend on page refresh */
 function SessionRestorer() {
@@ -128,10 +129,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Authenticated layout
+/** Subscribes to backend SSE to auto-invalidate the upload list cache. */
+function UploadEventListener() {
+  const { token } = useAuth();
+  useUploadEvents(token);
+  return null;
+}
+
+// Authenticated layout
   return (
     <DataProvider>
       <SessionRestorer />
+      <UploadEventListener />
       <SidebarProvider>
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
           <Sidebar />

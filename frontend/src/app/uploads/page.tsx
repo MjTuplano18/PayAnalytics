@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { History, FileSpreadsheet, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useData } from "@/context/DataContext";
-import { listUploads, getUpload, deleteUpload, type UploadSessionOut } from "@/lib/api";
+import { getUpload, deleteUpload, type UploadSessionOut } from "@/lib/api";
+import { useUploads } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { ParsedData } from "@/types/data";
 import { toast } from "sonner";
 
@@ -28,29 +30,14 @@ export default function UploadsPage() {
   const { token } = useAuth();
   const { sessionId, setSessionId, setData, setFileName } = useData();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const [sessions, setSessions] = useState<UploadSessionOut[]>([]);
-  const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const loadSessions = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const result = await listUploads(token);
-      setSessions(result.sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()));
-    } catch {
-      toast.error("Failed to load upload history");
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
-
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
+  // TanStack Query: cached + auto-polling every 30 s for cross-user upload events
+  const { data: sessions = [], isLoading: loading } = useUploads(token, { refetchInterval: 30_000 });
 
   const handleRestore = async (session: UploadSessionOut) => {
     if (!token) return;
@@ -123,7 +110,7 @@ export default function UploadsPage() {
       setData(parsedData);
       setFileName(detail.file_name);
       setSessionId(detail.id);
-      localStorage.setItem("sessionId", detail.id);
+      // setSessionId already persists to localStorage — no duplicate call needed
 
       toast.success(`Session restored: ${detail.file_name}`);
       router.push("/dashboard");
@@ -147,7 +134,8 @@ export default function UploadsPage() {
         setData(null);
         setFileName("");
       }
-      setSessions((prev) => prev.filter((s) => s.id !== session.id));
+      // Invalidate cache so the list refetches fresh data
+      queryClient.invalidateQueries({ queryKey: ["uploads"] });
     } catch {
       toast.error("Failed to delete upload session");
     } finally {

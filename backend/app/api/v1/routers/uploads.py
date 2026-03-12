@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies.auth import get_current_user
+from app.api.v1.routers.events import broadcast_new_upload
 from app.db.session import get_db
 from app.models.user import User
 from app.repositories.upload_repository import UploadRepository
@@ -31,6 +32,8 @@ async def create_upload(
         file_name=payload.file_name,
         records=payload.records,
     )
+    # Notify all SSE-connected clients so their uploads list auto-refreshes
+    await broadcast_new_upload(session.id, session.file_name)
     return UploadSessionOut.model_validate(session)
 
 

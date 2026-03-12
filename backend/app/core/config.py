@@ -22,8 +22,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # CORS
+    # CORS — restrict allowed origins in production via environment variable
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
+
+    # Rate-limiting (login brute-force protection)
+    # Max failed login attempts per IP before a temporary lockout is applied.
+    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 10
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
 
 
 settings = Settings()  # type: ignore[call-arg]

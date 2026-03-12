@@ -65,12 +65,22 @@ export function useTransactions(
   });
 }
 
-/** List all upload sessions for the current user — cached 5 minutes */
-export function useUploads(token: string | null) {
+/** List all upload sessions for the current user — cached 5 minutes.
+ *  Pass `{ refetchInterval }` to enable polling (e.g. for auto-reload on Uploads page). */
+export function useUploads(
+  token: string | null,
+  options: { refetchInterval?: number } = {}
+) {
   return useQuery({
     queryKey: queryKeys.uploads(token!),
     queryFn: () => listUploads(token!),
     enabled: !!token,
+    select: (data) =>
+      [...data].sort(
+        (a, b) =>
+          new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+      ),
+    ...options,
   });
 }
 

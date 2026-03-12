@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Download, Search } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
@@ -18,6 +18,8 @@ export default function TransactionsPage() {
   const { data, sessionId, globalSearchQuery, setGlobalSearchQuery } = useData();
   const { token } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [bankFilter, setBankFilter] = useState("all");
   const [tpFilter, setTpFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -25,12 +27,24 @@ export default function TransactionsPage() {
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const rowsPerPage = 25;
 
+  // Debounce search: wait 400 ms after the user stops typing before firing API call
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 400);
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, [searchQuery]);
+
   // Backend-mode state using TanStack Query (cached, no redundant Neon fetches)
   const { data: dashSummary } = useDashboard(token, sessionId);
   const apiFilters = {
     bank: bankFilter !== "all" ? bankFilter : undefined,
     touchpoint: tpFilter !== "all" ? tpFilter : undefined,
-    search: searchQuery || undefined,
+    search: debouncedSearch || undefined,
     page: currentPage,
     page_size: rowsPerPage,
   };
@@ -67,8 +81,8 @@ export default function TransactionsPage() {
     return dateFiltered.filter((p) => {
       if (bankFilter !== "all" && p.bank !== bankFilter) return false;
       if (tpFilter !== "all" && p.touchpoint !== tpFilter) return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
         return (
           p.bank.toLowerCase().includes(q) ||
           p.account.toLowerCase().includes(q) ||
@@ -77,7 +91,7 @@ export default function TransactionsPage() {
       }
       return true;
     });
-  }, [data, sessionId, bankFilter, tpFilter, searchQuery, dateRange, customRange]);
+  }, [data, sessionId, bankFilter, tpFilter, debouncedSearch, dateRange, customRange]);
 
   const inMemoryFilteredTotal = useMemo(
     () => inMemoryFiltered.reduce((s, p) => s + p.paymentAmount, 0),
@@ -192,7 +206,7 @@ export default function TransactionsPage() {
                 type="text"
                 placeholder="Search bank, account, touchpoint..."
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); resetPage(); }}
+                onChange={(e) => { setSearchQuery(e.target.value); }}
                 className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>

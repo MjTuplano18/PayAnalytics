@@ -32,6 +32,10 @@ const REFRESH_KEY = "pa_refresh_token";
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Store token as proper React state so consumers re-render when it changes
+  const [token, setTokenState] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null
+  );
   const router = useRouter();
   const pathname = usePathname();
 
@@ -54,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const tokens = await refreshTokens(refresh);
             localStorage.setItem(TOKEN_KEY, tokens.access_token);
             localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
+            setTokenState(tokens.access_token);
             const u = await getMe(tokens.access_token);
             setUser(u);
             return;
@@ -63,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(REFRESH_KEY);
+        setTokenState(null);
         if (pathname !== "/login") router.replace("/login");
       })
       .finally(() => setIsLoading(false));
@@ -73,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const tokens = await apiLogin(email, password);
       localStorage.setItem(TOKEN_KEY, tokens.access_token);
       localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
+      setTokenState(tokens.access_token);
       const u = await getMe(tokens.access_token);
       setUser(u);
       router.replace("/dashboard");
@@ -83,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
+    setTokenState(null);
     setUser(null);
     router.replace("/login");
   }, [router]);
@@ -90,12 +98,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       user,
-      token: typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null,
+      token,
       isLoading,
       login,
       logout,
     }),
-    [user, isLoading, login, logout]
+    [user, token, isLoading, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
