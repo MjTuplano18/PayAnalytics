@@ -1,21 +1,26 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
-import { Download, Search } from "lucide-react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { Download, Search, Plus, Pencil, Trash2, ChevronDown, X, Check } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
 import { getTransactions, getDashboardSummary, type PaymentRecordOut } from "@/lib/api";
 import { useDashboard, useTransactions } from "@/lib/queries";
+import { toast } from "sonner";
+import type { PaymentRecord, ParsedData } from "@/types/data";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
 }
 
 export default function TransactionsPage() {
-  const { data, sessionId, globalSearchQuery, setGlobalSearchQuery } = useData();
+  const { data, setData, sessionId, globalSearchQuery, setGlobalSearchQuery } = useData();
   const { token } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -130,7 +135,7 @@ export default function TransactionsPage() {
   // Reset to page 1 when filters change
   const resetPage = () => setCurrentPage(1);
 
-  const handleExport = () => {
+  const handleExportCSV = () => {
     const rows = usingApi
       ? (apiRows ?? []).map((r) => [r.bank, r.payment_date, r.payment_amount.toFixed(2), r.account, r.touchpoint])
       : inMemoryFiltered.map((p) => [p.bank, p.paymentDate, p.paymentAmount.toFixed(2), p.account, p.touchpoint]);
@@ -148,6 +153,159 @@ export default function TransactionsPage() {
     a.download = "transactions.csv";
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportXLSX = async () => {
+    const ExcelJS = (await import("exceljs")).default;
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Transactions");
+    sheet.columns = [
+      { header: "Bank", key: "bank" },
+      { header: "Payment Date", key: "paymentDate" },
+      { header: "Payment Amount", key: "paymentAmount" },
+      { header: "Account", key: "account" },
+      { header: "Touchpoint", key: "touchpoint" },
+    ];
+    const rows = usingApi
+      ? (apiRows ?? []).map((r) => ({ bank: r.bank, paymentDate: r.payment_date, paymentAmount: r.payment_amount, account: r.account, touchpoint: r.touchpoint }))
+      : inMemoryFiltered.map((p) => ({ bank: p.bank, paymentDate: p.paymentDate, paymentAmount: p.paymentAmount, account: p.account, touchpoint: p.touchpoint }));
+    sheet.addRows(rows);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "transactions.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── CRUD helpers (in-memory mode only) ──
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
+  const [addForm, setAddForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
+  const [exportOpen, setExportOpen] = useState(false);
+
+  const recalcParsedData = useCallback((payments: PaymentRecord[]): ParsedData => {
+    const bankMap = new Map<string, { count: Set<string>; amount: number; paymentCount: number }>();
+    const tpMap = new Map<string, { count: number; amount: number }>();
+    const accountSet = new Set<string>();
+    let totalAmount = 0;
+    for (const p of payments) {
+      totalAmount += p.paymentAmount;
+      accountSet.add(p.account);
+      const bk = bankMap.get(p.bank) ?? { count: new Set<string>(), amount: 0, paymentCount: 0 };
+      bk.count.add(p.account);
+      bk.amount += p.paymentAmount;
+      bk.paymentCount += 1;
+      bankMap.set(p.bank, bk);
+      const tp = tpMap.get(p.touchpoint) ?? { count: 0, amount: 0 };
+      tp.count += 1;
+      tp.amount += p.paymentAmount;
+      tpMap.set(p.touchpoint, tp);
+    }
+    const bankAnalytics = Array.from(bankMap.entries()).map(([bank, v]) => ({
+      bank,
+      accountCount: v.count.size,
+      totalAmount: v.amount,
+      debtorSum: 0,
+      percentage: totalAmount > 0 ? (v.amount / totalAmount) * 100 : 0,
+      paymentCount: v.paymentCount,
+    }));
+    const touchpointAnalytics = Array.from(tpMap.entries()).map(([touchpoint, v]) => ({
+      touchpoint,
+      count: v.count,
+      totalAmount: v.amount,
+      percentage: totalAmount > 0 ? (v.amount / totalAmount) * 100 : 0,
+    }));
+    return {
+      payments,
+      bankAnalytics,
+      touchpointAnalytics,
+      totalAccounts: accountSet.size,
+      totalAmount,
+      totalPayments: payments.length,
+      raw: payments.map((p) => ({ Bank: p.bank, "Payment Date": p.paymentDate, "Payment Amount": p.paymentAmount, Account: p.account, Touchpoint: p.touchpoint })),
+    };
+  }, []);
+
+  const handleAddTransaction = () => {
+    if (!data) return;
+    const amount = parseFloat(addForm.paymentAmount);
+    if (!addForm.bank || !addForm.paymentDate || isNaN(amount) || amount < 0 || !addForm.account || !addForm.touchpoint) {
+      toast.error("Please fill in all fields with valid values. Amount cannot be negative.");
+      return;
+    }
+    const newRecord: PaymentRecord = {
+      bank: addForm.bank.toUpperCase(),
+      paymentDate: addForm.paymentDate,
+      paymentAmount: amount,
+      account: addForm.account,
+      touchpoint: addForm.touchpoint.toUpperCase(),
+    };
+    const newPayments = [newRecord, ...data.payments];
+    setData(recalcParsedData(newPayments));
+    setAddForm({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
+    setShowAddForm(false);
+    toast.success("Transaction added.");
+  };
+
+  const handleStartEdit = (globalIdx: number) => {
+    if (!data) return;
+    const p = data.payments[globalIdx];
+    setEditingIndex(globalIdx);
+    setEditForm({
+      bank: p.bank,
+      paymentDate: p.paymentDate,
+      paymentAmount: String(p.paymentAmount),
+      account: p.account,
+      touchpoint: p.touchpoint,
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!data || editingIndex === null) return;
+    const amount = parseFloat(editForm.paymentAmount);
+    if (!editForm.bank || !editForm.paymentDate || isNaN(amount) || amount < 0 || !editForm.account || !editForm.touchpoint) {
+      toast.error("Please fill in all fields with valid values. Amount cannot be negative.");
+      return;
+    }
+    const newPayments = [...data.payments];
+    newPayments[editingIndex] = {
+      bank: editForm.bank.toUpperCase(),
+      paymentDate: editForm.paymentDate,
+      paymentAmount: amount,
+      account: editForm.account,
+      touchpoint: editForm.touchpoint.toUpperCase(),
+    };
+    setData(recalcParsedData(newPayments));
+    setEditingIndex(null);
+    toast.success("Transaction updated.");
+  };
+
+  const handleCancelEdit = () => setEditingIndex(null);
+
+  const handleDelete = (globalIdx: number) => {
+    if (!data) return;
+    const newPayments = data.payments.filter((_, i) => i !== globalIdx);
+    setData(recalcParsedData(newPayments));
+    toast.success("Transaction deleted.");
+  };
+
+  // Map display row index back to global index in data.payments
+  const getGlobalIndex = (rowIdx: number): number => {
+    if (!data) return -1;
+    if (usingApi) {
+      // Match by all fields for API rows
+      const r = displayRows[rowIdx];
+      return data.payments.findIndex(
+        (p) => p.bank === r.bank && p.paymentDate === r.paymentDate && p.paymentAmount === r.paymentAmount && p.account === r.account && p.touchpoint === r.touchpoint
+      );
+    }
+    const pageOffset = (currentPage - 1) * rowsPerPage;
+    const item = inMemoryFiltered[pageOffset + rowIdx];
+    return data.payments.indexOf(item);
   };
 
   if (!data && !sessionId) {
@@ -177,13 +335,31 @@ export default function TransactionsPage() {
               {fmt(displayTotal)} records &middot; ₱{fmt(displayTotalAmount)} total
             </p>
           </div>
-          <Button
-            onClick={handleExport}
-            className="bg-teal-600 hover:bg-teal-700 text-white self-start sm:self-auto"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </Button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <Popover open={exportOpen} onOpenChange={setExportOpen}>
+              <PopoverTrigger asChild>
+                <Button className="bg-teal-600 hover:bg-teal-700 text-white">
+                  <Download className="w-4 h-4 mr-1" />
+                  Export
+                  <ChevronDown className="w-3 h-3 ml-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-36 p-1" align="end">
+                <button
+                  onClick={() => { handleExportCSV(); setExportOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200"
+                >
+                  Export as CSV
+                </button>
+                <button
+                  onClick={() => { handleExportXLSX(); setExportOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200"
+                >
+                  Export as XLSX
+                </button>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {/* Date Filter — only shown for in-memory mode */}
@@ -196,6 +372,8 @@ export default function TransactionsPage() {
             />
           </div>
         )}
+
+
 
         {/* Filters */}
         <div className="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
@@ -266,33 +444,69 @@ export default function TransactionsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Touchpoint
                 </th>
+                {data && (
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {displayRows.map((p, i) => (
+              {displayRows.map((p, i) => {
+                const globalIdx = data ? getGlobalIndex(i) : -1;
+                const isEditing = editingIndex === globalIdx && globalIdx !== -1;
+                return (
                 <tr
                   key={`${currentPage}-${i}`}
                   className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200"
                 >
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                    {p.bank}
+                    {isEditing ? <Input value={editForm.bank} onChange={(e) => setEditForm({ ...editForm, bank: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" /> : p.bank}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    {p.paymentDate}
+                    {isEditing ? <Input type="date" value={editForm.paymentDate} onChange={(e) => setEditForm({ ...editForm, paymentDate: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" /> : p.paymentDate}
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400 whitespace-nowrap">
-                    ₱{fmt(p.paymentAmount)}
+                    {isEditing ? <Input type="number" step="0.01" value={editForm.paymentAmount} onChange={(e) => setEditForm({ ...editForm, paymentAmount: e.target.value })} className="h-7 text-xs text-right bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" /> : `₱${fmt(p.paymentAmount)}`}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                    {p.account}
+                    {isEditing ? <Input value={editForm.account} onChange={(e) => setEditForm({ ...editForm, account: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" /> : p.account}
                   </td>
                   <td className="px-4 py-3 text-sm whitespace-nowrap">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
-                      {p.touchpoint}
-                    </span>
+                    {isEditing ? (
+                      <Input value={editForm.touchpoint} onChange={(e) => setEditForm({ ...editForm, touchpoint: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" />
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
+                        {p.touchpoint}
+                      </span>
+                    )}
                   </td>
+                  {data && (
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                      {isEditing ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={handleSaveEdit} className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400" title="Save">
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button onClick={handleCancelEdit} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500" title="Cancel">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => handleStartEdit(globalIdx)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => handleDelete(globalIdx)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400" title="Delete">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  )}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           )}
@@ -357,6 +571,57 @@ export default function TransactionsPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Add Button */}
+      {data && (
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="fixed bottom-8 right-8 w-14 h-14 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center z-50"
+          title="Add Transaction"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Add Transaction Popup */}
+      {showAddForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px]" onClick={() => setShowAddForm(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">New Transaction</h3>
+              <button onClick={() => setShowAddForm(false)} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Bank</Label>
+                <Input value={addForm.bank} onChange={(e) => setAddForm({ ...addForm, bank: e.target.value })} placeholder="e.g. ENBD" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Payment Date</Label>
+                <Input type="date" value={addForm.paymentDate} onChange={(e) => setAddForm({ ...addForm, paymentDate: e.target.value })} placeholder="YYYY-MM-DD" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 uppercase placeholder:normal-case" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Amount</Label>
+                <Input type="number" step="0.01" min="0" value={addForm.paymentAmount} onChange={(e) => setAddForm({ ...addForm, paymentAmount: e.target.value })} placeholder="0.00" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Account</Label>
+                <Input value={addForm.account} onChange={(e) => setAddForm({ ...addForm, account: e.target.value })} placeholder="e.g. 1234567" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Touchpoint</Label>
+                <Input value={addForm.touchpoint} onChange={(e) => setAddForm({ ...addForm, touchpoint: e.target.value })} placeholder="e.g. SMS" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100" />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={handleAddTransaction} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white">Add Transaction</Button>
+              <Button variant="outline" onClick={() => setShowAddForm(false)} className="flex-1">Cancel</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -32,20 +32,26 @@ export default function SettingsPage() {
   const { user, token } = useAuth();
 
   return (
-    <div className="p-4 sm:p-8 space-y-8">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+    <div className="p-4 sm:p-8">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
         Settings
       </h1>
 
-      <ChangePasswordSection token={token} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Left column: Change Password + User Management */}
+        <div className="space-y-6">
+          <ChangePasswordSection token={token} />
 
-      {user?.is_superuser && (
-        <UserManagementSection token={token} currentUserId={user?.id} />
-      )}
+          {user?.is_superuser && (
+            <UserManagementSection token={token} currentUserId={user?.id} />
+          )}
+        </div>
 
-      {user?.is_superuser && (
-        <AuditLogSection token={token} />
-      )}
+        {/* Right column: Audit Log */}
+        {user?.is_superuser && (
+          <AuditLogSection token={token} />
+        )}
+      </div>
     </div>
   );
 }
@@ -107,7 +113,7 @@ function ChangePasswordSection({ token }: { token: string | null }) {
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
-              className="pr-10"
+              className="pr-10 bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-teal-500 focus-visible:ring-teal-500/30"
             />
             <button
               type="button"
@@ -129,7 +135,7 @@ function ChangePasswordSection({ token }: { token: string | null }) {
               onChange={(e) => setNewPassword(e.target.value)}
               required
               placeholder="Min. 8 characters"
-              className="pr-10"
+              className="pr-10 bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-teal-500 focus-visible:ring-teal-500/30"
             />
             <button
               type="button"
@@ -149,6 +155,7 @@ function ChangePasswordSection({ token }: { token: string | null }) {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
+            className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-teal-500 focus-visible:ring-teal-500/30"
           />
         </div>
 

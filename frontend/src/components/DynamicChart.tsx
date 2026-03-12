@@ -252,7 +252,7 @@ export function DynamicChart({
           <PieChart>
             <Pie
               data={processedData}
-              cx="50%"
+              cx="40%"
               cy="50%"
               labelLine={false}
               label={({ percent }: { percent?: number }) =>
@@ -276,7 +276,7 @@ export function DynamicChart({
               layout="vertical"
               align="right"
               verticalAlign="middle"
-              wrapperStyle={{ fontSize: 11, maxHeight: height, overflow: "auto" }}
+              wrapperStyle={{ fontSize: 11, maxHeight: height, overflow: "auto", paddingLeft: 0 }}
               formatter={(value: string) => truncate(value, 20)}
             />
           </PieChart>

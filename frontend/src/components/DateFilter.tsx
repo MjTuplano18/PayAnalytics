@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, ChevronDown, X } from "lucide-react";
+import { Calendar } from "lucide-react";
 import { type DateRange as DayPickerRange } from "react-day-picker";
 import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export type DateRange = "today" | "week" | "month" | "year" | "all" | "custom";
 
@@ -13,12 +20,13 @@ export interface CustomDateRange {
   to: Date;
 }
 
-const presets: { value: Exclude<DateRange, "custom">; label: string }[] = [
+const options: { value: DateRange; label: string }[] = [
+  { value: "all", label: "All Time" },
   { value: "today", label: "Today" },
   { value: "week", label: "This Week" },
   { value: "month", label: "This Month" },
   { value: "year", label: "This Year" },
-  { value: "all", label: "All Time" },
+  { value: "custom", label: "Custom Range" },
 ];
 
 interface DateFilterProps {
@@ -33,7 +41,6 @@ export function DateFilter({ value, onChange, customRange }: DateFilterProps) {
     customRange ? { from: customRange.from, to: customRange.to } : undefined
   );
 
-  // When calendar opens, restore selection from current customRange so user sees their prior selection
   useEffect(() => {
     if (calendarOpen) {
       setSelected(customRange ? { from: customRange.from, to: customRange.to } : undefined);
@@ -48,60 +55,44 @@ export function DateFilter({ value, onChange, customRange }: DateFilterProps) {
     }
   };
 
-  const customLabel =
+  const handleSelectChange = (val: string) => {
+    if (val === "custom") {
+      setCalendarOpen(true);
+    } else {
+      setSelected(undefined);
+      onChange(val as DateRange);
+    }
+  };
+
+  const displayLabel =
     value === "custom" && customRange
       ? `${customRange.from.toLocaleDateString("en-PH", { month: "short", day: "numeric" })} – ${customRange.to.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}`
-      : "Custom Range";
+      : undefined;
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex items-center gap-2">
       <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400 hidden sm:block" />
 
-      {/* Preset buttons */}
-      {presets.map((opt) => (
-        <button
-          key={opt.value}
-          onClick={() => {
-            setSelected(undefined);
-            onChange(opt.value);
-          }}
-          className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all duration-200 ${
-            value === opt.value
-              ? "bg-teal-600 text-white border-teal-600 shadow-sm"
-              : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200"
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-
-      {/* Calendar picker — shadcn Popover + Calendar */}
       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger asChild>
-          <button
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border transition-all duration-200 ${
-              value === "custom"
-                ? "bg-teal-600 text-white border-teal-600 shadow-sm"
-                : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200"
-            }`}
-          >
-            <Calendar className="w-3 h-3" />
-            <span>{customLabel}</span>
-            {value === "custom" ? (
-              <X
-                className="w-3 h-3 ml-0.5 hover:opacity-70"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelected(undefined);
-                  onChange("all");
-                }}
-              />
-            ) : (
-              <ChevronDown className="w-3 h-3" />
-            )}
-          </button>
+          <div>
+            <Select value={value} onValueChange={handleSelectChange}>
+              <SelectTrigger className="h-8 w-auto min-w-[140px] gap-1.5 rounded-full border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 focus:ring-teal-500 data-[state=open]:ring-teal-500">
+                <SelectValue>
+                  {displayLabel ?? options.find((o) => o.value === value)?.label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0" align="end">
           <ShadcnCalendar
             mode="range"
             selected={selected}

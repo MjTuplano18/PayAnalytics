@@ -2,13 +2,13 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
-import { parseExcelFile, generateMockData } from "@/utils/excelParser";
+import { parseExcelFile } from "@/utils/excelParser";
 import { saveUpload } from "@/lib/api";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -98,18 +98,6 @@ export default function UploadPage() {
     }
   };
 
-  const handleUseMockData = () => {
-    const mockData = generateMockData();
-    setData(mockData);
-    setRawData(mockData.raw);
-    setFileName("mock_data.xlsx");
-    setSessionId(null); // mock data is not persisted
-    toast.success("Mock data loaded successfully!");
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 1000);
-  };
-
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
       <div className="max-w-4xl mx-auto">
@@ -120,20 +108,6 @@ export default function UploadPage() {
           <p className="text-gray-600 dark:text-gray-400">
             Import data from Excel or CSV files
           </p>
-        </div>
-
-        {/* Data Type Selector */}
-        <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-6 animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            Data Type
-          </h3>
-          <select className="w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500">
-            <option>Transaction</option>
-          </select>
-          <Button className="mt-4 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-950 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700">
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Download Template
-          </Button>
         </div>
 
         {/* Upload Area */}
@@ -217,19 +191,7 @@ export default function UploadPage() {
           </Alert>
         )}
 
-        {/* Mock Data Button */}
-        <div className="mt-6 text-center">
-          <p className="text-sm mb-2 text-gray-500 dark:text-gray-400">
-            Don&apos;t have data? Try our sample dataset
-          </p>
-          <Button
-            onClick={handleUseMockData}
-            variant="outline"
-            className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            Use Sample Data
-          </Button>
-        </div>
+
       </div>
     </div>
   );
