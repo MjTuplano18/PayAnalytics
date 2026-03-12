@@ -2,16 +2,32 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { parseExcelFile } from "@/utils/excelParser";
-import { saveUpload } from "@/lib/api";
+import { saveUpload, getUpload, deleteUpload, type UploadSessionOut } from "@/lib/api";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useUploads } from "@/lib/queries";
+import { ParsedData } from "@/types/data";
+
+function fmt(n: number): string {
+  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleString("en-PH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
@@ -19,9 +35,15 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const { setData, setRawData, setFileName, setSessionId } = useData();
+  const { setData, setRawData, setFileName, sessionId, setSessionId } = useData();
   const { token } = useAuth();
   const queryClient = useQueryClient();
+
+  // Upload history state
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const { data: sessions = [] } = useUploads(token, { refetchInterval: 30_000 });
 
   const handleFileUpload = async (file: File) => {
     setUploading(true);
@@ -95,6 +117,101 @@ export default function UploadPage() {
     const file = e.target.files?.[0];
     if (file) {
       handleFileUpload(file);
+    }
+  };
+
+  const handleRestore = async (session: UploadSessionOut) => {
+    if (!token) return;
+    setRestoring(session.id);
+    try {
+      const detail = await getUpload(token, session.id);
+      const payments = detail.records.map((r) => ({
+        bank: r.bank,
+        paymentDate: r.payment_date ?? "",
+        paymentAmount: r.payment_amount,
+        account: r.account,
+        touchpoint: r.touchpoint ?? "",
+        environment: r.environment,
+      }));
+
+      const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
+      const tpMap = new Map<string, { count: number; totalAmount: number }>();
+      let totalAmount = 0;
+      const allAccounts = new Set<string>();
+
+      for (const p of payments) {
+        totalAmount += p.paymentAmount;
+        allAccounts.add(p.account);
+        if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
+        const b = bankMap.get(p.bank)!;
+        b.totalAmount += p.paymentAmount;
+        b.paymentCount++;
+        b.accounts.add(p.account);
+        if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
+        const t = tpMap.get(p.touchpoint)!;
+        t.count++;
+        t.totalAmount += p.paymentAmount;
+      }
+
+      const bankAnalytics = Array.from(bankMap.entries())
+        .map(([bank, d]) => ({
+          bank,
+          accountCount: d.accounts.size,
+          totalAmount: d.totalAmount,
+          debtorSum: 0,
+          percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
+          paymentCount: d.paymentCount,
+        }))
+        .sort((a, b) => b.totalAmount - a.totalAmount);
+
+      const touchpointAnalytics = Array.from(tpMap.entries())
+        .map(([touchpoint, d]) => ({
+          touchpoint,
+          count: d.count,
+          totalAmount: d.totalAmount,
+          percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      const parsedData: ParsedData = {
+        payments,
+        bankAnalytics,
+        touchpointAnalytics,
+        totalAccounts: allAccounts.size,
+        totalAmount,
+        totalPayments: payments.length,
+        raw: [],
+      };
+
+      setData(parsedData);
+      setFileName(detail.file_name);
+      setSessionId(detail.id);
+      toast.success(`Session restored: ${detail.file_name}`);
+      router.push("/dashboard");
+    } catch {
+      toast.error("Failed to restore session");
+    } finally {
+      setRestoring(null);
+    }
+  };
+
+  const handleDelete = async (session: UploadSessionOut) => {
+    if (!token) return;
+    setDeleting(session.id);
+    setConfirmDelete(null);
+    try {
+      await deleteUpload(token, session.id);
+      toast.success(`"${session.file_name}" deleted`);
+      if (session.id === sessionId) {
+        setSessionId(null);
+        setData(null);
+        setFileName("");
+      }
+      queryClient.invalidateQueries({ queryKey: ["uploads"] });
+    } catch {
+      toast.error("Failed to delete upload session");
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -190,6 +307,100 @@ export default function UploadPage() {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Upload History */}
+        <div className="mt-10 animate-fade-in-up" style={{ animationDelay: '0.35s' }}>
+          <div className="flex items-center gap-3 mb-4">
+            <History className="w-6 h-6 text-teal-500" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Upload History</h2>
+          </div>
+
+          {sessions.length === 0 ? (
+            <div className="p-8 rounded-lg text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <FileSpreadsheet className="w-10 h-10 mx-auto mb-3 text-gray-400" />
+              <p className="text-gray-600 dark:text-gray-400">No uploads yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sessions.map((s) => {
+                const isActive = s.id === sessionId;
+                return (
+                  <div
+                    key={s.id}
+                    className={`rounded-lg border p-5 bg-white dark:bg-gray-800 transition-all duration-200 ${
+                      isActive
+                        ? "border-teal-500 ring-1 ring-teal-400/40 shadow-teal-100 dark:shadow-none"
+                        : "border-gray-200 dark:border-gray-700 hover:border-teal-300 dark:hover:border-teal-600"
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <FileSpreadsheet className="w-5 h-5 text-green-500 flex-shrink-0" />
+                          <span className="font-medium text-gray-900 dark:text-white truncate">
+                            {s.file_name}
+                          </span>
+                          {isActive && (
+                            <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 rounded-full">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+                          <span>{fmt(s.total_records)} records</span>
+                          <span>₱{fmt(s.total_amount)}</span>
+                          <span>{fmtDate(s.uploaded_at)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          onClick={() => handleRestore(s)}
+                          disabled={restoring === s.id || deleting === s.id}
+                          className={`flex items-center gap-2 ${
+                            isActive
+                              ? "bg-teal-600 hover:bg-teal-700 text-white"
+                              : "bg-gray-100 dark:bg-gray-700 hover:bg-teal-50 dark:hover:bg-teal-900/30 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
+                          }`}
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          {restoring === s.id ? "Restoring..." : isActive ? "Reload" : "Restore"}
+                        </Button>
+
+                        {confirmDelete === s.id ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Delete?</span>
+                            <Button
+                              onClick={() => handleDelete(s)}
+                              disabled={deleting === s.id}
+                              className="h-8 px-3 text-xs bg-red-600 hover:bg-red-700 text-white"
+                            >
+                              {deleting === s.id ? "Deleting..." : "Yes"}
+                            </Button>
+                            <Button
+                              onClick={() => setConfirmDelete(null)}
+                              className="h-8 px-3 text-xs bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-100"
+                            >
+                              No
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            onClick={() => setConfirmDelete(s.id)}
+                            disabled={restoring === s.id || deleting === s.id}
+                            title="Delete this upload session"
+                            className="h-9 w-9 p-0 flex items-center justify-center bg-transparent hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 border border-gray-200 dark:border-gray-600 hover:border-red-300 dark:hover:border-red-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
 
       </div>
