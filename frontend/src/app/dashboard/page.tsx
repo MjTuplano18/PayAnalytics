@@ -8,6 +8,7 @@ import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { DynamicChart } from "@/components/DynamicChart";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
+import { PeriodComparison } from "@/components/PeriodComparison";
 import { type DashboardSummary } from "@/lib/api";
 import { useDashboard } from "@/lib/queries";
 
@@ -259,6 +260,14 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Period-over-Period Comparison */}
+      {payments.length > 0 && !apiLoading && (
+        <div className="mb-6">
+          <PeriodComparison payments={payments} />
+        </div>
+      )}
+
       {/* Bank Analytics Table */}
       {apiLoading ? (
         <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-8 p-6">

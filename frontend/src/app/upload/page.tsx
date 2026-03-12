@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, AlertCircle, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, History } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, History, Merge, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -44,6 +44,16 @@ export default function UploadPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const { data: sessions = [] } = useUploads(token, { refetchInterval: 30_000 });
+
+  // Multi-file merge state
+  const mergeInputRef = useRef<HTMLInputElement>(null);
+  const [mergeFiles, setMergeFiles] = useState<File[]>([]);
+  const [merging, setMerging] = useState(false);
+  const [mergeResult, setMergeResult] = useState<{
+    totalRecords: number;
+    duplicatesRemoved: number;
+    filesProcessed: number;
+  } | null>(null);
 
   const handleFileUpload = async (file: File) => {
     setUploading(true);
@@ -215,98 +225,268 @@ export default function UploadPage() {
     }
   };
 
+  const handleMergeFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter(
+      (f) => f.name.endsWith(".xlsx") || f.name.endsWith(".xls") || f.name.endsWith(".json")
+    );
+    if (files.length > 0) setMergeFiles((prev) => [...prev, ...files]);
+    if (mergeInputRef.current) mergeInputRef.current.value = "";
+  };
+
+  const removeMergeFile = (idx: number) => {
+    setMergeFiles((prev) => prev.filter((_, i) => i !== idx));
+    setMergeResult(null);
+  };
+
+  const executeMerge = async () => {
+    if (mergeFiles.length < 2) {
+      toast.error("Select at least 2 files to merge");
+      return;
+    }
+    setMerging(true);
+    setError(null);
+    setMergeResult(null);
+    try {
+      const allPayments: ParsedData["payments"] = [];
+      for (const file of mergeFiles) {
+        const parsed = await parseExcelFile(file);
+        allPayments.push(...parsed.payments);
+      }
+
+      // Deduplicate by account + date + amount
+      const seen = new Set<string>();
+      const unique = allPayments.filter((p) => {
+        const key = `${p.account}|${p.paymentDate}|${p.paymentAmount}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      const duplicatesRemoved = allPayments.length - unique.length;
+
+      // Build analytics
+      const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
+      const tpMap = new Map<string, { count: number; totalAmount: number }>();
+      let totalAmount = 0;
+      const allAccounts = new Set<string>();
+
+      for (const p of unique) {
+        totalAmount += p.paymentAmount;
+        allAccounts.add(p.account);
+        if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
+        const b = bankMap.get(p.bank)!;
+        b.totalAmount += p.paymentAmount;
+        b.paymentCount++;
+        b.accounts.add(p.account);
+        if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
+        const t = tpMap.get(p.touchpoint)!;
+        t.count++;
+        t.totalAmount += p.paymentAmount;
+      }
+
+      const bankAnalytics = Array.from(bankMap.entries())
+        .map(([bank, d]) => ({
+          bank,
+          accountCount: d.accounts.size,
+          totalAmount: d.totalAmount,
+          debtorSum: 0,
+          percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
+          paymentCount: d.paymentCount,
+        }))
+        .sort((a, b) => b.totalAmount - a.totalAmount);
+
+      const touchpointAnalytics = Array.from(tpMap.entries())
+        .map(([touchpoint, d]) => ({
+          touchpoint,
+          count: d.count,
+          totalAmount: d.totalAmount,
+          percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      const mergedData: ParsedData = {
+        payments: unique,
+        bankAnalytics,
+        touchpointAnalytics,
+        totalAccounts: allAccounts.size,
+        totalAmount,
+        totalPayments: unique.length,
+        raw: [],
+      };
+
+      setData(mergedData);
+      setRawData([]);
+      setFileName(mergeFiles.map((f) => f.name).join(" + "));
+      setSessionId(null);
+
+      setMergeResult({
+        totalRecords: unique.length,
+        duplicatesRemoved,
+        filesProcessed: mergeFiles.length,
+      });
+
+      toast.success(`Merged ${mergeFiles.length} files — ${fmt(unique.length)} records (${fmt(duplicatesRemoved)} duplicates removed)`);
+
+      setTimeout(() => router.push("/dashboard"), 2000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to merge files";
+      setError(message);
+      toast.error("Merge failed");
+    } finally {
+      setMerging(false);
+    }
+  };
+
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
+          Upload Data
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Import data from Excel or CSV files
+        </p>
+      </div>
+
+      {/* Main content */}
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
-            Upload Data
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Import data from Excel or CSV files
-          </p>
-        </div>
-
-        {/* Upload Area */}
-        <Card
-          className="p-8 sm:p-12 border-2 border-dashed bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-center cursor-pointer hover:border-teal-500 hover:shadow-lg transition-all duration-300 animate-fade-in-up"
-          style={{ animationDelay: '0.15s' }}
-          onDrop={handleFileDrop}
-          onDragOver={(e) => e.preventDefault()}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600" />
-          <h3 className="text-lg sm:text-xl font-semibold mb-2 text-gray-900 dark:text-white">
-            Drag and drop your file here
-          </h3>
-          <p className="mb-4 text-gray-500 dark:text-gray-400">
-            Supports CSV, XLSX, and JSON files
-          </p>
-          <Button
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-            disabled={uploading}
+        <div className="space-y-6">
+          {/* Upload Area */}
+          <Card
+            className="p-8 sm:p-12 border-2 border-dashed bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-center cursor-pointer hover:border-teal-500 hover:shadow-lg transition-all duration-300 animate-fade-in-up"
+            style={{ animationDelay: '0.15s' }}
+            onDrop={handleFileDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onClick={() => fileInputRef.current?.click()}
           >
-            {uploading ? "Uploading..." : "Browse Files"}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv,.json"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-        </Card>
+            <Upload className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600" />
+            <h3 className="text-lg sm:text-xl font-semibold mb-2 text-gray-900 dark:text-white">
+              Drag and drop your file here
+            </h3>
+            <p className="mb-4 text-gray-500 dark:text-gray-400">
+              Supports CSV, XLSX, and JSON files
+            </p>
+            <Button
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+              disabled={uploading}
+            >
+              {uploading ? "Uploading..." : "Browse Files"}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv,.json"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </Card>
 
-        {/* Import Instructions */}
-        <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mt-6 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
-          <div className="flex items-start gap-2 mb-4">
-            <AlertCircle className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <h4 className="text-gray-900 dark:text-white font-semibold mb-2">
-                Import Instructions
-              </h4>
-              <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                <li>
-                  <strong>Required Columns:</strong> Bank, Payment Date
-                  (leads_result_edate), Payment Amount (leads_result_amount),
-                  Account (debtor_id), Touchpoint (TAGGING)
-                </li>
-                <li>
-                  <strong>Supported formats:</strong> .xlsx, .xls, .csv
-                </li>
-              </ul>
+          {/* Import Instructions */}
+          <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+            <div className="flex items-start gap-2 mb-4">
+              <AlertCircle className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-gray-900 dark:text-white font-semibold mb-2">
+                  Import Instructions
+                </h4>
+                <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                  <li>
+                    <strong>Required Columns:</strong> Bank, Payment Date
+                    (leads_result_edate), Payment Amount (leads_result_amount),
+                    Account (debtor_id), Touchpoint (TAGGING)
+                  </li>
+                  <li>
+                    <strong>Supported formats:</strong> .xlsx, .xls, .csv
+                  </li>
+                </ul>
+                <div className="mt-4">
+                  <h5 className="text-gray-900 dark:text-white font-semibold mb-2">
+                    Tips:
+                  </h5>
+                  <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                    <li>Dates can be in YYYY-MM-DD format or Excel serial numbers</li>
+                    <li>Payment amounts should be numeric values</li>
+                    <li>Column headers are matched flexibly (e.g. &quot;Bank&quot;, &quot;BANK&quot;, &quot;bank&quot; all work)</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="mt-4">
-            <h5 className="text-gray-900 dark:text-white font-semibold mb-2">
-              Tips:
-            </h5>
-            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-              <li>Dates can be in YYYY-MM-DD format or Excel serial numbers</li>
-              <li>Payment amounts should be numeric values</li>
-              <li>Column headers are matched flexibly (e.g. &quot;Bank&quot;, &quot;BANK&quot;, &quot;bank&quot; all work)</li>
-            </ul>
+
+          {/* Multi-File Merge */}
+          <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 animate-fade-in-up" style={{ animationDelay: '0.30s' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <Merge className="w-5 h-5 text-teal-400" />
+              <h4 className="text-gray-900 dark:text-white font-semibold">Multi-File Merge</h4>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Combine multiple Excel files into one dataset. Duplicate records (same account + date + amount) are automatically removed.
+            </p>
+
+            <div className="flex flex-wrap gap-2 mb-4">
+              {mergeFiles.map((f, i) => (
+                <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-700 rounded-full text-sm">
+                  <FileSpreadsheet className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                  <span className="text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{f.name}</span>
+                  <button onClick={() => removeMergeFile(i)} className="text-gray-400 hover:text-red-500 transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => mergeInputRef.current?.click()}
+                disabled={merging}
+                className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
+              >
+                Add Files
+              </Button>
+              <Button
+                onClick={executeMerge}
+                disabled={merging || mergeFiles.length < 2}
+                className="bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50"
+              >
+                {merging ? "Merging..." : `Merge ${mergeFiles.length} File${mergeFiles.length !== 1 ? "s" : ""}`}
+              </Button>
+              <input
+                ref={mergeInputRef}
+                type="file"
+                accept=".xlsx,.xls,.json"
+                multiple
+                onChange={handleMergeFiles}
+                className="hidden"
+              />
+            </div>
+
+            {mergeResult && (
+              <div className="mt-4 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-sm text-green-700 dark:text-green-300">
+                <CheckCircle2 className="w-4 h-4 inline mr-2" />
+                Merged {mergeResult.filesProcessed} files — {fmt(mergeResult.totalRecords)} total records, {fmt(mergeResult.duplicatesRemoved)} duplicates removed. Redirecting...
+              </div>
+            )}
           </div>
+
+          {/* Alerts */}
+          {uploadSuccess && (
+            <Alert className="bg-green-50 dark:bg-green-900 border-green-300 dark:border-green-700">
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-green-800 dark:text-green-200">
+                File uploaded successfully! Redirecting to dashboard...
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {error && (
+            <Alert className="bg-red-50 dark:bg-red-900 border-red-300 dark:border-red-700">
+              <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+              <AlertDescription className="text-red-800 dark:text-red-200">
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
-
-        {/* Alerts */}
-        {uploadSuccess && (
-          <Alert className="mt-6 bg-green-50 dark:bg-green-900 border-green-300 dark:border-green-700">
-            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-            <AlertDescription className="text-green-800 dark:text-green-200">
-              File uploaded successfully! Redirecting to dashboard...
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {error && (
-          <Alert className="mt-6 bg-red-50 dark:bg-red-900 border-red-300 dark:border-red-700">
-            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-            <AlertDescription className="text-red-800 dark:text-red-200">
-              {error}
-            </AlertDescription>
-          </Alert>
-        )}
 
         {/* Upload History */}
         <div className="mt-10 animate-fade-in-up" style={{ animationDelay: '0.35s' }}>
@@ -401,9 +581,8 @@ export default function UploadPage() {
             </div>
           )}
         </div>
-
-
       </div>
+
     </div>
   );
 }
