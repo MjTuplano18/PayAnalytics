@@ -62,10 +62,4 @@ class ChangePasswordRequest(BaseModel):
     def validate_new_password(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("New password must be at least 8 characters long")
-        if not any(c.isupper() for c in v):
-            raise ValueError("New password must contain at least one uppercase letter")
-        if not any(c.islower() for c in v):
-            raise ValueError("New password must contain at least one lowercase letter")
-        if not any(c.isdigit() for c in v):
-            raise ValueError("New password must contain at least one digit")
         return v
