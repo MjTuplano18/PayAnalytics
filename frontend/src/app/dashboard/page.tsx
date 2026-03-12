@@ -202,19 +202,19 @@ export default function DashboardPage() {
 
         <div>
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Amount Distribution by Bank
+            By Touchpoint
           </h3>
           {apiLoading ? (
             <Skeleton className="h-[350px] w-full rounded-xl" />
           ) : (
           <DynamicChart
-            data={fa.bankAnalytics.slice(0, 10).map((a) => ({
-              bank: a.bank,
-              amount: a.totalAmount,
+            data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({
+              touchpoint: t.touchpoint,
+              count: t.count,
             }))}
-            type="barh"
-            dataKey="amount"
-            xAxisKey="bank"
+            type="pie"
+            dataKey="count"
+            xAxisKey="touchpoint"
             height={350}
           />
           )}
@@ -241,19 +241,19 @@ export default function DashboardPage() {
 
         <div>
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            By Touchpoint
+            Amount Distribution by Bank
           </h3>
           {apiLoading ? (
             <Skeleton className="h-[300px] w-full rounded-xl" />
           ) : (
           <DynamicChart
-            data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({
-              touchpoint: t.touchpoint,
-              count: t.count,
+            data={fa.bankAnalytics.slice(0, 10).map((a) => ({
+              bank: a.bank,
+              amount: a.totalAmount,
             }))}
-            type="pie"
-            dataKey="count"
-            xAxisKey="touchpoint"
+            type="barh"
+            dataKey="amount"
+            xAxisKey="bank"
             height={300}
           />
           )}

@@ -5,8 +5,14 @@ import {
   Download,
   FileSpreadsheet,
   BarChart3,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { exportToExcel, exportToCSV } from "@/utils/exportUtils";
@@ -21,6 +27,7 @@ export default function ReportsPage() {
   const { data, rawData, sessionId } = useData();
   const { token } = useAuth();
   const [exporting, setExporting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const reportData = useMemo(() => {
     if (!data) return [];
@@ -112,6 +119,34 @@ export default function ReportsPage() {
               Generate and export payment reports
             </p>
           </div>
+          <Popover open={exportOpen} onOpenChange={setExportOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                disabled={exporting}
+                className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
+              >
+                <Download className="w-4 h-4" />
+                {exporting ? "Exporting..." : "Export"}
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-48 p-1">
+              <button
+                onClick={() => { setExportOpen(false); handleExport("excel"); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                Export as XLSX
+              </button>
+              <button
+                onClick={() => { setExportOpen(false); handleExport("csv"); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+              >
+                <Download className="w-4 h-4" />
+                Export as CSV
+              </button>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Summary stats */}
@@ -127,36 +162,6 @@ export default function ReportsPage() {
           <div className="p-5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Banks</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmt(bankCount)}</p>
-          </div>
-        </div>
-
-        {/* Export Options */}
-        <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-            Export Options
-          </h3>
-          {sessionId && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              All records will be fetched from the server and exported.
-            </p>
-          )}
-          <div className="flex flex-col sm:flex-row gap-4 mt-4">
-            <Button
-              onClick={() => handleExport("excel")}
-              disabled={exporting}
-              className="flex-1 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/40 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-700 hover:shadow-md transition-all duration-300 disabled:opacity-50"
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              {exporting ? "Exporting..." : "Export to Excel"}
-            </Button>
-            <Button
-              onClick={() => handleExport("csv")}
-              disabled={exporting}
-              className="flex-1 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/40 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-700 hover:shadow-md transition-all duration-300 disabled:opacity-50"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              {exporting ? "Exporting..." : "Export to CSV"}
-            </Button>
           </div>
         </div>
 

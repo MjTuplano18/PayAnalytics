@@ -112,7 +112,7 @@ export function DynamicChart({
     switch (type) {
       case "bar":
         return (
-          <BarChart data={processedData} margin={{ bottom: 60 }}>
+          <BarChart data={processedData} margin={{ left: 30, right: 30, top: 15, bottom: 40 }}>
             <defs>
               <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#0d9488" stopOpacity={1} />
@@ -127,7 +127,7 @@ export function DynamicChart({
               angle={-35}
               textAnchor="end"
               interval={0}
-              height={70}
+              height={50}
             />
             <YAxis
               className="text-muted-foreground"
@@ -151,7 +151,7 @@ export function DynamicChart({
           <BarChart
             data={processedData}
             layout="vertical"
-            margin={{ left: 50, right: 10, top: 5, bottom: 5 }}
+            margin={{ left: 30, right: 30, top: 5, bottom: 5 }}
           >
             <defs>
               <linearGradient id="barhGradient" x1="0" y1="0" x2="0" y2="1">
@@ -213,7 +213,7 @@ export function DynamicChart({
         );
       case "area":
         return (
-          <AreaChart data={processedData}>
+          <AreaChart data={processedData} margin={{ left: 30, right: 30, top: 5, bottom: 5 }}>
             <defs>
               <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.85} />
@@ -276,7 +276,7 @@ export function DynamicChart({
               layout="vertical"
               align="right"
               verticalAlign="middle"
-              wrapperStyle={{ fontSize: 11, maxHeight: height, overflow: "auto", paddingLeft: 0 }}
+              wrapperStyle={{ fontSize: 11, maxHeight: height, overflow: "auto", paddingLeft: 0, right: "18%" }}
               formatter={(value: string) => truncate(value, 20)}
             />
           </PieChart>
