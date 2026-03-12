@@ -444,7 +444,7 @@ export default function TransactionsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Touchpoint
                 </th>
-                {data && (
+                {data && !usingApi && (
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">
                     Actions
                   </th>
@@ -481,7 +481,7 @@ export default function TransactionsPage() {
                       </span>
                     )}
                   </td>
-                  {data && (
+                  {data && !usingApi && (
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       {isEditing ? (
                         <div className="flex items-center justify-center gap-1">
@@ -494,10 +494,10 @@ export default function TransactionsPage() {
                         </div>
                       ) : (
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => handleStartEdit(globalIdx)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
+                          <button onClick={() => globalIdx !== -1 && handleStartEdit(globalIdx)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => handleDelete(globalIdx)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400" title="Delete">
+                          <button onClick={() => globalIdx !== -1 && handleDelete(globalIdx)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400" title="Delete">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -572,8 +572,8 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Floating Add Button */}
-      {data && (
+      {/* Floating Add Button — in-memory mode only (API mode has server-side data) */}
+      {data && !usingApi && (
         <button
           onClick={() => setShowAddForm(true)}
           className="fixed bottom-8 right-8 w-14 h-14 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center z-50"
