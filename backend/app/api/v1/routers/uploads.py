@@ -135,6 +135,38 @@ async def delete_upload(
         )
 
 
+@router.delete("/{session_id}/transactions/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_transaction(
+    session_id: str,
+    record_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Delete a single transaction record."""
+    repo = UploadRepository(db)
+    deleted = await repo.delete_transaction(record_id=record_id, session_id=session_id, user_id=current_user.id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found.")
+
+
+@router.delete("/{session_id}/transactions", status_code=status.HTTP_200_OK)
+async def delete_transactions_by_date_range(
+    session_id: str,
+    date_from: str = "",
+    date_to: str = "",
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Mass delete transactions within a date range. Returns count of deleted records."""
+    if not date_from or not date_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="date_from and date_to are required.")
+    repo = UploadRepository(db)
+    count = await repo.delete_transactions_by_date_range(
+        session_id=session_id, user_id=current_user.id, date_from=date_from, date_to=date_to
+    )
+    return {"deleted": count}
+
+
 @router.get("/admin/audit-log", response_model=list[AuditLogEntry])
 async def get_audit_log(
     current_user: User = Depends(get_current_user),

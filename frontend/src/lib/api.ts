@@ -213,3 +213,12 @@ export function getAuditLog(token: string) {
 export function deleteUpload(token: string, sessionId: string) {
   return apiFetch<void>(`/api/v1/uploads/${sessionId}`, { method: "DELETE", token });
 }
+
+export function deleteTransaction(token: string, sessionId: string, recordId: string) {
+  return apiFetch<void>(`/api/v1/uploads/${sessionId}/transactions/${recordId}`, { method: "DELETE", token });
+}
+
+export function deleteTransactionsByDateRange(token: string, sessionId: string, dateFrom: string, dateTo: string) {
+  const qs = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+  return apiFetch<{ deleted: number }>(`/api/v1/uploads/${sessionId}/transactions?${qs}`, { method: "DELETE", token });
+}

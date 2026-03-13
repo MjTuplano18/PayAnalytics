@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import delete as sql_delete, func, select, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -103,6 +103,83 @@ class UploadRepository:
         await self.session.commit()
         return True
 
+    async def delete_transaction(self, record_id: str, session_id: str, user_id: str) -> bool:
+        """Delete a single payment record. Returns True if deleted."""
+        # Verify session ownership
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return False
+        result = await self.session.execute(
+            select(PaymentRecord).where(
+                PaymentRecord.id == record_id,
+                PaymentRecord.session_id == session_id,
+            )
+        )
+        record = result.scalar_one_or_none()
+        if not record:
+            return False
+        await self.session.delete(record)
+        # Update session totals
+        await self._update_session_totals(session_id)
+        await self.session.commit()
+        return True
+
+    async def delete_transactions_by_date_range(
+        self, session_id: str, user_id: str, date_from: str, date_to: str
+    ) -> int:
+        """Delete payment records within a date range. Returns count of deleted records."""
+        # Verify session ownership
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return 0
+        # Count records to delete
+        count_result = await self.session.execute(
+            select(func.count(PaymentRecord.id)).where(
+                PaymentRecord.session_id == session_id,
+                PaymentRecord.payment_date >= date_from,
+                PaymentRecord.payment_date <= date_to,
+            )
+        )
+        count = count_result.scalar() or 0
+        if count == 0:
+            return 0
+        # Delete
+        await self.session.execute(
+            sql_delete(PaymentRecord).where(
+                PaymentRecord.session_id == session_id,
+                PaymentRecord.payment_date >= date_from,
+                PaymentRecord.payment_date <= date_to,
+            )
+        )
+        # Update session totals
+        await self._update_session_totals(session_id)
+        await self.session.commit()
+        return count
+
+    async def _update_session_totals(self, session_id: str) -> None:
+        """Recalculate and update session totals after record deletions."""
+        agg = await self.session.execute(
+            select(
+                func.count(PaymentRecord.id),
+                func.coalesce(func.sum(PaymentRecord.payment_amount), 0),
+            ).where(PaymentRecord.session_id == session_id)
+        )
+        total_records, total_amount = agg.one()
+        upload = await self.session.get(UploadSession, session_id)
+        if upload:
+            upload.total_records = total_records
+            upload.total_amount = float(total_amount)
+
     async def get_transactions(
         self,
         session_id: str,
@@ -137,7 +214,6 @@ class UploadRepository:
             query = query.where(PaymentRecord.environment == environment)
         if search:
             pattern = f"%{search}%"
-            from sqlalchemy import or_, cast, String
             query = query.where(
                 or_(
                     PaymentRecord.bank.ilike(pattern),

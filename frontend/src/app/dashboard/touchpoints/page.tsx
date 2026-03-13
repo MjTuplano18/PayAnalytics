@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Waypoints, DollarSign, Hash, BarChart3 } from "lucide-react";
+import { useMemo, useState, useRef, useEffect } from "react";
+import { Waypoints, DollarSign, Hash, BarChart3, ChevronDown, Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useData } from "@/context/DataContext";
@@ -19,7 +19,21 @@ export default function TouchpointsDashboardPage() {
   const { token, user } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
+  const [selectedTouchpoints, setSelectedTouchpoints] = useState<Set<string>>(new Set());
+  const [tpDropdownOpen, setTpDropdownOpen] = useState(false);
+  const tpDropdownRef = useRef<HTMLDivElement>(null);
   const { data: apiSummary, isLoading: apiLoading } = useDashboard(token, sessionId);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (tpDropdownRef.current && !tpDropdownRef.current.contains(e.target as Node)) {
+        setTpDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const payments = useMemo(() => {
     if (!data) return [];
@@ -27,6 +41,24 @@ export default function TouchpointsDashboardPage() {
   }, [data, dateRange, customRange]);
 
   const isFiltered = dateRange !== "all";
+
+  // All available touchpoint names (for the filter dropdown)
+  const allTouchpoints = useMemo(() => {
+    if (apiSummary) return apiSummary.touchpoints.map((t) => t.touchpoint);
+    if (!data) return [];
+    return [...new Set(data.payments.map((p) => p.touchpoint || "Unknown"))].sort();
+  }, [apiSummary, data]);
+
+  const toggleTouchpoint = (tp: string) => {
+    setSelectedTouchpoints((prev) => {
+      const next = new Set(prev);
+      if (next.has(tp)) next.delete(tp);
+      else next.add(tp);
+      return next;
+    });
+  };
+
+  const clearTpFilter = () => setSelectedTouchpoints(new Set());
 
   const touchpointAnalytics = useMemo(() => {
     if (apiSummary && !isFiltered) {
@@ -58,12 +90,18 @@ export default function TouchpointsDashboardPage() {
       .sort((a, b) => b.count - a.count);
   }, [apiSummary, payments, isFiltered]);
 
-  const totalTransactions = touchpointAnalytics.reduce((s, t) => s + t.count, 0);
-  const totalAmount = touchpointAnalytics.reduce((s, t) => s + t.totalAmount, 0);
-  const uniqueTouchpoints = touchpointAnalytics.length;
-  const topTouchpoint = touchpointAnalytics[0]?.touchpoint ?? "—";
+  // Apply touchpoint filter on top of the analytics
+  const filteredAnalytics = useMemo(() => {
+    if (selectedTouchpoints.size === 0) return touchpointAnalytics;
+    return touchpointAnalytics.filter((t) => selectedTouchpoints.has(t.touchpoint));
+  }, [touchpointAnalytics, selectedTouchpoints]);
 
-  const noData = touchpointAnalytics.length === 0 && !apiLoading;
+  const totalTransactions = filteredAnalytics.reduce((s, t) => s + t.count, 0);
+  const totalAmount = filteredAnalytics.reduce((s, t) => s + t.totalAmount, 0);
+  const uniqueTouchpoints = filteredAnalytics.length;
+  const topTouchpoint = filteredAnalytics[0]?.touchpoint ?? "—";
+
+  const noData = filteredAnalytics.length === 0 && !apiLoading;
 
   const metricCards = [
     { label: "Total Transactions", value: fmt(totalTransactions), icon: Hash, iconBg: "bg-teal-500" },
@@ -82,11 +120,54 @@ export default function TouchpointsDashboardPage() {
           </p>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Touchpoints Dashboard</h1>
         </div>
-        <DateFilter
-          value={dateRange}
-          onChange={(r, c) => { setDateRange(r); setCustomRange(c); }}
-          customRange={customRange}
-        />
+        <div className="flex items-center gap-3">
+          {/* Touchpoint multi-select filter */}
+          <div ref={tpDropdownRef} className="relative">
+            <button
+              onClick={() => setTpDropdownOpen((v) => !v)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Waypoints className="h-4 w-4" />
+              {selectedTouchpoints.size === 0
+                ? "All Touchpoints"
+                : `${selectedTouchpoints.size} selected`}
+              <ChevronDown className={`h-4 w-4 transition-transform ${tpDropdownOpen ? "rotate-180" : ""}`} />
+            </button>
+            {tpDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-64 max-h-72 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+                {selectedTouchpoints.size > 0 && (
+                  <button
+                    onClick={clearTpFilter}
+                    className="w-full px-3 py-2 text-left text-xs text-teal-600 dark:text-teal-400 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700"
+                  >
+                    Clear selection
+                  </button>
+                )}
+                {allTouchpoints.map((tp) => (
+                  <button
+                    key={tp}
+                    onClick={() => toggleTouchpoint(tp)}
+                    className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${
+                      selectedTouchpoints.has(tp)
+                        ? "bg-teal-500 border-teal-500"
+                        : "border-gray-300 dark:border-gray-600"
+                    }`}>
+                      {selectedTouchpoints.has(tp) && <Check className="h-3 w-3 text-white" />}
+                    </span>
+                    {tp}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <DateFilter
+            value={dateRange}
+            onChange={(r, c) => { setDateRange(r); setCustomRange(c); }}
+            customRange={customRange}
+          />
+        </div>
       </div>
 
       {/* Metric Cards */}
@@ -140,7 +221,7 @@ export default function TouchpointsDashboardPage() {
             <Skeleton className="h-[350px] w-full rounded-xl" />
           ) : (
             <DynamicChart
-              data={touchpointAnalytics.map((t) => ({
+              data={filteredAnalytics.map((t) => ({
                 touchpoint: t.touchpoint,
                 count: t.count,
               }))}
@@ -160,7 +241,7 @@ export default function TouchpointsDashboardPage() {
             <Skeleton className="h-[350px] w-full rounded-xl" />
           ) : (
             <DynamicChart
-              data={touchpointAnalytics.slice(0, 8).map((t) => ({
+              data={filteredAnalytics.slice(0, 8).map((t) => ({
                 touchpoint: t.touchpoint,
                 count: t.count,
               }))}
@@ -182,7 +263,7 @@ export default function TouchpointsDashboardPage() {
             <Skeleton className="h-[300px] w-full rounded-xl" />
           ) : (
             <DynamicChart
-              data={touchpointAnalytics.map((t) => ({
+              data={filteredAnalytics.map((t) => ({
                 touchpoint: t.touchpoint,
                 amount: t.totalAmount,
               }))}
@@ -202,7 +283,7 @@ export default function TouchpointsDashboardPage() {
             <Skeleton className="h-[300px] w-full rounded-xl" />
           ) : (
             <DynamicChart
-              data={touchpointAnalytics.map((t) => ({
+              data={filteredAnalytics.map((t) => ({
                 touchpoint: t.touchpoint,
                 percentage: Math.round(t.percentage * 10) / 10,
               }))}
@@ -255,7 +336,7 @@ export default function TouchpointsDashboardPage() {
                 <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmt(totalAmount)}</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">100.0%</td>
               </tr>
-              {touchpointAnalytics.map((t) => (
+              {filteredAnalytics.map((t) => (
                 <tr key={t.touchpoint} className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
                     {t.touchpoint}

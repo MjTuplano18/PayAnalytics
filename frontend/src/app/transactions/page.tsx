@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
-import { getTransactions, getDashboardSummary, type PaymentRecordOut } from "@/lib/api";
-import { useDashboard, useTransactions } from "@/lib/queries";
+import { getTransactions, getDashboardSummary, deleteTransaction, deleteTransactionsByDateRange, getUpload, deleteUpload, type PaymentRecordOut } from "@/lib/api";
+import { useDashboard, useTransactions, queryKeys } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { PaymentRecord, ParsedData } from "@/types/data";
 
@@ -20,8 +21,9 @@ function fmt(n: number): string {
 }
 
 export default function TransactionsPage() {
-  const { data, setData, sessionId, globalSearchQuery, setGlobalSearchQuery } = useData();
+  const { data, setData, sessionId, setSessionId, globalSearchQuery, setGlobalSearchQuery } = useData();
   const { token } = useAuth();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -259,6 +261,25 @@ export default function TransactionsPage() {
     };
   }, []);
 
+  /** Re-fetch session data from backend and update DataContext so all pages see the change */
+  const refreshSessionData = useCallback(async () => {
+    if (!token || !sessionId) return;
+    try {
+      const detail = await getUpload(token, sessionId);
+      const payments = detail.records.map((r) => ({
+        bank: r.bank,
+        paymentDate: r.payment_date ?? "",
+        paymentAmount: r.payment_amount,
+        account: r.account,
+        touchpoint: r.touchpoint ?? "",
+        environment: r.environment,
+      }));
+      setData(recalcParsedData(payments));
+    } catch {
+      // Silently fail — the TanStack Query cache will still be fresh
+    }
+  }, [token, sessionId, setData, recalcParsedData]);
+
   const handleAddTransaction = () => {
     if (!data) return;
     const amount = parseFloat(addForm.paymentAmount);
@@ -315,7 +336,32 @@ export default function TransactionsPage() {
 
   const handleCancelEdit = () => setEditingIndex(null);
 
-  const handleDelete = (globalIdx: number) => {
+  const handleDelete = async (globalIdx: number) => {
+    if (usingApi && token && sessionId && apiRows) {
+      const displayIdx = globalIdx - ((currentPage - 1) * rowsPerPage);
+      const row = apiRows[displayIdx];
+      if (!row) return;
+      try {
+        await deleteTransaction(token, sessionId, row.id);
+        queryClient.invalidateQueries({ queryKey: ["transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+
+        // If this was the last record, remove the session entirely
+        if (displayTotal <= 1) {
+          await deleteUpload(token, sessionId);
+          setSessionId(null);
+          setData(null);
+          queryClient.invalidateQueries({ queryKey: ["uploads"] });
+          toast.success("Last transaction deleted. Upload session removed.");
+        } else {
+          await refreshSessionData();
+          toast.success("Transaction deleted.");
+        }
+      } catch {
+        toast.error("Failed to delete transaction.");
+      }
+      return;
+    }
     if (!data) return;
     const newPayments = data.payments.filter((_, i) => i !== globalIdx);
     setData(recalcParsedData(newPayments));
@@ -331,18 +377,45 @@ export default function TransactionsPage() {
     }).length;
   }, [data, massDeleteFrom, massDeleteTo]);
 
-  const handleMassDelete = () => {
-    if (!data || !massDeleteFrom || !massDeleteTo) return;
+  const handleMassDelete = async () => {
+    if (!massDeleteFrom || !massDeleteTo) return;
+
+    if (usingApi && token && sessionId) {
+      // API mode: delete from backend
+      try {
+        const result = await deleteTransactionsByDateRange(token, sessionId, massDeleteFrom, massDeleteTo);
+        queryClient.invalidateQueries({ queryKey: ["transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        queryClient.invalidateQueries({ queryKey: ["uploads"] });
+
+        // Check if all records were deleted — if so, remove the session entirely
+        const remaining = displayTotal - result.deleted;
+        if (remaining <= 0) {
+          await deleteUpload(token, sessionId);
+          setSessionId(null);
+          setData(null);
+          queryClient.invalidateQueries({ queryKey: ["uploads"] });
+          closeMassDelete();
+          toast.success(`Deleted all ${fmt(result.deleted)} transactions. Upload session removed.`);
+        } else {
+          await refreshSessionData();
+          closeMassDelete();
+          toast.success(`Deleted ${fmt(result.deleted)} transactions.`);
+        }
+      } catch {
+        toast.error("Failed to delete transactions.");
+      }
+      return;
+    }
+
+    if (!data) return;
     const newPayments = data.payments.filter((p) => {
       const d = p.paymentDate;
       return !(d >= massDeleteFrom && d <= massDeleteTo);
     });
     const deleted = data.payments.length - newPayments.length;
     setData(recalcParsedData(newPayments));
-    setShowMassDelete(false);
-    setMassDeleteConfirmStep(false);
-    setMassDeleteFrom("");
-    setMassDeleteTo("");
+    closeMassDelete();
     toast.success(`Deleted ${fmt(deleted)} transactions.`);
   };
 
@@ -574,6 +647,9 @@ export default function TransactionsPage() {
                           </button>
                           <button onClick={handleCancelEdit} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500" title="Cancel">
                             <X className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => { handleDelete(globalIdx); setEditingIndex(null); }} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400" title="Delete">
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       ) : (
