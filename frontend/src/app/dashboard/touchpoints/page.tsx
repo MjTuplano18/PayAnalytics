@@ -1,0 +1,280 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Waypoints, DollarSign, Hash, BarChart3 } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useData } from "@/context/DataContext";
+import { useAuth } from "@/context/AuthContext";
+import { DynamicChart } from "@/components/DynamicChart";
+import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
+import { useDashboard } from "@/lib/queries";
+
+function fmt(n: number): string {
+  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+}
+
+export default function TouchpointsDashboardPage() {
+  const { data, sessionId } = useData();
+  const { token, user } = useAuth();
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
+  const { data: apiSummary, isLoading: apiLoading } = useDashboard(token, sessionId);
+
+  const payments = useMemo(() => {
+    if (!data) return [];
+    return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
+  }, [data, dateRange, customRange]);
+
+  const isFiltered = dateRange !== "all";
+
+  const touchpointAnalytics = useMemo(() => {
+    if (apiSummary && !isFiltered) {
+      return apiSummary.touchpoints.map((t) => ({
+        touchpoint: t.touchpoint,
+        count: t.count,
+        totalAmount: t.total_amount,
+        percentage: t.percentage,
+      }));
+    }
+    if (payments.length === 0) return [];
+    const tpMap = new Map<string, { count: number; totalAmount: number }>();
+    let totalAmount = 0;
+    for (const p of payments) {
+      totalAmount += p.paymentAmount;
+      const tp = p.touchpoint || "Unknown";
+      if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, totalAmount: 0 });
+      const entry = tpMap.get(tp)!;
+      entry.count++;
+      entry.totalAmount += p.paymentAmount;
+    }
+    return Array.from(tpMap.entries())
+      .map(([touchpoint, d]) => ({
+        touchpoint,
+        count: d.count,
+        totalAmount: d.totalAmount,
+        percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [apiSummary, payments, isFiltered]);
+
+  const totalTransactions = touchpointAnalytics.reduce((s, t) => s + t.count, 0);
+  const totalAmount = touchpointAnalytics.reduce((s, t) => s + t.totalAmount, 0);
+  const uniqueTouchpoints = touchpointAnalytics.length;
+  const topTouchpoint = touchpointAnalytics[0]?.touchpoint ?? "—";
+
+  const noData = touchpointAnalytics.length === 0 && !apiLoading;
+
+  const metricCards = [
+    { label: "Total Transactions", value: fmt(totalTransactions), icon: Hash, iconBg: "bg-teal-500" },
+    { label: "Total Amount", value: `₱${fmt(totalAmount)}`, icon: DollarSign, iconBg: "bg-teal-600" },
+    { label: "Unique Touchpoints", value: fmt(uniqueTouchpoints), icon: Waypoints, iconBg: "bg-teal-500" },
+    { label: "Top Touchpoint", value: topTouchpoint, icon: BarChart3, iconBg: "bg-teal-700" },
+  ];
+
+  return (
+    <div className="px-4 sm:px-8 py-8 min-h-screen">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+        <div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Welcome{user ? `, ${user.full_name.split(" ")[0]}` : ""}!
+          </p>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Touchpoints Dashboard</h1>
+        </div>
+        <DateFilter
+          value={dateRange}
+          onChange={(r, c) => { setDateRange(r); setCustomRange(c); }}
+          customRange={customRange}
+        />
+      </div>
+
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
+        {apiLoading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-9 w-9 rounded-lg" />
+                </div>
+                <Skeleton className="h-8 w-24 mt-2" />
+              </Card>
+            ))
+          : metricCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <Card
+                  key={card.label}
+                  className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {card.label}
+                    </span>
+                    <div className={`p-2 ${card.iconBg} rounded-lg`}>
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">
+                    {card.value}
+                  </div>
+                </Card>
+              );
+            })}
+      </div>
+
+      {noData && (
+        <div className="mb-6 p-4 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20 text-sm text-teal-700 dark:text-teal-300 text-center">
+          No records found for the selected time range. Upload data or try a different filter.
+        </div>
+      )}
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            Transactions per Touchpoint
+          </h3>
+          {apiLoading ? (
+            <Skeleton className="h-[350px] w-full rounded-xl" />
+          ) : (
+            <DynamicChart
+              data={touchpointAnalytics.map((t) => ({
+                touchpoint: t.touchpoint,
+                count: t.count,
+              }))}
+              type="bar"
+              dataKey="count"
+              xAxisKey="touchpoint"
+              height={350}
+            />
+          )}
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            Touchpoint Distribution
+          </h3>
+          {apiLoading ? (
+            <Skeleton className="h-[350px] w-full rounded-xl" />
+          ) : (
+            <DynamicChart
+              data={touchpointAnalytics.slice(0, 8).map((t) => ({
+                touchpoint: t.touchpoint,
+                count: t.count,
+              }))}
+              type="pie"
+              dataKey="count"
+              xAxisKey="touchpoint"
+              height={350}
+            />
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children mb-12">
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            Amount by Touchpoint
+          </h3>
+          {apiLoading ? (
+            <Skeleton className="h-[300px] w-full rounded-xl" />
+          ) : (
+            <DynamicChart
+              data={touchpointAnalytics.map((t) => ({
+                touchpoint: t.touchpoint,
+                amount: t.totalAmount,
+              }))}
+              type="barh"
+              dataKey="amount"
+              xAxisKey="touchpoint"
+              height={300}
+            />
+          )}
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            % Share by Touchpoint
+          </h3>
+          {apiLoading ? (
+            <Skeleton className="h-[300px] w-full rounded-xl" />
+          ) : (
+            <DynamicChart
+              data={touchpointAnalytics.map((t) => ({
+                touchpoint: t.touchpoint,
+                percentage: Math.round(t.percentage * 10) / 10,
+              }))}
+              type="bar"
+              dataKey="percentage"
+              xAxisKey="touchpoint"
+              height={300}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Touchpoint Table */}
+      {apiLoading ? (
+        <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-8 p-6">
+          <Skeleton className="h-6 w-40 mb-4" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Touchpoint Analytics
+            </h3>
+          </div>
+          <table className="w-full min-w-[500px]">
+            <thead className="bg-gray-50 dark:bg-gray-900">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  Touchpoint
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  Transactions
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  Total Amount
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  % of Total
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {/* Totals row */}
+              <tr className="bg-gray-50 dark:bg-gray-900 font-semibold">
+                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">Total</td>
+                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(totalTransactions)}</td>
+                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmt(totalAmount)}</td>
+                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">100.0%</td>
+              </tr>
+              {touchpointAnalytics.map((t) => (
+                <tr key={t.touchpoint} className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200">
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                    {t.touchpoint}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                    {fmt(t.count)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                    ₱{fmt(t.totalAmount)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                    {t.percentage.toFixed(1)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
