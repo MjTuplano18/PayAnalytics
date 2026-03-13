@@ -53,6 +53,8 @@ export function useTransactions(
     bank?: string;
     touchpoint?: string;
     search?: string;
+    payment_date?: string;
+    environment?: string;
     page?: number;
     page_size?: number;
   } = {}

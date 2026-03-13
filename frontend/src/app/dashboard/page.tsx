@@ -19,7 +19,7 @@ function fmt(n: number): string {
 
 export default function DashboardPage() {
   const { data, sessionId } = useData();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const { data: apiSummary, isLoading: apiLoading } = useDashboard(token, sessionId);
@@ -129,7 +129,12 @@ export default function DashboardPage() {
     <div className="px-4 sm:px-8 py-8 min-h-screen">
       {/* Date Filter */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
+        <div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Welcome{user ? `, ${user.full_name.split(" ")[0]}` : ""}!
+          </p>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
+        </div>
         <DateFilter
           value={dateRange}
           onChange={(r, c) => { setDateRange(r); setCustomRange(c); }}

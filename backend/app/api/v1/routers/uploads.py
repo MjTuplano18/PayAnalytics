@@ -68,6 +68,8 @@ async def get_transactions(
     bank: str | None = None,
     touchpoint: str | None = None,
     search: str | None = None,
+    payment_date: str | None = None,
+    environment: str | None = None,
     page: int = 1,
     page_size: int = 25,
     current_user: User = Depends(get_current_user),
@@ -80,17 +82,20 @@ async def get_transactions(
         page_size = 25
 
     repo = UploadRepository(db)
-    total, records = await repo.get_transactions(
+    total, total_amount, records = await repo.get_transactions(
         session_id=session_id,
         user_id=current_user.id,
         bank=bank,
         touchpoint=touchpoint,
         search=search,
+        payment_date=payment_date,
+        environment=environment,
         page=page,
         page_size=page_size,
     )
     return PaginatedTransactions(
         total=total,
+        total_amount=total_amount,
         page=page,
         page_size=page_size,
         items=[PaymentRecordOut.model_validate(r) for r in records],

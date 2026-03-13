@@ -41,6 +41,7 @@ class UploadSessionDetail(UploadSessionOut):
 
 class PaginatedTransactions(BaseModel):
     total: int
+    total_amount: float
     page: int
     page_size: int
     items: list[PaymentRecordOut]
@@ -68,6 +69,8 @@ class DashboardSummary(BaseModel):
     total_banks: int
     banks: list[BankSummary]
     touchpoints: list[TouchpointSummary]
+    dates: list[str] = []
+    environments: list[str] = []
     session_id: str | None = None
 
 

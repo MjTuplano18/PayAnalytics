@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { Download, Search, Plus, Pencil, Trash2, ChevronDown, X, Check } from "lucide-react";
+import { Download, Search, Plus, Pencil, Trash2, ChevronDown, X, Check, AlertTriangle } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,8 @@ export default function TransactionsPage() {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [bankFilter, setBankFilter] = useState("all");
   const [tpFilter, setTpFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
+  const [envFilter, setEnvFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
@@ -49,6 +51,8 @@ export default function TransactionsPage() {
   const apiFilters = {
     bank: bankFilter !== "all" ? bankFilter : undefined,
     touchpoint: tpFilter !== "all" ? tpFilter : undefined,
+    payment_date: dateFilter !== "all" ? dateFilter : undefined,
+    environment: envFilter !== "all" ? envFilter : undefined,
     search: debouncedSearch || undefined,
     page: currentPage,
     page_size: rowsPerPage,
@@ -57,9 +61,11 @@ export default function TransactionsPage() {
 
   const apiRows = txPage?.items ?? null;
   const apiTotal = txPage?.total ?? 0;
-  const apiTotalAmount = dashSummary?.total_amount ?? 0;
+  const apiTotalAmount = txPage?.total_amount ?? 0;
   const apiBanks = dashSummary?.banks.map((b) => b.bank) ?? [];
   const apiTouchpoints = dashSummary?.touchpoints.map((t) => t.touchpoint) ?? [];
+  const apiDates = dashSummary?.dates ?? [];
+  const apiEnvironments = dashSummary?.environments ?? [];
 
   // Initialize search query from global context (e.g. nav bar search)
   useEffect(() => {
@@ -80,12 +86,24 @@ export default function TransactionsPage() {
     return [...new Set(data.payments.map((p) => p.touchpoint))].sort();
   }, [data]);
 
+  const inMemoryDates = useMemo(() => {
+    if (!data) return [];
+    return [...new Set(data.payments.map((p) => p.paymentDate).filter(Boolean))].sort();
+  }, [data]);
+
+  const inMemoryEnvironments = useMemo(() => {
+    if (!data) return [];
+    return [...new Set(data.payments.map((p) => p.environment).filter(Boolean) as string[])].sort();
+  }, [data]);
+
   const inMemoryFiltered = useMemo(() => {
     if (sessionId || !data) return [];
     const dateFiltered = filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
     return dateFiltered.filter((p) => {
       if (bankFilter !== "all" && p.bank !== bankFilter) return false;
       if (tpFilter !== "all" && p.touchpoint !== tpFilter) return false;
+      if (dateFilter !== "all" && p.paymentDate !== dateFilter) return false;
+      if (envFilter !== "all" && (p.environment ?? "") !== envFilter) return false;
       if (debouncedSearch) {
         const q = debouncedSearch.toLowerCase();
         return (
@@ -96,7 +114,7 @@ export default function TransactionsPage() {
       }
       return true;
     });
-  }, [data, sessionId, bankFilter, tpFilter, debouncedSearch, dateRange, customRange]);
+  }, [data, sessionId, bankFilter, tpFilter, dateFilter, envFilter, debouncedSearch, dateRange, customRange]);
 
   const inMemoryFilteredTotal = useMemo(
     () => inMemoryFiltered.reduce((s, p) => s + p.paymentAmount, 0),
@@ -113,13 +131,16 @@ export default function TransactionsPage() {
   const usingApi = !!sessionId;
   const displayBanks = usingApi ? apiBanks : inMemoryBanks;
   const displayTouchpoints = usingApi ? apiTouchpoints : inMemoryTouchpoints;
+  const displayDates = usingApi ? apiDates : inMemoryDates;
+  const displayEnvironments = usingApi ? apiEnvironments : inMemoryEnvironments;
   const displayRows = usingApi
     ? (apiRows ?? []).map((r) => ({
         bank: r.bank,
-        paymentDate: r.payment_date,
+        paymentDate: r.payment_date ?? "",
         paymentAmount: r.payment_amount,
         account: r.account,
-        touchpoint: r.touchpoint,
+        touchpoint: r.touchpoint ?? "",
+        environment: r.environment ?? "",
       }))
     : inMemoryPaginatedRows.map((p) => ({
         bank: p.bank,
@@ -127,6 +148,7 @@ export default function TransactionsPage() {
         paymentAmount: p.paymentAmount,
         account: p.account,
         touchpoint: p.touchpoint,
+        environment: p.environment ?? "",
       }));
   const displayTotal = usingApi ? apiTotal : inMemoryFiltered.length;
   const displayTotalAmount = usingApi ? apiTotalAmount : inMemoryFilteredTotal;
@@ -137,10 +159,10 @@ export default function TransactionsPage() {
 
   const handleExportCSV = () => {
     const rows = usingApi
-      ? (apiRows ?? []).map((r) => [r.bank, r.payment_date, r.payment_amount.toFixed(2), r.account, r.touchpoint])
-      : inMemoryFiltered.map((p) => [p.bank, p.paymentDate, p.paymentAmount.toFixed(2), p.account, p.touchpoint]);
+      ? (apiRows ?? []).map((r) => [r.bank, r.payment_date, r.payment_amount.toFixed(2), r.account, r.touchpoint, r.environment ?? ""])
+      : inMemoryFiltered.map((p) => [p.bank, p.paymentDate, p.paymentAmount.toFixed(2), p.account, p.touchpoint, p.environment ?? ""]);
     const csv = [
-      ["Bank", "Payment Date", "Payment Amount", "Account", "Touchpoint"],
+      ["Bank", "Payment Date", "Payment Amount", "Account", "Touchpoint", "Environment"],
       ...rows,
     ]
       .map((row) => row.join(","))
@@ -165,10 +187,11 @@ export default function TransactionsPage() {
       { header: "Payment Amount", key: "paymentAmount" },
       { header: "Account", key: "account" },
       { header: "Touchpoint", key: "touchpoint" },
+      { header: "Environment", key: "environment" },
     ];
     const rows = usingApi
-      ? (apiRows ?? []).map((r) => ({ bank: r.bank, paymentDate: r.payment_date, paymentAmount: r.payment_amount, account: r.account, touchpoint: r.touchpoint }))
-      : inMemoryFiltered.map((p) => ({ bank: p.bank, paymentDate: p.paymentDate, paymentAmount: p.paymentAmount, account: p.account, touchpoint: p.touchpoint }));
+      ? (apiRows ?? []).map((r) => ({ bank: r.bank, paymentDate: r.payment_date, paymentAmount: r.payment_amount, account: r.account, touchpoint: r.touchpoint, environment: r.environment ?? "" }))
+      : inMemoryFiltered.map((p) => ({ bank: p.bank, paymentDate: p.paymentDate, paymentAmount: p.paymentAmount, account: p.account, touchpoint: p.touchpoint, environment: p.environment ?? "" }));
     sheet.addRows(rows);
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -186,6 +209,12 @@ export default function TransactionsPage() {
   const [editForm, setEditForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
   const [addForm, setAddForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
   const [exportOpen, setExportOpen] = useState(false);
+
+  // Mass delete state
+  const [showMassDelete, setShowMassDelete] = useState(false);
+  const [massDeleteFrom, setMassDeleteFrom] = useState("");
+  const [massDeleteTo, setMassDeleteTo] = useState("");
+  const [massDeleteConfirmStep, setMassDeleteConfirmStep] = useState(false);
 
   const recalcParsedData = useCallback((payments: PaymentRecord[]): ParsedData => {
     const bankMap = new Map<string, { count: Set<string>; amount: number; paymentCount: number }>();
@@ -293,6 +322,37 @@ export default function TransactionsPage() {
     toast.success("Transaction deleted.");
   };
 
+  // Mass delete: count of records in selected date range
+  const massDeleteCount = useMemo(() => {
+    if (!data || !massDeleteFrom || !massDeleteTo) return 0;
+    return data.payments.filter((p) => {
+      const d = p.paymentDate;
+      return d >= massDeleteFrom && d <= massDeleteTo;
+    }).length;
+  }, [data, massDeleteFrom, massDeleteTo]);
+
+  const handleMassDelete = () => {
+    if (!data || !massDeleteFrom || !massDeleteTo) return;
+    const newPayments = data.payments.filter((p) => {
+      const d = p.paymentDate;
+      return !(d >= massDeleteFrom && d <= massDeleteTo);
+    });
+    const deleted = data.payments.length - newPayments.length;
+    setData(recalcParsedData(newPayments));
+    setShowMassDelete(false);
+    setMassDeleteConfirmStep(false);
+    setMassDeleteFrom("");
+    setMassDeleteTo("");
+    toast.success(`Deleted ${fmt(deleted)} transactions.`);
+  };
+
+  const closeMassDelete = () => {
+    setShowMassDelete(false);
+    setMassDeleteConfirmStep(false);
+    setMassDeleteFrom("");
+    setMassDeleteTo("");
+  };
+
   // Map display row index back to global index in data.payments
   const getGlobalIndex = (rowIdx: number): number => {
     if (!data) return -1;
@@ -377,41 +437,59 @@ export default function TransactionsPage() {
 
         {/* Filters */}
         <div className="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="relative sm:col-span-2 lg:col-span-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
               <input
                 type="text"
                 placeholder="Search bank, account, touchpoint..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); }}
-                className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
               />
             </div>
 
             <select
               value={bankFilter}
               onChange={(e) => { setBankFilter(e.target.value); resetPage(); }}
-              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
             >
               <option value="all">All Banks</option>
               {displayBanks.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
+                <option key={b} value={b}>{b}</option>
               ))}
             </select>
 
             <select
               value={tpFilter}
               onChange={(e) => { setTpFilter(e.target.value); resetPage(); }}
-              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
             >
               <option value="all">All Touchpoints</option>
               {displayTouchpoints.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+
+            <select
+              value={dateFilter}
+              onChange={(e) => { setDateFilter(e.target.value); resetPage(); }}
+              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+            >
+              <option value="all">All Dates</option>
+              {displayDates.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+
+            <select
+              value={envFilter}
+              onChange={(e) => { setEnvFilter(e.target.value); resetPage(); }}
+              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+            >
+              <option value="all">All Environments</option>
+              {displayEnvironments.map((e) => (
+                <option key={e} value={e}>{e}</option>
               ))}
             </select>
           </div>
@@ -426,7 +504,7 @@ export default function TransactionsPage() {
               ))}
             </div>
           ) : (
-          <table className="w-full min-w-[700px]">
+          <table className="w-full min-w-[850px]">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -443,6 +521,9 @@ export default function TransactionsPage() {
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Touchpoint
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  Environment
                 </th>
                 {data && (
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">
@@ -481,6 +562,9 @@ export default function TransactionsPage() {
                       </span>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    {p.environment || "—"}
+                  </td>
                   {data && (
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       {isEditing ? (
@@ -493,14 +577,9 @@ export default function TransactionsPage() {
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => handleStartEdit(globalIdx)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => handleDelete(globalIdx)} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400" title="Delete">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        <button onClick={() => handleStartEdit(globalIdx)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
                       )}
                     </td>
                   )}
@@ -574,13 +653,22 @@ export default function TransactionsPage() {
 
       {/* Floating Add Button */}
       {data && (
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="fixed bottom-8 right-8 w-14 h-14 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center z-50"
-          title="Add Transaction"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
+        <>
+          <button
+            onClick={() => setShowMassDelete(true)}
+            className="fixed bottom-8 right-24 w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center z-50"
+            title="Mass Delete"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="fixed bottom-8 right-8 w-14 h-14 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center z-50"
+            title="Add Transaction"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
+        </>
       )}
 
       {/* Add Transaction Popup */}
@@ -619,6 +707,90 @@ export default function TransactionsPage() {
               <Button onClick={handleAddTransaction} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white">Add Transaction</Button>
               <Button variant="outline" onClick={() => setShowAddForm(false)} className="flex-1">Cancel</Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mass Delete Modal */}
+      {showMassDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px]" onClick={closeMassDelete}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+                  <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Mass Delete</h3>
+              </div>
+              <button onClick={closeMassDelete} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!massDeleteConfirmStep ? (
+              <>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  Select a date range to delete all matching transactions.
+                </p>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-sm text-gray-700 dark:text-gray-300">From</Label>
+                    <Input
+                      type="date"
+                      value={massDeleteFrom}
+                      onChange={(e) => setMassDeleteFrom(e.target.value)}
+                      className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm text-gray-700 dark:text-gray-300">To</Label>
+                    <Input
+                      type="date"
+                      value={massDeleteTo}
+                      onChange={(e) => setMassDeleteTo(e.target.value)}
+                      className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+                </div>
+
+                {massDeleteFrom && massDeleteTo && (
+                  <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {massDeleteCount > 0
+                      ? <><span className="text-red-500">{fmt(massDeleteCount)}</span> transaction{massDeleteCount !== 1 ? "s" : ""} will be deleted.</>
+                      : "No transactions found in this range."}
+                  </p>
+                )}
+
+                <div className="flex gap-3 mt-5">
+                  <Button
+                    onClick={() => setMassDeleteConfirmStep(true)}
+                    disabled={!massDeleteFrom || !massDeleteTo || massDeleteCount === 0}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-40"
+                  >
+                    Delete
+                  </Button>
+                  <Button variant="outline" onClick={closeMassDelete} className="flex-1">Cancel</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 mb-4">
+                  <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    Are you sure? This will permanently delete <strong>{fmt(massDeleteCount)}</strong> transaction{massDeleteCount !== 1 ? "s" : ""} from {massDeleteFrom} to {massDeleteTo}. This action cannot be undone.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleMassDelete}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    Yes, Delete
+                  </Button>
+                  <Button variant="outline" onClick={() => setMassDeleteConfirmStep(false)} className="flex-1">Go Back</Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

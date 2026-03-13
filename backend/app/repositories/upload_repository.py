@@ -110,9 +110,11 @@ class UploadRepository:
         bank: str | None = None,
         touchpoint: str | None = None,
         search: str | None = None,
+        payment_date: str | None = None,
+        environment: str | None = None,
         page: int = 1,
         page_size: int = 25,
-    ) -> tuple[int, list[PaymentRecord]]:
+    ) -> tuple[int, float, list[PaymentRecord]]:
         # Verify the session belongs to this user
         session_check = await self.session.execute(
             select(UploadSession.id).where(
@@ -121,7 +123,7 @@ class UploadRepository:
             )
         )
         if not session_check.scalar_one_or_none():
-            return 0, []
+            return 0, 0.0, []
 
         query = select(PaymentRecord).where(PaymentRecord.session_id == session_id)
 
@@ -129,20 +131,36 @@ class UploadRepository:
             query = query.where(PaymentRecord.bank == bank)
         if touchpoint:
             query = query.where(PaymentRecord.touchpoint == touchpoint)
+        if payment_date:
+            query = query.where(PaymentRecord.payment_date == payment_date)
+        if environment:
+            query = query.where(PaymentRecord.environment == environment)
         if search:
-            query = query.where(PaymentRecord.account.ilike(f"%{search}%"))
+            pattern = f"%{search}%"
+            from sqlalchemy import or_, cast, String
+            query = query.where(
+                or_(
+                    PaymentRecord.bank.ilike(pattern),
+                    PaymentRecord.account.ilike(pattern),
+                    PaymentRecord.touchpoint.ilike(pattern),
+                    PaymentRecord.payment_date.ilike(pattern),
+                    PaymentRecord.environment.ilike(pattern),
+                    cast(PaymentRecord.payment_amount, String).ilike(pattern),
+                )
+            )
 
-        # Total count
-        count_result = await self.session.execute(
-            select(func.count()).select_from(query.subquery())
+        # Total count and total amount for the filtered set
+        sub = query.subquery()
+        agg_result = await self.session.execute(
+            select(func.count(), func.coalesce(func.sum(sub.c.payment_amount), 0)).select_from(sub)
         )
-        total = count_result.scalar_one()
+        total, total_amount = agg_result.one()
 
         # Paginated results
         offset = (page - 1) * page_size
         query = query.order_by(PaymentRecord.payment_date.desc()).offset(offset).limit(page_size)
         result = await self.session.execute(query)
-        return total, list(result.scalars().all())
+        return total, float(total_amount), list(result.scalars().all())
 
     async def get_dashboard_summary(self, session_id: str, user_id: str) -> dict | None:
         # Verify session ownership
@@ -212,6 +230,24 @@ class UploadRepository:
             for row in tp_rows.all()
         ]
 
+        # Distinct dates
+        date_rows = await self.session.execute(
+            select(func.distinct(PaymentRecord.payment_date))
+            .where(PaymentRecord.session_id == session_id)
+            .where(PaymentRecord.payment_date.isnot(None))
+            .order_by(PaymentRecord.payment_date)
+        )
+        dates = [row[0] for row in date_rows.all()]
+
+        # Distinct environments
+        env_rows = await self.session.execute(
+            select(func.distinct(PaymentRecord.environment))
+            .where(PaymentRecord.session_id == session_id)
+            .where(PaymentRecord.environment.isnot(None))
+            .order_by(PaymentRecord.environment)
+        )
+        environments = [row[0] for row in env_rows.all()]
+
         return {
             "total_payments": total_payments or 0,
             "total_amount": total_amount,
@@ -219,5 +255,7 @@ class UploadRepository:
             "total_banks": total_banks or 0,
             "banks": banks,
             "touchpoints": touchpoints,
+            "dates": dates,
+            "environments": environments,
             "session_id": session_id,
         }

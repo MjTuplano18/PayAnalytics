@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, AlertCircle, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, History, Merge, X } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, History, Merge, X, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -13,7 +13,7 @@ import { saveUpload, getUpload, deleteUpload, type UploadSessionOut } from "@/li
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUploads } from "@/lib/queries";
-import { ParsedData } from "@/types/data";
+import { ParsedData, PaymentRecord } from "@/types/data";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -55,6 +55,164 @@ export default function UploadPage() {
     filesProcessed: number;
   } | null>(null);
 
+  // Date filter popup state
+  const [pendingParsed, setPendingParsed] = useState<ParsedData | null>(null);
+  const [pendingFileName, setPendingFileName] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [allDates, setAllDates] = useState(true);
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+
+  // Extract unique sorted dates from pending data
+  const availableDates = useMemo(() => {
+    if (!pendingParsed) return [];
+    const dates = new Set<string>();
+    for (const p of pendingParsed.payments) {
+      if (p.paymentDate) dates.add(p.paymentDate);
+    }
+    return [...dates].sort();
+  }, [pendingParsed]);
+
+  // Count records matching the current date range selection
+  const filteredRecordCount = useMemo(() => {
+    if (!pendingParsed || allDates) return pendingParsed?.payments.length ?? 0;
+    return pendingParsed.payments.filter((p) => {
+      if (!p.paymentDate) return false;
+      if (dateFrom && p.paymentDate < dateFrom) return false;
+      if (dateTo && p.paymentDate > dateTo) return false;
+      return true;
+    }).length;
+  }, [pendingParsed, allDates, dateFrom, dateTo]);
+
+  // Rebuild ParsedData from a filtered payment array
+  function buildParsedData(payments: PaymentRecord[]): ParsedData {
+    const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
+    const tpMap = new Map<string, { count: number; totalAmount: number }>();
+    let totalAmount = 0;
+    const allAccounts = new Set<string>();
+
+    for (const p of payments) {
+      totalAmount += p.paymentAmount;
+      allAccounts.add(p.account);
+      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
+      const b = bankMap.get(p.bank)!;
+      b.totalAmount += p.paymentAmount;
+      b.paymentCount++;
+      b.accounts.add(p.account);
+      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
+      const t = tpMap.get(p.touchpoint)!;
+      t.count++;
+      t.totalAmount += p.paymentAmount;
+    }
+
+    const bankAnalytics = Array.from(bankMap.entries())
+      .map(([bank, d]) => ({
+        bank,
+        accountCount: d.accounts.size,
+        totalAmount: d.totalAmount,
+        debtorSum: 0,
+        percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
+        paymentCount: d.paymentCount,
+      }))
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+
+    const touchpointAnalytics = Array.from(tpMap.entries())
+      .map(([touchpoint, d]) => ({
+        touchpoint,
+        count: d.count,
+        totalAmount: d.totalAmount,
+        percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      payments,
+      bankAnalytics,
+      touchpointAnalytics,
+      totalAccounts: allAccounts.size,
+      totalAmount,
+      totalPayments: payments.length,
+      raw: payments.map((p) => ({ Bank: p.bank, "Payment Date": p.paymentDate, "Payment Amount": p.paymentAmount, Account: p.account, Touchpoint: p.touchpoint })),
+    };
+  }
+
+  // Finalize import after user confirms date selection
+  const finalizeImport = async (parsedData: ParsedData, fileName: string) => {
+    setData(parsedData);
+    setRawData(parsedData.raw);
+    setFileName(fileName);
+
+    if (token) {
+      try {
+        const records = parsedData.payments.map((p) => ({
+          bank: p.bank,
+          account: p.account,
+          touchpoint: p.touchpoint,
+          payment_date: p.paymentDate,
+          payment_amount: p.paymentAmount,
+          environment: p.environment,
+        }));
+        const saved = await saveUpload(token, { file_name: fileName, records });
+        setSessionId(saved.id);
+        await queryClient.invalidateQueries({ queryKey: ["uploads"] });
+        toast.success(`File uploaded & saved! ${saved.total_records} records stored.`);
+      } catch (backendErr) {
+        setSessionId(null);
+        const msg = backendErr instanceof Error ? backendErr.message : "Unknown error";
+        toast.warning(`File loaded locally — server sync failed: ${msg}. Make sure the backend is running.`);
+      }
+    } else {
+      toast.success("File uploaded successfully!");
+    }
+
+    setUploadSuccess(true);
+    setTimeout(() => {
+      router.push("/dashboard");
+    }, 1500);
+  };
+
+  // Handle date selection confirmation
+  const handleDateConfirm = async () => {
+    if (!pendingParsed) return;
+
+    let finalData: ParsedData;
+    if (allDates) {
+      finalData = pendingParsed;
+    } else {
+      const filtered = pendingParsed.payments.filter((p) => {
+        if (!p.paymentDate) return false;
+        if (dateFrom && p.paymentDate < dateFrom) return false;
+        if (dateTo && p.paymentDate > dateTo) return false;
+        return true;
+      });
+      if (filtered.length === 0) {
+        toast.error("No records found for the selected date range.");
+        return;
+      }
+      finalData = buildParsedData(filtered);
+    }
+
+    setShowDatePicker(false);
+    setPendingParsed(null);
+    setUploading(true);
+    try {
+      await finalizeImport(finalData, pendingFileName);
+    } catch {
+      toast.error("Import failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDateCancel = () => {
+    setShowDatePicker(false);
+    setPendingParsed(null);
+    setPendingFileName("");
+    setDateFrom("");
+    setDateTo("");
+    setUploading(false);
+  };
+
   const handleFileUpload = async (file: File) => {
     setUploading(true);
     setError(null);
@@ -62,40 +220,15 @@ export default function UploadPage() {
 
     try {
       const parsedData = await parseExcelFile(file);
-      setData(parsedData);
-      setRawData(parsedData.raw);
-      setFileName(file.name);
 
-      // Persist to backend if authenticated
-      if (token) {
-        try {
-          const records = parsedData.payments.map((p) => ({
-            bank: p.bank,
-            account: p.account,
-            touchpoint: p.touchpoint,
-            payment_date: p.paymentDate,
-            payment_amount: p.paymentAmount,
-            environment: p.environment,
-          }));
-          const saved = await saveUpload(token, { file_name: file.name, records });
-          setSessionId(saved.id);
-          // Immediately refresh the uploads list in cache so other pages see the new file
-          await queryClient.invalidateQueries({ queryKey: ["uploads"] });
-          toast.success(`File uploaded & saved! ${saved.total_records} records stored.`);
-        } catch (backendErr) {
-          // Backend save failed — still work in-memory
-          setSessionId(null);
-          const msg = backendErr instanceof Error ? backendErr.message : "Unknown error";
-          toast.warning(`File loaded locally — server sync failed: ${msg}. Make sure the backend is running.`);
-        }
-      } else {
-        toast.success("File uploaded successfully!");
-      }
-
-      setUploadSuccess(true);
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 1500);
+      // Show date selection popup before importing
+      setPendingParsed(parsedData);
+      setPendingFileName(file.name);
+      setAllDates(true);
+      setDateFrom("");
+      setDateTo("");
+      setShowDatePicker(true);
+      setUploading(false);
     } catch (err) {
       const message =
         err instanceof Error
@@ -110,24 +243,38 @@ export default function UploadPage() {
 
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (
-      file &&
-      (file.name.endsWith(".xlsx") ||
-        file.name.endsWith(".xls") ||
-        file.name.endsWith(".json"))
-    ) {
-      handleFileUpload(file);
+    const files = Array.from(e.dataTransfer.files).filter(
+      (f) =>
+        f.name.endsWith(".xlsx") ||
+        f.name.endsWith(".xls") ||
+        f.name.endsWith(".csv") ||
+        f.name.endsWith(".json")
+    );
+    if (files.length === 0) {
+      setError("Please upload valid files (.xlsx, .xls, .csv)");
+      return;
+    }
+    if (files.length === 1) {
+      handleFileUpload(files[0]);
     } else {
-      setError("Please upload a valid Excel file (.xlsx, .xls) or JSON file");
+      setMergeFiles((prev) => [...prev, ...files]);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFileUpload(file);
+    const files = Array.from(e.target.files || []).filter(
+      (f) =>
+        f.name.endsWith(".xlsx") ||
+        f.name.endsWith(".xls") ||
+        f.name.endsWith(".csv") ||
+        f.name.endsWith(".json")
+    );
+    if (files.length === 1) {
+      handleFileUpload(files[0]);
+    } else if (files.length > 1) {
+      setMergeFiles((prev) => [...prev, ...files]);
     }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleRestore = async (session: UploadSessionOut) => {
@@ -351,7 +498,7 @@ export default function UploadPage() {
       {/* Main content */}
       <div className="max-w-4xl mx-auto">
         <div className="space-y-6">
-          {/* Upload Area */}
+          {/* Combined Upload & Merge Area */}
           <Card
             className="p-8 sm:p-12 border-2 border-dashed bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-center cursor-pointer hover:border-teal-500 hover:shadow-lg transition-all duration-300 animate-fade-in-up"
             style={{ animationDelay: '0.15s' }}
@@ -361,25 +508,93 @@ export default function UploadPage() {
           >
             <Upload className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600" />
             <h3 className="text-lg sm:text-xl font-semibold mb-2 text-gray-900 dark:text-white">
-              Drag and drop your file here
+              Drop one or more files here
             </h3>
-            <p className="mb-4 text-gray-500 dark:text-gray-400">
-              Supports CSV, XLSX, and JSON files
+            <p className="mb-1 text-gray-500 dark:text-gray-400">
+              Supports .xlsx, .xls, and .csv files
+            </p>
+            <p className="mb-4 text-sm text-gray-400 dark:text-gray-500">
+              Drop a single file to import, or multiple files to merge them into one dataset
             </p>
             <Button
               className="bg-teal-600 hover:bg-teal-700 text-white"
-              disabled={uploading}
+              disabled={uploading || merging}
             >
-              {uploading ? "Uploading..." : "Browse Files"}
+              {uploading ? "Processing..." : merging ? "Merging..." : "Browse Files"}
             </Button>
             <input
               ref={fileInputRef}
               type="file"
               accept=".xlsx,.xls,.csv,.json"
+              multiple
               onChange={handleFileSelect}
               className="hidden"
             />
           </Card>
+
+          {/* Merge file list (shown when multiple files queued) */}
+          {mergeFiles.length > 0 && (
+            <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 animate-fade-in-up" style={{ animationDelay: '0.20s' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Merge className="w-5 h-5 text-teal-400" />
+                <h4 className="text-gray-900 dark:text-white font-semibold">Files to Merge</h4>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  — duplicates (same account + date + amount) will be removed automatically
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-4" onClick={(e) => e.stopPropagation()}>
+                {mergeFiles.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-700 rounded-full text-sm">
+                    <FileSpreadsheet className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                    <span className="text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{f.name}</span>
+                    <button onClick={(e) => { e.stopPropagation(); removeMergeFile(i); }} className="text-gray-400 hover:text-red-500 transition-colors">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  onClick={() => mergeInputRef.current?.click()}
+                  disabled={merging}
+                  className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
+                >
+                  Add More Files
+                </Button>
+                <Button
+                  onClick={executeMerge}
+                  disabled={merging || mergeFiles.length < 2}
+                  className="bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50"
+                >
+                  {merging ? "Merging..." : `Merge ${mergeFiles.length} File${mergeFiles.length !== 1 ? "s" : ""}`}
+                </Button>
+                <Button
+                  onClick={() => { setMergeFiles([]); setMergeResult(null); }}
+                  disabled={merging}
+                  className="bg-transparent hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 border border-gray-200 dark:border-gray-600 hover:border-red-300 dark:hover:border-red-600"
+                >
+                  Clear All
+                </Button>
+                <input
+                  ref={mergeInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.json"
+                  multiple
+                  onChange={handleMergeFiles}
+                  className="hidden"
+                />
+              </div>
+
+              {mergeResult && (
+                <div className="mt-4 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-sm text-green-700 dark:text-green-300">
+                  <CheckCircle2 className="w-4 h-4 inline mr-2" />
+                  Merged {mergeResult.filesProcessed} files — {fmt(mergeResult.totalRecords)} total records, {fmt(mergeResult.duplicatesRemoved)} duplicates removed. Redirecting...
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Import Instructions */}
           <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
@@ -411,61 +626,6 @@ export default function UploadPage() {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Multi-File Merge */}
-          <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 animate-fade-in-up" style={{ animationDelay: '0.30s' }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Merge className="w-5 h-5 text-teal-400" />
-              <h4 className="text-gray-900 dark:text-white font-semibold">Multi-File Merge</h4>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Combine multiple Excel files into one dataset. Duplicate records (same account + date + amount) are automatically removed.
-            </p>
-
-            <div className="flex flex-wrap gap-2 mb-4">
-              {mergeFiles.map((f, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-700 rounded-full text-sm">
-                  <FileSpreadsheet className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                  <span className="text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{f.name}</span>
-                  <button onClick={() => removeMergeFile(i)} className="text-gray-400 hover:text-red-500 transition-colors">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => mergeInputRef.current?.click()}
-                disabled={merging}
-                className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
-              >
-                Add Files
-              </Button>
-              <Button
-                onClick={executeMerge}
-                disabled={merging || mergeFiles.length < 2}
-                className="bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50"
-              >
-                {merging ? "Merging..." : `Merge ${mergeFiles.length} File${mergeFiles.length !== 1 ? "s" : ""}`}
-              </Button>
-              <input
-                ref={mergeInputRef}
-                type="file"
-                accept=".xlsx,.xls,.json"
-                multiple
-                onChange={handleMergeFiles}
-                className="hidden"
-              />
-            </div>
-
-            {mergeResult && (
-              <div className="mt-4 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-sm text-green-700 dark:text-green-300">
-                <CheckCircle2 className="w-4 h-4 inline mr-2" />
-                Merged {mergeResult.filesProcessed} files — {fmt(mergeResult.totalRecords)} total records, {fmt(mergeResult.duplicatesRemoved)} duplicates removed. Redirecting...
-              </div>
-            )}
           </div>
 
           {/* Alerts */}
@@ -582,6 +742,133 @@ export default function UploadPage() {
           )}
         </div>
       </div>
+
+      {/* Date Selection Popup */}
+      {showDatePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md mx-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-2xl p-6 animate-fade-in-up">
+            <div className="flex items-center gap-3 mb-4">
+              <CalendarDays className="w-6 h-6 text-teal-500" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Select Import Date
+              </h3>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              File: <span className="font-medium text-gray-800 dark:text-gray-200">{pendingFileName}</span>
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
+              {fmt(pendingParsed?.payments.length ?? 0)} total records &middot; {availableDates.length} unique date{availableDates.length !== 1 ? "s" : ""} found
+              {availableDates.length > 0 && (
+                <span> &middot; {availableDates[0]} to {availableDates[availableDates.length - 1]}</span>
+              )}
+            </p>
+
+            {/* All Dates checkbox */}
+            <label className="flex items-center gap-3 mb-5 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={allDates}
+                onChange={(e) => {
+                  setAllDates(e.target.checked);
+                  if (e.target.checked) {
+                    setDateFrom("");
+                    setDateTo("");
+                  }
+                }}
+                className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-teal-600 focus:ring-teal-500 accent-teal-600"
+              />
+              <span className="text-gray-900 dark:text-white font-medium group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                All Dates
+              </span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                (Import entire file)
+              </span>
+            </label>
+
+            {/* Date range selectors */}
+            <div className={`transition-opacity ${allDates ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Or select a date range:
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                    From
+                  </label>
+                  <select
+                    value={dateFrom}
+                    onChange={(e) => {
+                      setDateFrom(e.target.value);
+                      if (e.target.value) setAllDates(false);
+                      // Auto-set To if empty or less than From
+                      if (e.target.value && (!dateTo || dateTo < e.target.value)) {
+                        setDateTo(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="">Earliest</option>
+                    {availableDates.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                    To
+                  </label>
+                  <select
+                    value={dateTo}
+                    onChange={(e) => {
+                      setDateTo(e.target.value);
+                      if (e.target.value) setAllDates(false);
+                      // Auto-set From if empty or greater than To
+                      if (e.target.value && (!dateFrom || dateFrom > e.target.value)) {
+                        setDateFrom(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="">Latest</option>
+                    {availableDates.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary of selection */}
+            {!allDates && (dateFrom || dateTo) && (
+              <div className="mt-4 p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 text-sm text-teal-700 dark:text-teal-300">
+                <CheckCircle2 className="w-4 h-4 inline mr-2" />
+                {fmt(filteredRecordCount)} records will be imported
+                {dateFrom && dateTo && dateFrom === dateTo
+                  ? ` for ${dateFrom}`
+                  : ` from ${dateFrom || availableDates[0] || "start"} to ${dateTo || availableDates[availableDates.length - 1] || "end"}`}
+              </div>
+            )}
+
+            {/* Buttons */}
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <Button
+                onClick={handleDateCancel}
+                className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDateConfirm}
+                disabled={!allDates && !dateFrom && !dateTo}
+                className="bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50"
+              >
+                Import {!allDates && filteredRecordCount > 0 ? `(${fmt(filteredRecordCount)} records)` : ""}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

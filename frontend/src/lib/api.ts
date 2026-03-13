@@ -122,6 +122,7 @@ export interface UploadSessionDetail extends UploadSessionOut {
 
 export interface PaginatedTransactions {
   total: number;
+  total_amount: number;
   page: number;
   page_size: number;
   items: PaymentRecordOut[];
@@ -149,6 +150,8 @@ export interface DashboardSummary {
   total_banks: number;
   banks: BankSummary[];
   touchpoints: TouchpointSummary[];
+  dates: string[];
+  environments: string[];
   session_id: string | null;
 }
 
@@ -174,12 +177,14 @@ export function getUpload(token: string, sessionId: string) {
 export function getTransactions(
   token: string,
   sessionId: string,
-  params: { bank?: string; touchpoint?: string; search?: string; page?: number; page_size?: number } = {}
+  params: { bank?: string; touchpoint?: string; search?: string; payment_date?: string; environment?: string; page?: number; page_size?: number } = {}
 ) {
   const qs = new URLSearchParams();
   if (params.bank) qs.set("bank", params.bank);
   if (params.touchpoint) qs.set("touchpoint", params.touchpoint);
   if (params.search) qs.set("search", params.search);
+  if (params.payment_date) qs.set("payment_date", params.payment_date);
+  if (params.environment) qs.set("environment", params.environment);
   if (params.page) qs.set("page", String(params.page));
   if (params.page_size) qs.set("page_size", String(params.page_size));
   const query = qs.toString() ? `?${qs}` : "";
