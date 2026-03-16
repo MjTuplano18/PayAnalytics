@@ -56,8 +56,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.ALLOWED_ORIGINS,
-        # Accept all Vercel preview/prod subdomains without manual env updates.
-        allow_origin_regex=r"https://.*\.vercel\.app",
+        allow_origin_regex=settings.ALLOWED_ORIGINS_REGEX or None,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "Accept"],

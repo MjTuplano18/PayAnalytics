@@ -24,6 +24,8 @@ class Settings(BaseSettings):
 
     # CORS — restrict allowed origins in production via environment variable
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
+    # Optional regex for dynamic origins, e.g. Vercel preview deployments
+    ALLOWED_ORIGINS_REGEX: str = ""
 
     # Rate-limiting (login brute-force protection)
     # Max failed login attempts per IP before a temporary lockout is applied.
