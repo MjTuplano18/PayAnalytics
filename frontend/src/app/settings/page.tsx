@@ -9,11 +9,12 @@ import {
   listUsers,
   createUser,
   changePassword,
-  getAuditLog,
+  getUnifiedAuditLog,
+  undoAuditEntry,
   type UserResponse,
-  type AuditLogEntry,
+  type UnifiedAuditLogEntry,
 } from "@/lib/api";
-import { Eye, EyeOff, Plus, Shield, Lock, ClipboardList } from "lucide-react";
+import { Eye, EyeOff, Plus, Shield, Lock, ClipboardList, Undo2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -30,6 +31,8 @@ function fmtDate(iso: string): string {
 
 export default function SettingsPage() {
   const { user, token } = useAuth();
+  const isAdmin = !!user?.is_superuser;
+  const [activeTab, setActiveTab] = useState<"settings" | "users">("settings");
 
   return (
     <div className="p-4 sm:p-8">
@@ -37,21 +40,46 @@ export default function SettingsPage() {
         Settings
       </h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        {/* Left column: Change Password + User Management */}
-        <div className="space-y-6">
-          <ChangePasswordSection token={token} />
-
-          {user?.is_superuser && (
-            <UserManagementSection token={token} currentUserId={user?.id} />
-          )}
+      {/* Tabs (admin only) */}
+      {isAdmin && (
+        <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors rounded-t-md ${
+              activeTab === "settings"
+                ? "border-b-2 border-teal-500 text-teal-500 bg-teal-500/5"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}
+          >
+            <Lock className="h-4 w-4" />
+            Settings
+          </button>
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors rounded-t-md ${
+              activeTab === "users"
+                ? "border-b-2 border-teal-500 text-teal-500 bg-teal-500/5"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            User Management
+          </button>
         </div>
+      )}
 
-        {/* Right column: Audit Log */}
-        {user?.is_superuser && (
-          <AuditLogSection token={token} />
-        )}
-      </div>
+      {/* Settings tab content (or always shown for non-admins) */}
+      {(!isAdmin || activeTab === "settings") && (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 items-start">
+          <ChangePasswordSection token={token} />
+          <UnifiedAuditLogSection token={token} />
+        </div>
+      )}
+
+      {/* User Management tab content (admin only) */}
+      {isAdmin && activeTab === "users" && (
+        <UserManagementSection token={token} currentUserId={user?.id} />
+      )}
     </div>
   );
 }
@@ -392,18 +420,45 @@ function UserManagementSection({
   );
 }
 
-/* ─── Audit Log ─── */
-function AuditLogSection({ token }: { token: string | null }) {
-  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+/* ─── Audit Log (unified: uploads, deletions, record changes — max 10 per user) ─── */
+
+const ACTION_LABELS: Record<string, { label: string; color: string }> = {
+  file_upload: { label: "Upload", color: "bg-green-500/10 text-green-400" },
+  file_delete: { label: "Delete File", color: "bg-red-500/10 text-red-400" },
+  record_delete: { label: "Delete Record", color: "bg-orange-500/10 text-orange-400" },
+  record_bulk_delete: { label: "Bulk Delete", color: "bg-red-500/10 text-red-400" },
+};
+
+function UnifiedAuditLogSection({ token }: { token: string | null }) {
+  const [entries, setEntries] = useState<UnifiedAuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [undoing, setUndoing] = useState<string | null>(null);
+
+  const fetchEntries = () => {
+    if (!token) return;
+    getUnifiedAuditLog(token)
+      .then(setEntries)
+      .catch(() => toast.error("Failed to load activity log"))
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
-    if (!token) return;
-    getAuditLog(token)
-      .then(setEntries)
-      .catch(() => toast.error("Failed to load audit log"))
-      .finally(() => setLoading(false));
+    fetchEntries();
   }, [token]);
+
+  const handleUndo = async (entryId: string) => {
+    if (!token) return;
+    setUndoing(entryId);
+    try {
+      const res = await undoAuditEntry(token, entryId);
+      toast.success(res.detail);
+      fetchEntries();
+    } catch {
+      toast.error("Failed to undo action");
+    } finally {
+      setUndoing(null);
+    }
+  };
 
   return (
     <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
@@ -412,7 +467,7 @@ function AuditLogSection({ token }: { token: string | null }) {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Audit Log</h2>
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        All upload sessions across all users (most recent first).
+        Your recent file activity (uploads, deletions, record changes — up to 10).
       </p>
 
       {loading ? (
@@ -422,32 +477,59 @@ function AuditLogSection({ token }: { token: string | null }) {
           ))}
         </div>
       ) : entries.length === 0 ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">No uploads yet.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">No activity recorded yet.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[720px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="pb-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">User</th>
+                <th className="pb-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Action</th>
                 <th className="pb-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">File</th>
                 <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Records</th>
                 <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
-                <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Uploaded</th>
+                <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">When</th>
+                <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {entries.map((e) => (
-                <tr key={e.id} className="hover:bg-teal-50 dark:hover:bg-gray-700/50 transition-colors">
-                  <td className="py-2.5">
-                    <div className="font-medium text-gray-900 dark:text-white">{e.user_name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{e.user_email}</div>
-                  </td>
-                  <td className="py-2.5 text-gray-700 dark:text-gray-300 max-w-[200px] truncate">{e.file_name}</td>
-                  <td className="py-2.5 text-right text-gray-700 dark:text-gray-300">{fmt(e.total_records)}</td>
-                  <td className="py-2.5 text-right text-green-600 dark:text-green-400 font-medium">₱{fmt(e.total_amount)}</td>
-                  <td className="py-2.5 text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">{fmtDate(e.uploaded_at)}</td>
-                </tr>
-              ))}
+              {entries.map((e) => {
+                const actionInfo = ACTION_LABELS[e.action] ?? { label: e.action, color: "bg-gray-500/10 text-gray-400" };
+                return (
+                  <tr key={e.id} className={`hover:bg-teal-50 dark:hover:bg-gray-700/50 transition-colors ${e.is_undone ? "opacity-50" : ""}`}>
+                    <td className="py-2.5">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${actionInfo.color}`}>
+                        {actionInfo.label}
+                      </span>
+                      {e.is_undone && (
+                        <span className="ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-gray-500/10 text-gray-400">
+                          Undone
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2.5 text-gray-700 dark:text-gray-300 max-w-[180px] truncate" title={e.file_name}>
+                      {e.file_name}
+                    </td>
+                    <td className="py-2.5 text-right text-gray-700 dark:text-gray-300">{fmt(e.record_count)}</td>
+                    <td className="py-2.5 text-right text-green-600 dark:text-green-400 font-medium">
+                      {e.total_amount > 0 ? `₱${fmt(e.total_amount)}` : "—"}
+                    </td>
+                    <td className="py-2.5 text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">{fmtDate(e.created_at)}</td>
+                    <td className="py-2.5 text-right">
+                      {e.can_undo && !e.is_undone ? (
+                        <button
+                          onClick={() => handleUndo(e.id)}
+                          disabled={undoing === e.id}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-500/10 disabled:opacity-50 transition-colors"
+                          title="Undo this action"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                          {undoing === e.id ? "Undoing\u2026" : "Undo"}
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -129,6 +129,40 @@ class UploadRepository:
         await self.session.commit()
         return True
 
+    async def update_transaction(
+        self, record_id: str, session_id: str, user_id: str,
+        bank: str, account: str, payment_amount: float,
+        touchpoint: str | None = None, payment_date: str | None = None,
+        environment: str | None = None,
+    ) -> PaymentRecord | None:
+        """Update fields on a single payment record. Returns updated record or None."""
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return None
+        result = await self.session.execute(
+            select(PaymentRecord).where(
+                PaymentRecord.id == record_id,
+                PaymentRecord.session_id == session_id,
+            )
+        )
+        record = result.scalar_one_or_none()
+        if not record:
+            return None
+        record.bank = bank
+        record.account = account
+        record.payment_amount = payment_amount
+        record.touchpoint = touchpoint
+        record.payment_date = payment_date
+        record.environment = environment
+        await self._update_session_totals(session_id)
+        await self.session.commit()
+        return record
+
     async def delete_transactions_by_date_range(
         self, session_id: str, user_id: str, date_from: str, date_to: str
     ) -> int:

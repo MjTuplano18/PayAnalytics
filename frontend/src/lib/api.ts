@@ -210,12 +210,60 @@ export function getAuditLog(token: string) {
   return apiFetch<AuditLogEntry[]>("/api/v1/uploads/admin/audit-log", { token });
 }
 
+export interface DeletionAuditLogEntry {
+  id: string;
+  session_id: string;
+  file_name: string;
+  total_records: number;
+  total_amount: number;
+  owner_user_id: string;
+  deleted_by_user_id: string;
+  deleted_by_email: string;
+  deleted_by_name: string;
+  deleted_at: string;
+}
+
+export function getDeletionAuditLog(token: string) {
+  return apiFetch<DeletionAuditLogEntry[]>("/api/v1/uploads/admin/deletion-log", { token });
+}
+
+export interface UnifiedAuditLogEntry {
+  id: string;
+  user_id: string;
+  user_email: string;
+  user_name: string;
+  action: string;
+  file_name: string;
+  session_id: string | null;
+  record_count: number;
+  total_amount: number;
+  details: string | null;
+  is_undone: boolean;
+  can_undo: boolean;
+  created_at: string;
+}
+
+export function getUnifiedAuditLog(token: string) {
+  return apiFetch<UnifiedAuditLogEntry[]>("/api/v1/uploads/unified-audit-log", { token });
+}
+
+export function undoAuditEntry(token: string, entryId: string) {
+  return apiFetch<{ detail: string }>(`/api/v1/uploads/audit-log/${entryId}/undo`, {
+    method: "POST",
+    token,
+  });
+}
+
 export function deleteUpload(token: string, sessionId: string) {
   return apiFetch<void>(`/api/v1/uploads/${sessionId}`, { method: "DELETE", token });
 }
 
 export function deleteTransaction(token: string, sessionId: string, recordId: string) {
   return apiFetch<void>(`/api/v1/uploads/${sessionId}/transactions/${recordId}`, { method: "DELETE", token });
+}
+
+export function updateTransaction(token: string, sessionId: string, recordId: string, data: { bank: string; account: string; payment_amount: number; touchpoint?: string; payment_date?: string; environment?: string }) {
+  return apiFetch<PaymentRecordOut>(`/api/v1/uploads/${sessionId}/transactions/${recordId}`, { method: "PUT", token, body: JSON.stringify(data) });
 }
 
 export function deleteTransactionsByDateRange(token: string, sessionId: string, dateFrom: string, dateTo: string) {

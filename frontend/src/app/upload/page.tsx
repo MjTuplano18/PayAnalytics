@@ -19,6 +19,10 @@ function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
 }
 
+function fmtAmount(n: number): string {
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleString("en-PH", {
     year: "numeric",
@@ -688,7 +692,7 @@ export default function UploadPage() {
                         </div>
                         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
                           <span>{fmt(s.total_records)} records</span>
-                          <span>₱{fmt(s.total_amount)}</span>
+                          <span>₱{fmtAmount(s.total_amount)}</span>
                           <span>{fmtDate(s.uploaded_at)}</span>
                         </div>
                       </div>

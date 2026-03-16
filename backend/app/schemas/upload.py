@@ -83,7 +83,23 @@ class AuditLogEntry(BaseModel):
     user_id: str
     user_email: str
     user_name: str
+
+    model_config = {"from_attributes": True}
+
+
+class UnifiedAuditLogEntry(BaseModel):
+    id: str
+    user_id: str
     user_email: str
     user_name: str
+    action: str
+    file_name: str
+    session_id: str | None = None
+    record_count: int
+    total_amount: float
+    details: str | None = None
+    is_undone: bool = False
+    can_undo: bool = False
+    created_at: datetime
 
     model_config = {"from_attributes": True}
