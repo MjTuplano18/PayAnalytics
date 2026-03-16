@@ -9,8 +9,9 @@ export async function apiFetch<T>(
   options: FetchOptions = {}
 ): Promise<T> {
   const { token, headers, ...rest } = options;
+  const normalizedPath = `/${path.replace(/^\/+/, "")}`;
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${normalizedPath}`, {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
