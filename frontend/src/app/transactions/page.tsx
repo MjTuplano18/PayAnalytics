@@ -15,7 +15,7 @@ import { useDashboard, useTransactions, queryKeys } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { exportToExcel, exportToCSV } from "@/utils/exportUtils";
-import type { PaymentRecord, ParsedData } from "@/types/data";
+import type { PaymentRecord, ParsedData, DataRow } from "@/types/data";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -133,11 +133,10 @@ export default function TransactionsPage() {
 
   // Derived display values (switches between API and in-memory)
   const usingApi = !!sessionId;
-  const environmentOptions = ["ENV1", "ENV2", "ENV3", "ENV4", "HSBC"];
   const displayBanks = usingApi ? apiBanks : inMemoryBanks;
   const displayTouchpoints = usingApi ? apiTouchpoints : inMemoryTouchpoints;
   const displayDates = usingApi ? apiDates : inMemoryDates;
-  const displayEnvironments = [...new Set([...environmentOptions, ...(usingApi ? apiEnvironments : inMemoryEnvironments)])].sort();
+  const displayEnvironments = usingApi ? apiEnvironments : inMemoryEnvironments;
   const displayRows = usingApi
     ? (apiRows ?? []).map((r) => ({
         bank: r.bank,
@@ -208,12 +207,12 @@ export default function TransactionsPage() {
     URL.revokeObjectURL(url);
   };
 
-  // ── CRUD helpers (in-memory mode only) ──
+  // ── CRUD helpers ──
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editingApiRecordId, setEditingApiRecordId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
-  const [addForm, setAddForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
+  const [editingDisplayIdx, setEditingDisplayIdx] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
+  const [addForm, setAddForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
   const [exportOpen, setExportOpen] = useState(false);
 
   // Mass delete state
@@ -301,59 +300,49 @@ export default function TransactionsPage() {
       paymentAmount: amount,
       account: addForm.account,
       touchpoint: addForm.touchpoint.toUpperCase(),
-      environment: addForm.environment || undefined,
     };
     const newPayments = [newRecord, ...data.payments];
     setData(recalcParsedData(newPayments));
-    setAddForm({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
+    setAddForm({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
     setShowAddForm(false);
     toast.success("Transaction added.");
   };
 
-  const handleStartEdit = (globalIdx: number, displayRow?: { bank: string; paymentDate: string; paymentAmount: number; account: string; touchpoint: string; environment?: string }, displayRowIdx?: number) => {
-    if (!data && !displayRow) return;
-    const p = displayRow ?? (globalIdx >= 0 ? data?.payments[globalIdx] : undefined);
-    if (!p) return;
-    // Track the API record ID for API-mode edits
-    if (usingApi && apiRows && displayRowIdx !== undefined) {
-      setEditingApiRecordId(apiRows[displayRowIdx]?.id ?? null);
-    } else {
-      setEditingApiRecordId(null);
-    }
+  const handleStartEdit = (globalIdx: number, displayIdx: number, displayRow: { bank: string; paymentDate: string; paymentAmount: number; account: string; touchpoint: string }) => {
     setEditingIndex(globalIdx);
+    setEditingDisplayIdx(displayIdx);
     setEditForm({
-      bank: p.bank,
-      paymentDate: p.paymentDate,
-      paymentAmount: String(p.paymentAmount),
-      account: p.account,
-      touchpoint: p.touchpoint,
-      environment: p.environment ?? "",
+      bank: displayRow.bank,
+      paymentDate: displayRow.paymentDate,
+      paymentAmount: String(displayRow.paymentAmount),
+      account: displayRow.account,
+      touchpoint: displayRow.touchpoint,
     });
   };
 
   const handleSaveEdit = async () => {
-    if (editingIndex === null) return;
     const amount = parseFloat(editForm.paymentAmount);
     if (!editForm.bank || !editForm.paymentDate || isNaN(amount) || amount < 0 || !editForm.account || !editForm.touchpoint) {
       toast.error("Please fill in all fields with valid values. Amount cannot be negative.");
       return;
     }
 
-    if (usingApi && token && sessionId && editingApiRecordId) {
+    if (usingApi && token && sessionId && apiRows && editingDisplayIdx !== null) {
+      const row = apiRows[editingDisplayIdx];
+      if (!row) return;
       try {
-        await updateTransaction(token, sessionId, editingApiRecordId, {
+        await updateTransaction(token, sessionId, row.id, {
           bank: editForm.bank.toUpperCase(),
           account: editForm.account,
           payment_amount: amount,
           touchpoint: editForm.touchpoint.toUpperCase(),
           payment_date: editForm.paymentDate,
-          environment: editForm.environment || undefined,
         });
         queryClient.invalidateQueries({ queryKey: ["transactions"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
         await refreshSessionData();
         setEditingIndex(null);
-        setEditingApiRecordId(null);
+        setEditingDisplayIdx(null);
         toast.success("Transaction updated.");
       } catch {
         toast.error("Failed to update transaction.");
@@ -361,7 +350,7 @@ export default function TransactionsPage() {
       return;
     }
 
-    if (!data) return;
+    if (!data || editingIndex === null) return;
     const newPayments = [...data.payments];
     newPayments[editingIndex] = {
       bank: editForm.bank.toUpperCase(),
@@ -369,19 +358,19 @@ export default function TransactionsPage() {
       paymentAmount: amount,
       account: editForm.account,
       touchpoint: editForm.touchpoint.toUpperCase(),
-      environment: editForm.environment || undefined,
     };
     setData(recalcParsedData(newPayments));
     setEditingIndex(null);
+    setEditingDisplayIdx(null);
     toast.success("Transaction updated.");
   };
 
-  const handleCancelEdit = () => { setEditingIndex(null); setEditingApiRecordId(null); };
+  const handleCancelEdit = () => { setEditingIndex(null); setEditingDisplayIdx(null); };
 
-  const handleDelete = async (globalIdx: number, displayIdx?: number) => {
+  const handleDelete = async (globalIdx: number) => {
     if (usingApi && token && sessionId && apiRows) {
-      const idx = displayIdx ?? (globalIdx - ((currentPage - 1) * rowsPerPage));
-      const row = apiRows[idx];
+      const displayIdx = globalIdx - ((currentPage - 1) * rowsPerPage);
+      const row = apiRows[displayIdx];
       if (!row) return;
       try {
         await deleteTransaction(token, sessionId, row.id);
@@ -497,7 +486,7 @@ export default function TransactionsPage() {
   const handleReportExport = async (format: "excel" | "csv") => {
     setReportExporting(true);
     try {
-      let exportData: object[];
+      let exportData: DataRow[];
       if (sessionId && token) {
         toast.info("Fetching all records from server...");
         exportData = await fetchAllForExport();
@@ -727,11 +716,7 @@ export default function TransactionsPage() {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {displayRows.map((p, i) => {
                 const globalIdx = data ? getGlobalIndex(i) : -1;
-                const apiRecordId = usingApi && apiRows ? apiRows[i]?.id : undefined;
-                const isEditing = editingIndex !== null && (
-                  (globalIdx !== -1 && editingIndex === globalIdx) ||
-                  (editingApiRecordId != null && apiRecordId === editingApiRecordId)
-                );
+                const isEditing = editingDisplayIdx === i;
                 return (
                 <tr
                   key={`${currentPage}-${i}`}
@@ -751,15 +736,7 @@ export default function TransactionsPage() {
                   </td>
                   <td className="px-4 py-3 text-sm whitespace-nowrap">
                     {isEditing ? (
-                      <select
-                        value={editForm.touchpoint}
-                        onChange={(e) => setEditForm({ ...editForm, touchpoint: e.target.value })}
-                        className="h-7 text-xs rounded-md bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-2"
-                      >
-                        {displayTouchpoints.map((tp) => (
-                          <option key={tp} value={tp}>{tp}</option>
-                        ))}
-                      </select>
+                      <Input value={editForm.touchpoint} onChange={(e) => setEditForm({ ...editForm, touchpoint: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" />
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
                         {p.touchpoint}
@@ -767,18 +744,7 @@ export default function TransactionsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    {isEditing ? (
-                      <select
-                        value={editForm.environment}
-                        onChange={(e) => setEditForm({ ...editForm, environment: e.target.value })}
-                        className="h-7 text-xs rounded-md bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-2"
-                      >
-                        <option value="">—</option>
-                        {environmentOptions.map((env) => (
-                          <option key={env} value={env}>{env}</option>
-                        ))}
-                      </select>
-                    ) : (p.environment || "—")}
+                    {p.environment || "—"}
                   </td>
                   {data && (
                     <td className="px-4 py-3 text-center whitespace-nowrap">
@@ -790,12 +756,12 @@ export default function TransactionsPage() {
                           <button onClick={handleCancelEdit} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500" title="Cancel">
                             <X className="w-4 h-4" />
                           </button>
-                          <button onClick={() => { handleDelete(globalIdx, i); setEditingIndex(null); }} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400" title="Delete">
+                          <button onClick={() => { handleDelete(globalIdx); setEditingIndex(null); }} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400" title="Delete">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handleStartEdit(globalIdx, p, i)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
+                        <button onClick={() => handleStartEdit(globalIdx, i, p)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -1007,29 +973,7 @@ export default function TransactionsPage() {
               </div>
               <div className="space-y-1">
                 <Label className="text-sm text-gray-700 dark:text-gray-300">Touchpoint</Label>
-                <select
-                  value={addForm.touchpoint}
-                  onChange={(e) => setAddForm({ ...addForm, touchpoint: e.target.value })}
-                  className="w-full h-10 rounded-md bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-3 text-sm"
-                >
-                  <option value="">Select touchpoint</option>
-                  {displayTouchpoints.map((tp) => (
-                    <option key={tp} value={tp}>{tp}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm text-gray-700 dark:text-gray-300">Environment</Label>
-                <select
-                  value={addForm.environment}
-                  onChange={(e) => setAddForm({ ...addForm, environment: e.target.value })}
-                  className="w-full h-10 rounded-md bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-3 text-sm"
-                >
-                  <option value="">Select environment</option>
-                  {environmentOptions.map((env) => (
-                    <option key={env} value={env}>{env}</option>
-                  ))}
-                </select>
+                <Input value={addForm.touchpoint} onChange={(e) => setAddForm({ ...addForm, touchpoint: e.target.value })} placeholder="e.g. SMS" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100" />
               </div>
             </div>
             <div className="flex gap-3 mt-6">

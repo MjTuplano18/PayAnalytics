@@ -18,6 +18,7 @@ import { useAuth } from "@/context/AuthContext";
 import { exportToExcel, exportToCSV } from "@/utils/exportUtils";
 import { getDashboardSummary, getTransactions } from "@/lib/api";
 import { toast } from "sonner";
+import type { DataRow } from "@/types/data";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -59,7 +60,7 @@ export default function ReportsPage() {
   const handleExport = async (format: "excel" | "csv") => {
     setExporting(true);
     try {
-      let exportData: object[];
+      let exportData: DataRow[];
       if (sessionId && token) {
         toast.info("Fetching all records from server...");
         exportData = await fetchAllForExport();
