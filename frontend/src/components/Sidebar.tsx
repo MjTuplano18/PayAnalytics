@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -48,11 +49,29 @@ export function Sidebar() {
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Toggle button + Logo */}
-        <div className={`flex items-center p-6 ${isCollapsed ? "justify-center" : "justify-between"}`}>
+        <div className={`flex items-center p-6 ${isCollapsed ? "flex-col gap-3" : "justify-between"}`}>
           {!isCollapsed && (
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent">
-              PayAnalytics
-            </h1>
+            <div className="flex items-center gap-2">
+              <Image
+                src="/logo.svg"
+                alt="PayAnalytics Logo"
+                width={28}
+                height={28}
+                style={{ filter: "invert(70%) sepia(50%) saturate(500%) hue-rotate(130deg) brightness(95%)" }}
+              />
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent">
+                PayAnalytics
+              </h1>
+            </div>
+          )}
+          {isCollapsed && (
+            <Image
+              src="/logo.svg"
+              alt="PayAnalytics Logo"
+              width={28}
+              height={28}
+              style={{ filter: "invert(70%) sepia(50%) saturate(500%) hue-rotate(130deg) brightness(95%)" }}
+            />
           )}
           <button
             onClick={toggleCollapsed}
