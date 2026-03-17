@@ -9,13 +9,8 @@ export async function apiFetch<T>(
   options: FetchOptions = {}
 ): Promise<T> {
   const { token, headers, ...rest } = options;
-  const normalizedPath = `/${path.replace(/^\/+/, "")}`;
-  const dedupedPath =
-    API_BASE.endsWith("/api/v1") && normalizedPath.startsWith("/api/v1/")
-      ? normalizedPath.replace(/^\/api\/v1/, "")
-      : normalizedPath;
 
-  const res = await fetch(`${API_BASE}${dedupedPath}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -265,10 +260,6 @@ export function deleteUpload(token: string, sessionId: string) {
 
 export function deleteTransaction(token: string, sessionId: string, recordId: string) {
   return apiFetch<void>(`/api/v1/uploads/${sessionId}/transactions/${recordId}`, { method: "DELETE", token });
-}
-
-export function updateTransaction(token: string, sessionId: string, recordId: string, data: { bank: string; account: string; payment_amount: number; touchpoint?: string; payment_date?: string; environment?: string }) {
-  return apiFetch<PaymentRecordOut>(`/api/v1/uploads/${sessionId}/transactions/${recordId}`, { method: "PUT", token, body: JSON.stringify(data) });
 }
 
 export function deleteTransactionsByDateRange(token: string, sessionId: string, dateFrom: string, dateTo: string) {
