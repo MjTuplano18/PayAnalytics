@@ -55,8 +55,8 @@ export function Sidebar() {
               <Image
                 src="/logo.svg"
                 alt="PayAnalytics Logo"
-                width={24}
-                height={24}
+                width={36}
+                height={36}
                 className="flex-shrink-0"
               />
               <h1 className="flex-1 text-lg font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent truncate">
@@ -76,8 +76,8 @@ export function Sidebar() {
               <Image
                 src="/logo.svg"
                 alt="PayAnalytics Logo"
-                width={24}
-                height={24}
+                width={36}
+                height={36}
               />
               <button
                 onClick={toggleCollapsed}
