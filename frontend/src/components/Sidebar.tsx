@@ -49,41 +49,45 @@ export function Sidebar() {
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Toggle button + Logo */}
-        <div className={`flex items-center p-6 ${isCollapsed ? "flex-col gap-3" : "justify-between"}`}>
+        <div className={`flex items-center p-4 ${isCollapsed ? "flex-col gap-2" : "gap-2"}`}>
           {!isCollapsed && (
-            <div className="flex items-center gap-2">
+            <>
               <Image
                 src="/logo.svg"
                 alt="PayAnalytics Logo"
-                width={28}
-                height={28}
-                style={{ filter: "invert(70%) sepia(50%) saturate(500%) hue-rotate(130deg) brightness(95%)" }}
+                width={24}
+                height={24}
+                className="flex-shrink-0"
               />
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent">
+              <h1 className="flex-1 text-lg font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent truncate">
                 PayAnalytics
               </h1>
-            </div>
+              <button
+                onClick={toggleCollapsed}
+                className="flex-shrink-0 rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
+                aria-label="Collapse sidebar"
+              >
+                <ChevronsLeft className="h-5 w-5" />
+              </button>
+            </>
           )}
           {isCollapsed && (
-            <Image
-              src="/logo.svg"
-              alt="PayAnalytics Logo"
-              width={28}
-              height={28}
-              style={{ filter: "invert(70%) sepia(50%) saturate(500%) hue-rotate(130deg) brightness(95%)" }}
-            />
+            <>
+              <Image
+                src="/logo.svg"
+                alt="PayAnalytics Logo"
+                width={24}
+                height={24}
+              />
+              <button
+                onClick={toggleCollapsed}
+                className="rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
+                aria-label="Expand sidebar"
+              >
+                <ChevronsRight className="h-5 w-5" />
+              </button>
+            </>
           )}
-          <button
-            onClick={toggleCollapsed}
-            className="rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
-            aria-label="Toggle sidebar"
-          >
-            {isCollapsed ? (
-              <ChevronsRight className="h-5 w-5" />
-            ) : (
-              <ChevronsLeft className="h-5 w-5" />
-            )}
-          </button>
         </div>
 
         {/* Navigation */}
