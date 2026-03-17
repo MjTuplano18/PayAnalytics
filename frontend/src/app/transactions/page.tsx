@@ -15,7 +15,7 @@ import { useDashboard, useTransactions, queryKeys } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { exportToExcel, exportToCSV } from "@/utils/exportUtils";
-import type { PaymentRecord, ParsedData } from "@/types/data";
+import type { PaymentRecord, ParsedData, DataRow } from "@/types/data";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -468,7 +468,7 @@ export default function TransactionsPage() {
   const handleReportExport = async (format: "excel" | "csv") => {
     setReportExporting(true);
     try {
-      let exportData: object[];
+      let exportData: DataRow[];
       if (sessionId && token) {
         toast.info("Fetching all records from server...");
         exportData = await fetchAllForExport();
