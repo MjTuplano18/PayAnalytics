@@ -9,11 +9,12 @@ import {
   listUsers,
   createUser,
   changePassword,
-  getUnifiedAuditLog,
   undoAuditEntry,
   type UserResponse,
   type UnifiedAuditLogEntry,
 } from "@/lib/api";
+import { useUnifiedAuditLog } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, Plus, Shield, Lock, ClipboardList, Undo2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -430,21 +431,9 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 function UnifiedAuditLogSection({ token }: { token: string | null }) {
-  const [entries, setEntries] = useState<UnifiedAuditLogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: entries = [], isLoading: loading } = useUnifiedAuditLog(token);
+  const queryClient = useQueryClient();
   const [undoing, setUndoing] = useState<string | null>(null);
-
-  const fetchEntries = () => {
-    if (!token) return;
-    getUnifiedAuditLog(token)
-      .then(setEntries)
-      .catch(() => toast.error("Failed to load activity log"))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    fetchEntries();
-  }, [token]);
 
   const handleUndo = async (entryId: string) => {
     if (!token) return;
@@ -452,7 +441,7 @@ function UnifiedAuditLogSection({ token }: { token: string | null }) {
     try {
       const res = await undoAuditEntry(token, entryId);
       toast.success(res.detail);
-      fetchEntries();
+      queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
     } catch {
       toast.error("Failed to undo action");
     } finally {

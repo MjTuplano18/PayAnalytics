@@ -13,6 +13,7 @@ import {
   getTransactions,
   listUploads,
   getAuditLog,
+  getUnifiedAuditLog,
 } from "@/lib/api";
 
 // ── Query key factory ────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ export const queryKeys = {
     }
   ) => ["transactions", sessionId, filters, token] as const,
   auditLog: (token: string) => ["audit-log", token] as const,
+  unifiedAuditLog: (token: string) => ["unified-audit-log", token] as const,
 };
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -92,5 +94,14 @@ export function useAuditLog(token: string | null, isAdmin: boolean) {
     queryKey: queryKeys.auditLog(token!),
     queryFn: () => getAuditLog(token!),
     enabled: !!token && isAdmin,
+  });
+}
+
+/** Fetch unified audit log for the current user — cached with TanStack Query */
+export function useUnifiedAuditLog(token: string | null) {
+  return useQuery({
+    queryKey: queryKeys.unifiedAuditLog(token!),
+    queryFn: () => getUnifiedAuditLog(token!),
+    enabled: !!token,
   });
 }

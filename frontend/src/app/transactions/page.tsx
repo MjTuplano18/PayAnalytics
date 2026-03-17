@@ -10,12 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
-import { getTransactions, getDashboardSummary, deleteTransaction, deleteTransactionsByDateRange, getUpload, deleteUpload, updateTransaction, type PaymentRecordOut } from "@/lib/api";
+import { getTransactions, getDashboardSummary, deleteTransaction, deleteTransactionsByDateRange, getUpload, deleteUpload, type PaymentRecordOut } from "@/lib/api";
 import { useDashboard, useTransactions, queryKeys } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { exportToExcel, exportToCSV } from "@/utils/exportUtils";
-import type { PaymentRecord, ParsedData, DataRow } from "@/types/data";
+import type { PaymentRecord, ParsedData } from "@/types/data";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -207,10 +207,9 @@ export default function TransactionsPage() {
     URL.revokeObjectURL(url);
   };
 
-  // ── CRUD helpers ──
+  // ── CRUD helpers (in-memory mode only) ──
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editingDisplayIdx, setEditingDisplayIdx] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
   const [addForm, setAddForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
   const [exportOpen, setExportOpen] = useState(false);
@@ -308,49 +307,27 @@ export default function TransactionsPage() {
     toast.success("Transaction added.");
   };
 
-  const handleStartEdit = (globalIdx: number, displayIdx: number, displayRow: { bank: string; paymentDate: string; paymentAmount: number; account: string; touchpoint: string }) => {
+  const handleStartEdit = (globalIdx: number, displayRow?: { bank: string; paymentDate: string; paymentAmount: number; account: string; touchpoint: string }) => {
+    if (!data && !displayRow) return;
+    const p = displayRow ?? (globalIdx >= 0 ? data?.payments[globalIdx] : undefined);
+    if (!p) return;
     setEditingIndex(globalIdx);
-    setEditingDisplayIdx(displayIdx);
     setEditForm({
-      bank: displayRow.bank,
-      paymentDate: displayRow.paymentDate,
-      paymentAmount: String(displayRow.paymentAmount),
-      account: displayRow.account,
-      touchpoint: displayRow.touchpoint,
+      bank: p.bank,
+      paymentDate: p.paymentDate,
+      paymentAmount: String(p.paymentAmount),
+      account: p.account,
+      touchpoint: p.touchpoint,
     });
   };
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = () => {
+    if (!data || editingIndex === null) return;
     const amount = parseFloat(editForm.paymentAmount);
     if (!editForm.bank || !editForm.paymentDate || isNaN(amount) || amount < 0 || !editForm.account || !editForm.touchpoint) {
       toast.error("Please fill in all fields with valid values. Amount cannot be negative.");
       return;
     }
-
-    if (usingApi && token && sessionId && apiRows && editingDisplayIdx !== null) {
-      const row = apiRows[editingDisplayIdx];
-      if (!row) return;
-      try {
-        await updateTransaction(token, sessionId, row.id, {
-          bank: editForm.bank.toUpperCase(),
-          account: editForm.account,
-          payment_amount: amount,
-          touchpoint: editForm.touchpoint.toUpperCase(),
-          payment_date: editForm.paymentDate,
-        });
-        queryClient.invalidateQueries({ queryKey: ["transactions"] });
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-        await refreshSessionData();
-        setEditingIndex(null);
-        setEditingDisplayIdx(null);
-        toast.success("Transaction updated.");
-      } catch {
-        toast.error("Failed to update transaction.");
-      }
-      return;
-    }
-
-    if (!data || editingIndex === null) return;
     const newPayments = [...data.payments];
     newPayments[editingIndex] = {
       bank: editForm.bank.toUpperCase(),
@@ -361,11 +338,10 @@ export default function TransactionsPage() {
     };
     setData(recalcParsedData(newPayments));
     setEditingIndex(null);
-    setEditingDisplayIdx(null);
     toast.success("Transaction updated.");
   };
 
-  const handleCancelEdit = () => { setEditingIndex(null); setEditingDisplayIdx(null); };
+  const handleCancelEdit = () => setEditingIndex(null);
 
   const handleDelete = async (globalIdx: number) => {
     if (usingApi && token && sessionId && apiRows) {
@@ -486,7 +462,7 @@ export default function TransactionsPage() {
   const handleReportExport = async (format: "excel" | "csv") => {
     setReportExporting(true);
     try {
-      let exportData: DataRow[];
+      let exportData: object[];
       if (sessionId && token) {
         toast.info("Fetching all records from server...");
         exportData = await fetchAllForExport();
@@ -716,7 +692,7 @@ export default function TransactionsPage() {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {displayRows.map((p, i) => {
                 const globalIdx = data ? getGlobalIndex(i) : -1;
-                const isEditing = editingDisplayIdx === i;
+                const isEditing = editingIndex === globalIdx && globalIdx !== -1;
                 return (
                 <tr
                   key={`${currentPage}-${i}`}
@@ -761,7 +737,7 @@ export default function TransactionsPage() {
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handleStartEdit(globalIdx, i, p)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
+                        <button onClick={() => handleStartEdit(globalIdx, p)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -924,24 +900,24 @@ export default function TransactionsPage() {
       </div>
       )}
 
-      {/* Floating Add Button */}
+      {/* Floating Action Buttons */}
       {data && activeTab === "transactions" && (
-        <>
+        <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 flex flex-col items-center gap-3">
           <button
             onClick={() => setShowMassDelete(true)}
-            className="fixed bottom-8 right-24 w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center z-50"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center"
             title="Mass Delete"
           >
             <Trash2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => setShowAddForm(true)}
-            className="fixed bottom-8 right-8 w-14 h-14 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center z-50"
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center"
             title="Add Transaction"
           >
-            <Plus className="w-6 h-6" />
+            <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-        </>
+        </div>
       )}
 
       {/* Add Transaction Popup */}

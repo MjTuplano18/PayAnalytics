@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import {
   BarChart,
   Bar,
@@ -54,6 +54,11 @@ function truncate(str: string, max: number): string {
   return str.length > max ? str.slice(0, max) + "…" : str;
 }
 
+/** Shorter truncation for bar chart x-axis labels */
+function truncateAxis(str: string, max: number): string {
+  return str.length > max ? str.slice(0, max) + "…" : str;
+}
+
 /** Format number with compact abbreviations (1K, 4M, 2B, etc.) */
 function fmtNum(value: number): string {
   const abs = Math.abs(value);
@@ -74,11 +79,24 @@ export function DynamicChart({
   height = 350,
   title,
 }: DynamicChartProps) {
+  const [containerWidth, setContainerWidth] = useState(0);
+  const containerRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(node);
+    setContainerWidth(node.getBoundingClientRect().width);
+    return () => observer.disconnect();
+  }, []);
+
   const processedData = useMemo(() => {
     if (!data || data.length === 0) return [];
     return data.map((item, index) => ({
       ...item,
-      _shortName: truncate(String(item[xAxisKey] ?? ""), 14),
+      _shortName: truncateAxis(String(item[xAxisKey] ?? ""), 10),
       _uniqueId: `${xAxisKey}-${item[xAxisKey]}-${index}`,
     }));
   }, [data, xAxisKey]);
@@ -109,10 +127,14 @@ export function DynamicChart({
   };
 
   const renderChart = () => {
+    // Responsive: on narrow containers, skip some x-axis labels to prevent overlap
+    const isCompact = containerWidth < 500;
+    const barInterval = isCompact ? Math.max(1, Math.floor(processedData.length / 15)) : 0;
+
     switch (type) {
       case "bar":
         return (
-          <BarChart data={processedData} margin={{ left: 30, right: 30, top: 15, bottom: 40 }}>
+          <BarChart data={processedData} margin={{ left: isCompact ? 10 : 30, right: isCompact ? 10 : 30, top: 15, bottom: 40 }}>
             <defs>
               <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#0d9488" stopOpacity={1} />
@@ -123,10 +145,10 @@ export function DynamicChart({
             <XAxis
               dataKey="_shortName"
               className="text-muted-foreground"
-              tick={{ fontSize: 11 }}
-              angle={-35}
+              tick={{ fontSize: isCompact ? 9 : 11 }}
+              angle={-45}
               textAnchor="end"
-              interval={0}
+              interval={barInterval}
               height={50}
             />
             <YAxis
@@ -247,18 +269,19 @@ export function DynamicChart({
             />
           </AreaChart>
         );
-      case "pie":
+      case "pie": {
+        const isNarrow = containerWidth < 500;
         return (
           <PieChart>
             <Pie
               data={processedData}
-              cx="40%"
-              cy="50%"
+              cx={isNarrow ? "50%" : "40%"}
+              cy={isNarrow ? "40%" : "50%"}
               labelLine={false}
               label={({ percent }: { percent?: number }) =>
                 `${((percent ?? 0) * 100).toFixed(1)}%`
               }
-              outerRadius={Math.min(height / 3, 120)}
+              outerRadius={Math.min(height / 3, isNarrow ? 90 : 120)}
               dataKey={dataKey}
               nameKey={xAxisKey}
             >
@@ -272,22 +295,33 @@ export function DynamicChart({
               ))}
             </Pie>
             <Tooltip contentStyle={tooltipStyle} formatter={formatTooltipValue} />
-            <Legend
-              layout="vertical"
-              align="right"
-              verticalAlign="middle"
-              wrapperStyle={{ fontSize: 11, maxHeight: height, overflow: "auto", paddingLeft: 0, right: "18%" }}
-              formatter={(value: string) => truncate(value, 20)}
-            />
+            {isNarrow ? (
+              <Legend
+                layout="horizontal"
+                align="center"
+                verticalAlign="bottom"
+                wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                formatter={(value: string) => truncate(value, 15)}
+              />
+            ) : (
+              <Legend
+                layout="vertical"
+                align="right"
+                verticalAlign="middle"
+                wrapperStyle={{ fontSize: 11, maxHeight: height, overflow: "auto", paddingLeft: 0 }}
+                formatter={(value: string) => truncate(value, 20)}
+              />
+            )}
           </PieChart>
         );
+      }
       default:
         return null;
     }
   };
 
   return (
-    <div className="rounded-lg bg-card p-4">
+    <div ref={containerRef} className="rounded-lg bg-card p-4">
       {title && (
         <h3 className="mb-4 text-lg font-semibold font-display text-foreground">
           {title}

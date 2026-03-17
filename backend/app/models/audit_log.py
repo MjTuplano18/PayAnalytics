@@ -29,7 +29,7 @@ class AuditLog(Base):
     snapshot_data: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_undone: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
     # Relationships
