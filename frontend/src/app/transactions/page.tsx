@@ -211,7 +211,7 @@ export default function TransactionsPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
-  const [addForm, setAddForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
+  const [addForm, setAddForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
   const [exportOpen, setExportOpen] = useState(false);
 
   // Mass delete state
@@ -219,6 +219,7 @@ export default function TransactionsPage() {
   const [massDeleteFrom, setMassDeleteFrom] = useState("");
   const [massDeleteTo, setMassDeleteTo] = useState("");
   const [massDeleteConfirmStep, setMassDeleteConfirmStep] = useState(false);
+  const [massDeleting, setMassDeleting] = useState(false);
 
   // Reports tab state
   const [reportExporting, setReportExporting] = useState(false);
@@ -299,10 +300,11 @@ export default function TransactionsPage() {
       paymentAmount: amount,
       account: addForm.account,
       touchpoint: addForm.touchpoint.toUpperCase(),
+      environment: addForm.environment || undefined,
     };
     const newPayments = [newRecord, ...data.payments];
     setData(recalcParsedData(newPayments));
-    setAddForm({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
+    setAddForm({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
     setShowAddForm(false);
     toast.success("Transaction added.");
   };
@@ -389,6 +391,7 @@ export default function TransactionsPage() {
 
     if (usingApi && token && sessionId) {
       // API mode: delete from backend
+      setMassDeleting(true);
       try {
         const result = await deleteTransactionsByDateRange(token, sessionId, massDeleteFrom, massDeleteTo);
         queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -411,6 +414,8 @@ export default function TransactionsPage() {
         }
       } catch {
         toast.error("Failed to delete transactions.");
+      } finally {
+        setMassDeleting(false);
       }
       return;
     }
@@ -431,6 +436,7 @@ export default function TransactionsPage() {
     setMassDeleteConfirmStep(false);
     setMassDeleteFrom("");
     setMassDeleteTo("");
+    setMassDeleting(false);
   };
 
   // ── Reports tab helpers ──
@@ -949,7 +955,29 @@ export default function TransactionsPage() {
               </div>
               <div className="space-y-1">
                 <Label className="text-sm text-gray-700 dark:text-gray-300">Touchpoint</Label>
-                <Input value={addForm.touchpoint} onChange={(e) => setAddForm({ ...addForm, touchpoint: e.target.value })} placeholder="e.g. SMS" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100" />
+                <select
+                  value={addForm.touchpoint}
+                  onChange={(e) => setAddForm({ ...addForm, touchpoint: e.target.value })}
+                  className="w-full h-10 rounded-md border bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-3 text-sm"
+                >
+                  <option value="">Select touchpoint...</option>
+                  {displayTouchpoints.map((tp) => (
+                    <option key={tp} value={tp}>{tp}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Environment</Label>
+                <select
+                  value={addForm.environment}
+                  onChange={(e) => setAddForm({ ...addForm, environment: e.target.value })}
+                  className="w-full h-10 rounded-md border bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-3 text-sm"
+                >
+                  <option value="">Select environment...</option>
+                  {displayEnvironments.map((env) => (
+                    <option key={env} value={env}>{env}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
@@ -1032,11 +1060,12 @@ export default function TransactionsPage() {
                 <div className="flex gap-3">
                   <Button
                     onClick={handleMassDelete}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                    disabled={massDeleting}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
                   >
-                    Yes, Delete
+                    {massDeleting ? "Deleting…" : "Yes, Delete"}
                   </Button>
-                  <Button variant="outline" onClick={() => setMassDeleteConfirmStep(false)} className="flex-1">Go Back</Button>
+                  <Button variant="outline" onClick={() => setMassDeleteConfirmStep(false)} disabled={massDeleting} className="flex-1">Go Back</Button>
                 </div>
               </>
             )}

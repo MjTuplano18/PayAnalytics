@@ -322,38 +322,23 @@ async def delete_transactions_by_date_range(
     repo = UploadRepository(db)
     audit_repo = AuditLogRepository(db)
 
-    # Get session info and matching records for snapshot before deleting
-    session_obj = await repo.get_session(session_id, current_user.id)
+    # Lightweight session check — do NOT load all records into memory
+    session_obj = await repo.get_session_meta(session_id, current_user.id)
     if not session_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
-
-    # Build snapshot of records that will be deleted
-    matching_records = [
-        r for r in session_obj.records
-        if r.payment_date and r.payment_date >= date_from and r.payment_date <= date_to
-    ]
-    snapshot = None
-    if matching_records:
-        snapshot = json.dumps({
-            "session_id": session_id,
-            "records": [
-                {
-                    "bank": r.bank,
-                    "account": r.account,
-                    "touchpoint": r.touchpoint,
-                    "payment_date": r.payment_date,
-                    "payment_amount": r.payment_amount,
-                    "environment": r.environment,
-                }
-                for r in matching_records
-            ],
-        })
 
     count = await repo.delete_transactions_by_date_range(
         session_id=session_id, user_id=current_user.id, date_from=date_from, date_to=date_to
     )
 
     if count > 0:
+        # Log audit without heavy per-record snapshot for large deletes
+        snapshot = json.dumps({
+            "session_id": session_id,
+            "date_from": date_from,
+            "date_to": date_to,
+            "deleted_count": count,
+        })
         await audit_repo.log_action(
             user_id=current_user.id,
             action="record_bulk_delete",

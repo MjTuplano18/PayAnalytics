@@ -8,7 +8,8 @@ import {
   FileText,
   UserCheck,
   Upload,
-  Menu,
+  ChevronsLeft,
+  ChevronsRight,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -42,24 +43,34 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r bg-gray-900 border-gray-800 transition-all duration-300 ease-in-out lg:translate-x-0 ${
-          isCollapsed ? "w-20" : "w-64"
+        className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r transition-all duration-300 ease-in-out lg:translate-x-0 ${
+          isCollapsed
+            ? "w-20 bg-gradient-to-b from-teal-600 via-teal-500 to-cyan-400 border-teal-400/30"
+            : "w-64 bg-gray-900 border-gray-800"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Toggle button + Logo */}
-        <div className="flex items-center justify-between p-6">
-          <button
-            onClick={toggleCollapsed}
-            className="rounded-lg p-1 text-gray-400 hover:bg-gray-800 hover:text-white"
-            aria-label="Toggle sidebar"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+        <div className={`flex items-center p-6 ${isCollapsed ? "justify-center" : "justify-between"}`}>
           {!isCollapsed && (
             <h1 className="text-2xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent">
               PayAnalytics
             </h1>
           )}
+          <button
+            onClick={toggleCollapsed}
+            className={`rounded-lg p-1.5 transition-colors duration-200 ${
+              isCollapsed
+                ? "text-white/80 hover:bg-white/20 hover:text-white"
+                : "text-gray-400 hover:bg-gray-800 hover:text-white"
+            }`}
+            aria-label="Toggle sidebar"
+          >
+            {isCollapsed ? (
+              <ChevronsRight className="h-5 w-5" />
+            ) : (
+              <ChevronsLeft className="h-5 w-5" />
+            )}
+          </button>
         </div>
 
         {/* Navigation */}
@@ -77,8 +88,12 @@ export function Sidebar() {
                   isCollapsed ? "justify-center px-2" : ""
                 } ${
                   active
-                    ? "bg-teal-600 text-white shadow-lg shadow-teal-600/30"
-                    : "text-gray-400 hover:bg-gray-800 hover:text-white hover:translate-x-1"
+                    ? isCollapsed
+                      ? "bg-white/25 text-white shadow-lg"
+                      : "bg-teal-600 text-white shadow-lg shadow-teal-600/30"
+                    : isCollapsed
+                      ? "text-white/70 hover:bg-white/15 hover:text-white"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white hover:translate-x-1"
                 }`}
               >
                 <Icon className="h-5 w-5 flex-shrink-0" />
@@ -91,7 +106,9 @@ export function Sidebar() {
         </nav>
 
         {/* Profile & Sign Out */}
-        <div className="border-t border-gray-800 p-4">
+        <div className={`border-t p-4 ${
+          isCollapsed ? "border-white/20" : "border-gray-800"
+        }`}>
           {user && !isCollapsed && (
             <div className="mb-3 flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-sm font-semibold text-white">
@@ -109,7 +126,7 @@ export function Sidebar() {
           )}
           {user && isCollapsed && (
             <div className="mb-3 flex justify-center">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-sm font-semibold text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white">
                 {user.full_name.charAt(0).toUpperCase()}
               </div>
             </div>
@@ -117,8 +134,10 @@ export function Sidebar() {
           <button
             onClick={logout}
             title={isCollapsed ? "Sign Out" : undefined}
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-gray-400 transition-all duration-200 hover:bg-gray-800 hover:text-white ${
-              isCollapsed ? "justify-center px-2" : ""
+            className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 transition-all duration-200 ${
+              isCollapsed
+                ? "justify-center px-2 text-white/70 hover:bg-white/15 hover:text-white"
+                : "text-gray-400 hover:bg-gray-800 hover:text-white"
             }`}
           >
             <LogOut className="h-5 w-5" />
