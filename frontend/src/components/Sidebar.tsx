@@ -49,14 +49,14 @@ export function Sidebar() {
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Toggle button + Logo */}
-        <div className={`flex items-center p-4 ${isCollapsed ? "flex-col gap-2" : "gap-2"}`}>
+        <div className={`flex items-center p-4 ${isCollapsed ? "justify-center" : "gap-2"}`}>
           {!isCollapsed && (
             <>
               <Image
                 src="/logo.svg"
                 alt="PayAnalytics Logo"
-                width={36}
-                height={36}
+                width={26}
+                height={26}
                 className="flex-shrink-0"
               />
               <h1 className="flex-1 text-xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent truncate">
@@ -72,21 +72,13 @@ export function Sidebar() {
             </>
           )}
           {isCollapsed && (
-            <>
-              <Image
-                src="/logo.svg"
-                alt="PayAnalytics Logo"
-                width={36}
-                height={36}
-              />
-              <button
-                onClick={toggleCollapsed}
-                className="rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
-                aria-label="Expand sidebar"
-              >
-                <ChevronsRight className="h-5 w-5" />
-              </button>
-            </>
+            <button
+              onClick={toggleCollapsed}
+              className="rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
+              aria-label="Expand sidebar"
+            >
+              <ChevronsRight className="h-5 w-5" />
+            </button>
           )}
         </div>
 
