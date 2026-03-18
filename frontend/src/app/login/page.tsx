@@ -43,7 +43,7 @@ export default function LoginPage() {
       <div className="pointer-events-none absolute inset-0 bg-gray-950/40" />
 
       {/* Glassmorphism card */}
-      <div className="relative z-10 w-full max-w-[440px] mx-4 rounded-[40px] border border-white/10 bg-[rgba(80,80,80,0.35)] px-8 py-[52px] sm:px-12 sm:py-[75px] backdrop-blur-lg shadow-2xl">
+      <div className="relative z-10 w-full max-w-[440px] mx-4 rounded-[40px] border border-white/10 bg-[rgba(30,30,30,0.45)] px-8 py-[52px] sm:px-12 sm:py-[75px] backdrop-blur-sm shadow-2xl">
         {/* Brand Logo */}
         <div className="mb-12 flex justify-center">
           <Image
