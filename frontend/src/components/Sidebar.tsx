@@ -49,7 +49,7 @@ export function Sidebar() {
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Toggle button + Logo */}
-        <div className={`flex items-center p-4 ${isCollapsed ? "justify-center" : "gap-2"}`}>
+        <div className={`flex items-center p-4 ${isCollapsed ? "justify-center" : "justify-between px-5"}`}>
           {!isCollapsed && (
             <>
               <Image
@@ -59,7 +59,7 @@ export function Sidebar() {
                 height={26}
                 className="flex-shrink-0"
               />
-              <h1 className="flex-1 text-xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent truncate">
+              <h1 className="text-xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent">
                 PayAnalytics
               </h1>
               <button
