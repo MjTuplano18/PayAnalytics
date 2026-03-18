@@ -31,7 +31,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-end overflow-hidden bg-gray-950 pr-8 sm:pr-16 lg:pr-32">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-950">
       {/* Background SVG */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -41,7 +41,7 @@ export default function LoginPage() {
       />
 
       {/* Glassmorphism card */}
-      <div className="relative z-10 w-full max-w-[600px] mx-4 rounded-[40px] border border-white/10 bg-white/5 px-8 py-10 sm:px-16 sm:py-14 backdrop-blur-xl shadow-2xl">
+      <div className="relative z-10 w-full max-w-[520px] mx-4 rounded-[40px] border border-white/10 bg-white/5 px-8 py-14 sm:px-14 sm:py-20 backdrop-blur-xl shadow-2xl">
         {/* Logo SVG centered */}
         <div className="mb-10 flex justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -73,7 +73,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 text-base text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 transition-all"
+              className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 text-base text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 focus:bg-[#ACACAC]/40 transition-all"
             />
           </div>
 
@@ -91,7 +91,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 pr-11 text-base text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 transition-all"
+                className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 pr-11 text-base text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 focus:bg-[#ACACAC]/40 transition-all"
               />
               <button
                 type="button"
