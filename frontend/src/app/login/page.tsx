@@ -44,14 +44,14 @@ export default function LoginPage() {
       <div className="pointer-events-none absolute inset-0 bg-gray-950/40" />
 
       {/* Glassmorphism card */}
-      <div className="relative z-10 w-full max-w-[694px] mx-4 rounded-[40px] border border-white/5 bg-[rgba(56,56,56,0.20)] px-8 py-12 sm:px-20 sm:py-16 backdrop-blur-md shadow-2xl">
+      <div className="relative z-10 w-full max-w-[440px] mx-4 rounded-[40px] border border-white/5 bg-[rgba(56,56,56,0.20)] px-8 py-10 sm:px-14 sm:py-14 backdrop-blur-md shadow-2xl flex flex-col min-h-[620px]">
         {/* Brand: Logo */}
-        <div className="mb-12 flex items-center justify-center">
+        <div className="mb-10 flex items-center justify-center">
           <Image
             src="/SVG Lgo.svg"
             alt="Logo"
-            width={280}
-            height={80}
+            width={220}
+            height={64}
             className="flex-shrink-0"
           />
         </div>
@@ -63,10 +63,10 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* Email */}
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-lg text-[#939393]">
+          <div className="space-y-1.5">
+            <label htmlFor="email" className="text-sm text-[#939393]">
               Email
             </label>
             <input
@@ -77,13 +77,13 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full rounded-[15px] bg-[#ACACAC]/40 px-5 py-4 text-lg text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 transition-all"
+              className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 text-sm text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 transition-all [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgba(172,172,172,0.4)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[caret-color:white]"
             />
           </div>
 
           {/* Password */}
-          <div className="space-y-2">
-            <label htmlFor="password" className="text-lg text-[#939393]">
+          <div className="space-y-1.5">
+            <label htmlFor="password" className="text-sm text-[#939393]">
               Password
             </label>
             <div className="relative">
@@ -95,45 +95,45 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full rounded-[15px] bg-[#ACACAC]/40 px-5 py-4 pr-12 text-lg text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 transition-all"
+                className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 pr-10 text-sm text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 transition-all [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgba(172,172,172,0.4)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[caret-color:white]"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
                 tabIndex={-1}
               >
                 {showPassword ? (
-                  <EyeOff className="h-5 w-5" />
+                  <EyeOff className="h-4 w-4" />
                 ) : (
-                  <Eye className="h-5 w-5" />
+                  <Eye className="h-4 w-4" />
                 )}
               </button>
             </div>
           </div>
 
           {/* Submit */}
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end pt-2">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-[15px] bg-[#5B66E2] px-10 py-4 text-xl font-normal text-white transition-all hover:bg-[#4B56D2] disabled:opacity-50 shadow-lg"
+              className="rounded-[12px] bg-[#5B66E2] px-8 py-3 text-base font-normal text-white transition-all hover:bg-[#4B56D2] disabled:opacity-50 shadow-lg"
             >
               {isSubmitting ? "Signing in…" : "Login"}
             </button>
           </div>
         </form>
 
-        {/* Footer */}
-        <p className="mt-10 text-center text-lg text-[#939393]">
-          Contact your administrator for account access
-        </p>
-        <div className="mt-6 flex justify-center">
+        {/* Footer - pushed to bottom */}
+        <div className="mt-auto pt-8 flex flex-col items-center gap-3">
+          <p className="text-center text-sm text-[#939393]">
+            Contact your administrator for account access
+          </p>
           <Image
             src="/SPMADRID WHITE.svg"
             alt="SPMADRID"
-            width={180}
-            height={40}
+            width={140}
+            height={32}
             className="opacity-80"
           />
         </div>
