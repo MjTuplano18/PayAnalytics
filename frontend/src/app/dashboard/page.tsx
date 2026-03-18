@@ -35,6 +35,10 @@ export default function DashboardPage() {
   const [envDropdownOpen, setEnvDropdownOpen] = useState(false);
   const envDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Top-N bank chart limit
+  const [bankTopN, setBankTopN] = useState<number | "all">(20);
+  const [envBankTopN, setEnvBankTopN] = useState<number | "all">(20);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -468,23 +472,42 @@ export default function DashboardPage() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
         <div>
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Payments per Bank
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Payments per Bank
+            </h3>
+            <select
+              value={envBankTopN === "all" ? "all" : String(envBankTopN)}
+              onChange={(e) => setEnvBankTopN(e.target.value === "all" ? "all" : parseInt(e.target.value))}
+              className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-500"
+            >
+              <option value="10">Top 10</option>
+              <option value="20">Top 20</option>
+              <option value="50">Top 50</option>
+              <option value="all">All</option>
+            </select>
+          </div>
           {apiLoading ? (
             <Skeleton className="h-[350px] w-full rounded-xl" />
-          ) : (
-            <DynamicChart
-              data={envBankAnalytics.bankAnalytics.map((a) => ({
-                bank: a.bank,
-                amount: a.totalAmount,
-              }))}
-              type="bar"
-              dataKey="amount"
-              xAxisKey="bank"
-              height={350}
-            />
-          )}
+          ) : (() => {
+            const envBankData = envBankTopN === "all"
+              ? envBankAnalytics.bankAnalytics
+              : envBankAnalytics.bankAnalytics.slice(0, envBankTopN);
+            const minWidth = Math.max(550, envBankData.length * 28);
+            return (
+              <div className="overflow-x-auto rounded-xl">
+                <div style={{ minWidth }}>
+                  <DynamicChart
+                    data={envBankData.map((a) => ({ bank: a.bank, amount: a.totalAmount }))}
+                    type="bar"
+                    dataKey="amount"
+                    xAxisKey="bank"
+                    height={350}
+                  />
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <div>
@@ -535,18 +558,25 @@ export default function DashboardPage() {
           </h3>
           {apiLoading ? (
             <Skeleton className="h-[300px] w-full rounded-xl" />
-          ) : (
-            <DynamicChart
-              data={envBankAnalytics.bankAnalytics.map((a) => ({
-                bank: a.bank,
-                percentage: Math.round(a.percentage * 10) / 10,
-              }))}
-              type="bar"
-              dataKey="percentage"
-              xAxisKey="bank"
-              height={300}
-            />
-          )}
+          ) : (() => {
+            const shareData = envBankTopN === "all"
+              ? envBankAnalytics.bankAnalytics
+              : envBankAnalytics.bankAnalytics.slice(0, envBankTopN);
+            const minWidth = Math.max(550, shareData.length * 28);
+            return (
+              <div className="overflow-x-auto rounded-xl">
+                <div style={{ minWidth }}>
+                  <DynamicChart
+                    data={shareData.map((a) => ({ bank: a.bank, percentage: Math.round(a.percentage * 10) / 10 }))}
+                    type="bar"
+                    dataKey="percentage"
+                    xAxisKey="bank"
+                    height={300}
+                  />
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -647,23 +677,42 @@ export default function DashboardPage() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
         <div>
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Payments per Bank
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Payments per Bank
+            </h3>
+            <select
+              value={bankTopN === "all" ? "all" : String(bankTopN)}
+              onChange={(e) => setBankTopN(e.target.value === "all" ? "all" : parseInt(e.target.value))}
+              className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-500"
+            >
+              <option value="10">Top 10</option>
+              <option value="20">Top 20</option>
+              <option value="50">Top 50</option>
+              <option value="all">All</option>
+            </select>
+          </div>
           {apiLoading ? (
             <Skeleton className="h-[350px] w-full rounded-xl" />
-          ) : (
-          <DynamicChart
-            data={fa.bankAnalytics.map((a) => ({
-              bank: a.bank,
-              amount: a.totalAmount,
-            }))}
-            type="bar"
-            dataKey="amount"
-            xAxisKey="bank"
-            height={350}
-          />
-          )}
+          ) : (() => {
+            const bankData = bankTopN === "all"
+              ? fa.bankAnalytics
+              : fa.bankAnalytics.slice(0, bankTopN);
+            const minWidth = Math.max(550, bankData.length * 28);
+            return (
+              <div className="overflow-x-auto rounded-xl">
+                <div style={{ minWidth }}>
+                  <DynamicChart
+                    data={bankData.map((a) => ({ bank: a.bank, amount: a.totalAmount }))}
+                    type="bar"
+                    dataKey="amount"
+                    xAxisKey="bank"
+                    height={350}
+                  />
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <div>
