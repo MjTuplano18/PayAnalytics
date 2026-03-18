@@ -40,11 +40,11 @@
   --ring: #14b8a6;
 
   /* Chart colours (light mode) */
-  --chart-1: #00008B;
-  --chart-2: #1F75FE;
-  --chart-3: #74BBFB;
-  --chart-4: #7982B9;
-  --chart-5: #A5C1DC;
+  --chart-1: #14b8a6;
+  --chart-2: #5eead4;
+  --chart-3: #0d9488;
+  --chart-4: #2dd4bf;
+  --chart-5: #c5c6c7;
 
   --radius: 0.625rem;
 
@@ -84,11 +84,11 @@
   --ring: #14b8a6;
 
   /* Chart colours (dark mode) */
-  --chart-1: #1F75FE;
-  --chart-2: #74BBFB;
-  --chart-3: #00008B;
-  --chart-4: #7982B9;
-  --chart-5: #A5C1DC;
+  --chart-1: #14b8a6;
+  --chart-2: #5eead4;
+  --chart-3: #2dd4bf;
+  --chart-4: #0d9488;
+  --chart-5: #c5c6c7;
 
   /* Sidebar */
   --sidebar-background: #1f2833;

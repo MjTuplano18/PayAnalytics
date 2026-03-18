@@ -69,14 +69,6 @@ class UploadRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_session_meta(self, session_id: str, user_id: str) -> UploadSession | None:
-        """Get session metadata without loading records (lightweight)."""
-        result = await self.session.execute(
-            select(UploadSession)
-            .where(UploadSession.id == session_id, UploadSession.user_id == user_id)
-        )
-        return result.scalar_one_or_none()
-
     async def get_session_any_user(self, session_id: str) -> UploadSession | None:
         """Admin: get session regardless of owner."""
         result = await self.session.execute(

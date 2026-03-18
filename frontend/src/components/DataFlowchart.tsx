@@ -45,7 +45,7 @@ export function DataFlowchart({
         sourcePosition: Position.Bottom,
         style: {
           ...nodeBase,
-          background: "#00008B",
+          background: "#14b8a6",
           color: "#ffffff",
           border: "none",
           fontWeight: 600,
@@ -77,7 +77,7 @@ export function DataFlowchart({
             source: `month-${index - 1}`,
             target: `month-${index}`,
             animated: true,
-            style: { stroke: "#1F75FE" },
+            style: { stroke: "#14b8a6" },
           });
         } else {
           edges.push({
@@ -85,7 +85,7 @@ export function DataFlowchart({
             source: "start",
             target: "month-0",
             animated: true,
-            style: { stroke: "#1F75FE" },
+            style: { stroke: "#14b8a6" },
           });
         }
       });
@@ -98,7 +98,7 @@ export function DataFlowchart({
         targetPosition: Position.Top,
         style: {
           ...nodeBase,
-          background: "#7982B9",
+          background: "#10b981",
           color: "#ffffff",
           border: "none",
           fontWeight: 600,
@@ -110,7 +110,7 @@ export function DataFlowchart({
         source: `month-${sampleData.length - 1}`,
         target: "end",
         animated: true,
-        style: { stroke: "#7982B9" },
+        style: { stroke: "#10b981" },
       });
     } else {
       const categories = [
@@ -124,7 +124,7 @@ export function DataFlowchart({
         sourcePosition: Position.Bottom,
         style: {
           ...nodeBase,
-          background: "#7982B9",
+          background: "#f59e0b",
           color: "#ffffff",
           border: "none",
           fontWeight: 600,
@@ -161,7 +161,7 @@ export function DataFlowchart({
           source: "start",
           target: `category-${index}`,
           animated: true,
-            style: { stroke: "#7982B9" },
+          style: { stroke: "#f59e0b" },
         });
       });
     }
