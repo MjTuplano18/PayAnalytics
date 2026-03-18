@@ -358,6 +358,39 @@ class UploadRepository:
         )
         environments = [row[0] for row in env_rows.all()]
 
+        # Environment → bank → touchpoint mapping (for cascading filters)
+        env_bank_tp_rows = await self.session.execute(
+            select(
+                PaymentRecord.environment,
+                PaymentRecord.bank,
+                PaymentRecord.touchpoint,
+            )
+            .where(PaymentRecord.session_id == session_id)
+            .where(PaymentRecord.environment.isnot(None))
+            .distinct()
+            .order_by(PaymentRecord.environment, PaymentRecord.bank, PaymentRecord.touchpoint)
+        )
+        env_map_build: dict[str, dict[str, set[str]]] = {}
+        for env, bank, touchpoint in env_bank_tp_rows.all():
+            if env not in env_map_build:
+                env_map_build[env] = {}
+            if bank not in env_map_build[env]:
+                env_map_build[env][bank] = set()
+            if touchpoint:
+                env_map_build[env][bank].add(touchpoint)
+
+        environment_map = [
+            {
+                "environment": env,
+                "banks": sorted(banks_dict.keys()),
+                "touchpoints_by_bank": {
+                    bank: sorted(tps)
+                    for bank, tps in banks_dict.items()
+                },
+            }
+            for env, banks_dict in sorted(env_map_build.items())
+        ]
+
         return {
             "total_payments": total_payments or 0,
             "total_amount": total_amount,
@@ -367,5 +400,6 @@ class UploadRepository:
             "touchpoints": touchpoints,
             "dates": dates,
             "environments": environments,
+            "environment_map": environment_map,
             "session_id": session_id,
         }

@@ -17,6 +17,7 @@ import { Filter, X } from "lucide-react";
 interface FilterPanelProps {
   filters: FilterOptions;
   onFiltersChange: (filters: FilterOptions) => void;
+  environments?: string[];
   banks: string[];
   touchpoints: string[];
 }
@@ -24,6 +25,7 @@ interface FilterPanelProps {
 export function FilterPanel({
   filters,
   onFiltersChange,
+  environments = [],
   banks,
   touchpoints,
 }: FilterPanelProps) {
@@ -75,15 +77,44 @@ export function FilterPanel({
             onChange={(e) => handleFilterChange("endDate", e.target.value)}
           />
         </div>
+        {environments.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="environment">Environment</Label>
+            <Select
+              value={filters.environment || "all"}
+              onValueChange={(value) => {
+                onFiltersChange({
+                  ...filters,
+                  environment: value === "all" ? undefined : value,
+                  bank: undefined,
+                  touchpoint: undefined,
+                });
+              }}
+            >
+              <SelectTrigger id="environment">
+                <SelectValue placeholder="All Environments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Environments</SelectItem>
+                {environments.map((env) => (
+                  <SelectItem key={env} value={env}>
+                    {env}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="space-y-2">
-          <Label htmlFor="bank">Bank</Label>
+          <Label htmlFor="bank">Bank (Campaign)</Label>
           <Select
             value={filters.bank || "all"}
             onValueChange={(value) =>
-              handleFilterChange(
-                "bank",
-                value === "all" ? undefined : value
-              )
+              onFiltersChange({
+                ...filters,
+                bank: value === "all" ? undefined : value,
+                touchpoint: undefined,
+              })
             }
           >
             <SelectTrigger id="bank">
@@ -94,6 +125,30 @@ export function FilterPanel({
               {banks.map((bank) => (
                 <SelectItem key={bank} value={bank}>
                   {bank}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="touchpoint">Touchpoint</Label>
+          <Select
+            value={filters.touchpoint || "all"}
+            onValueChange={(value) =>
+              handleFilterChange(
+                "touchpoint",
+                value === "all" ? undefined : value
+              )
+            }
+          >
+            <SelectTrigger id="touchpoint">
+              <SelectValue placeholder="All Touchpoints" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Touchpoints</SelectItem>
+              {touchpoints.map((tp) => (
+                <SelectItem key={tp} value={tp}>
+                  {tp}
                 </SelectItem>
               ))}
             </SelectContent>

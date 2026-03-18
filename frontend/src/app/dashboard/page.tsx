@@ -144,11 +144,52 @@ export default function DashboardPage() {
   const noData = !rawFa && !apiLoading;
 
   // ── Touchpoints tab data ──
-  const allTouchpoints = useMemo(() => {
-    if (apiSummary) return apiSummary.touchpoints.map((t) => t.touchpoint);
+  // ── Environment filter data ──
+  const allEnvironments = useMemo(() => {
+    if (apiSummary) return apiSummary.environments;
     if (!data) return [];
-    return [...new Set(data.payments.map((p) => p.touchpoint || "Unknown"))].sort();
+    return [...new Set(data.payments.map((p) => p.environment).filter(Boolean) as string[])].sort();
   }, [apiSummary, data]);
+
+  const toggleEnvironment = (env: string) => {
+    setSelectedEnvironments((prev) => {
+      const next = new Set(prev);
+      if (next.has(env)) next.delete(env);
+      else next.add(env);
+      // Reset touchpoint selection when env changes
+      setSelectedTouchpoints(new Set());
+      return next;
+    });
+  };
+
+  const clearEnvFilter = () => {
+    setSelectedEnvironments(new Set());
+    setSelectedTouchpoints(new Set());
+  };
+
+  // Touchpoints available based on selected environments (cascading)
+  const allTouchpoints = useMemo(() => {
+    if (apiSummary) {
+      const envMap = apiSummary.environment_map ?? [];
+      if (selectedEnvironments.size > 0 && envMap.length > 0) {
+        const tpSet = new Set<string>();
+        for (const envEntry of envMap) {
+          if (selectedEnvironments.has(envEntry.environment)) {
+            for (const tps of Object.values(envEntry.touchpoints_by_bank)) {
+              tps.forEach((tp) => tpSet.add(tp));
+            }
+          }
+        }
+        return Array.from(tpSet).sort();
+      }
+      return apiSummary.touchpoints.map((t) => t.touchpoint);
+    }
+    if (!data) return [];
+    const filteredPayments = selectedEnvironments.size > 0
+      ? data.payments.filter((p) => selectedEnvironments.has(p.environment || "Unknown"))
+      : data.payments;
+    return [...new Set(filteredPayments.map((p) => p.touchpoint || "Unknown"))].sort();
+  }, [apiSummary, data, selectedEnvironments]);
 
   const toggleTouchpoint = (tp: string) => {
     setSelectedTouchpoints((prev) => {
@@ -161,25 +202,13 @@ export default function DashboardPage() {
 
   const clearTpFilter = () => setSelectedTouchpoints(new Set());
 
-  // ── Environment filter data ──
-  const allEnvironments = useMemo(() => {
-    if (!data) return [];
-    return [...new Set(data.payments.map((p) => p.environment || "Unknown"))].sort();
-  }, [data]);
-
-  const toggleEnvironment = (env: string) => {
-    setSelectedEnvironments((prev) => {
-      const next = new Set(prev);
-      if (next.has(env)) next.delete(env);
-      else next.add(env);
-      return next;
-    });
-  };
-
-  const clearEnvFilter = () => setSelectedEnvironments(new Set());
-
   const touchpointAnalytics = useMemo(() => {
-    if (apiSummary && !isFiltered) {
+    // When environments are selected, always use in-memory filtering for accuracy
+    const envFiltered = selectedEnvironments.size > 0
+      ? payments.filter((p) => selectedEnvironments.has(p.environment || "Unknown"))
+      : payments;
+
+    if (apiSummary && !isFiltered && selectedEnvironments.size === 0) {
       return apiSummary.touchpoints.map((t) => ({
         touchpoint: t.touchpoint,
         count: t.count,
@@ -187,10 +216,10 @@ export default function DashboardPage() {
         percentage: t.percentage,
       }));
     }
-    if (payments.length === 0) return [];
+    if (envFiltered.length === 0) return [];
     const tpMap = new Map<string, { count: number; totalAmount: number }>();
     let totalAmount = 0;
-    for (const p of payments) {
+    for (const p of envFiltered) {
       totalAmount += p.paymentAmount;
       const tp = p.touchpoint || "Unknown";
       if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, totalAmount: 0 });
@@ -206,7 +235,7 @@ export default function DashboardPage() {
         percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
       }))
       .sort((a, b) => b.count - a.count);
-  }, [apiSummary, payments, isFiltered]);
+  }, [apiSummary, payments, isFiltered, selectedEnvironments]);
 
   const filteredTpAnalytics = useMemo(() => {
     if (selectedTouchpoints.size === 0) return touchpointAnalytics;

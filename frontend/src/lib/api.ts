@@ -143,6 +143,12 @@ export interface TouchpointSummary {
   percentage: number;
 }
 
+export interface EnvironmentCampaignMap {
+  environment: string;
+  banks: string[];
+  touchpoints_by_bank: Record<string, string[]>;
+}
+
 export interface DashboardSummary {
   total_payments: number;
   total_amount: number;
@@ -152,6 +158,7 @@ export interface DashboardSummary {
   touchpoints: TouchpointSummary[];
   dates: string[];
   environments: string[];
+  environment_map: EnvironmentCampaignMap[];
   session_id: string | null;
 }
 

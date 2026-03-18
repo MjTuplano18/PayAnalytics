@@ -42,6 +42,7 @@ export type ChartType = "bar" | "line" | "pie" | "area" | "barh";
 export interface FilterOptions {
   startDate?: string;
   endDate?: string;
+  environment?: string;
   bank?: string;
   touchpoint?: string;
   minValue?: number;

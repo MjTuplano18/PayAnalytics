@@ -66,10 +66,45 @@ export default function TransactionsPage() {
   const apiRows = txPage?.items ?? null;
   const apiTotal = txPage?.total ?? 0;
   const apiTotalAmount = txPage?.total_amount ?? 0;
-  const apiBanks = dashSummary?.banks.map((b) => b.bank) ?? [];
-  const apiTouchpoints = dashSummary?.touchpoints.map((t) => t.touchpoint) ?? [];
-  const apiDates = dashSummary?.dates ?? [];
   const apiEnvironments = dashSummary?.environments ?? [];
+  const apiEnvironmentMap = dashSummary?.environment_map ?? [];
+
+  // Cascading filter helpers (API mode)
+  const apiBanks = useMemo(() => {
+    if (!dashSummary) return [];
+    if (envFilter !== "all") {
+      const envEntry = apiEnvironmentMap.find((e) => e.environment === envFilter);
+      return envEntry ? envEntry.banks : [];
+    }
+    return dashSummary.banks.map((b) => b.bank);
+  }, [dashSummary, envFilter, apiEnvironmentMap]);
+
+  const apiTouchpoints = useMemo(() => {
+    if (!dashSummary) return [];
+    if (bankFilter !== "all") {
+      if (envFilter !== "all") {
+        const envEntry = apiEnvironmentMap.find((e) => e.environment === envFilter);
+        return envEntry?.touchpoints_by_bank[bankFilter] ?? [];
+      }
+      // bank selected but no env: collect touchpoints across all envs for this bank
+      const tpSet = new Set<string>();
+      for (const e of apiEnvironmentMap) {
+        for (const tp of (e.touchpoints_by_bank[bankFilter] ?? [])) tpSet.add(tp);
+      }
+      return tpSet.size > 0 ? Array.from(tpSet).sort() : dashSummary.touchpoints.map((t) => t.touchpoint);
+    }
+    if (envFilter !== "all") {
+      const envEntry = apiEnvironmentMap.find((e) => e.environment === envFilter);
+      if (envEntry) {
+        const tpSet = new Set<string>();
+        for (const tps of Object.values(envEntry.touchpoints_by_bank)) tps.forEach((tp) => tpSet.add(tp));
+        return Array.from(tpSet).sort();
+      }
+    }
+    return dashSummary.touchpoints.map((t) => t.touchpoint);
+  }, [dashSummary, envFilter, bankFilter, apiEnvironmentMap]);
+
+  const apiDates = dashSummary?.dates ?? [];
 
   // Initialize search query from global context (e.g. nav bar search)
   useEffect(() => {
@@ -80,24 +115,32 @@ export default function TransactionsPage() {
   }, [globalSearchQuery, setGlobalSearchQuery]);
 
   // In-memory fallback (used when sessionId is null)
+  const inMemoryEnvironments = useMemo(() => {
+    if (!data) return [];
+    return [...new Set(data.payments.map((p) => p.environment).filter(Boolean) as string[])].sort();
+  }, [data]);
+
   const inMemoryBanks = useMemo(() => {
     if (!data) return [];
-    return [...new Set(data.payments.map((p) => p.bank))].sort();
-  }, [data]);
+    const payments = envFilter !== "all"
+      ? data.payments.filter((p) => (p.environment ?? "") === envFilter)
+      : data.payments;
+    return [...new Set(payments.map((p) => p.bank))].sort();
+  }, [data, envFilter]);
 
   const inMemoryTouchpoints = useMemo(() => {
     if (!data) return [];
-    return [...new Set(data.payments.map((p) => p.touchpoint))].sort();
-  }, [data]);
+    const payments = data.payments.filter((p) => {
+      if (envFilter !== "all" && (p.environment ?? "") !== envFilter) return false;
+      if (bankFilter !== "all" && p.bank !== bankFilter) return false;
+      return true;
+    });
+    return [...new Set(payments.map((p) => p.touchpoint))].sort();
+  }, [data, envFilter, bankFilter]);
 
   const inMemoryDates = useMemo(() => {
     if (!data) return [];
     return [...new Set(data.payments.map((p) => p.paymentDate).filter(Boolean))].sort();
-  }, [data]);
-
-  const inMemoryEnvironments = useMemo(() => {
-    if (!data) return [];
-    return [...new Set(data.payments.map((p) => p.environment).filter(Boolean) as string[])].sort();
   }, [data]);
 
   const inMemoryFiltered = useMemo(() => {
@@ -612,9 +655,22 @@ export default function TransactionsPage() {
               />
             </div>
 
+            {/* Environment filter — first, drives bank list */}
+            <select
+              value={envFilter}
+              onChange={(e) => { setEnvFilter(e.target.value); setBankFilter("all"); setTpFilter("all"); resetPage(); }}
+              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+            >
+              <option value="all">All Environments</option>
+              {displayEnvironments.map((e) => (
+                <option key={e} value={e}>{e}</option>
+              ))}
+            </select>
+
+            {/* Bank (Campaign) filter — filtered by selected environment */}
             <select
               value={bankFilter}
-              onChange={(e) => { setBankFilter(e.target.value); resetPage(); }}
+              onChange={(e) => { setBankFilter(e.target.value); setTpFilter("all"); resetPage(); }}
               className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
             >
               <option value="all">All Banks</option>
@@ -623,6 +679,7 @@ export default function TransactionsPage() {
               ))}
             </select>
 
+            {/* Touchpoint filter — filtered by selected environment + bank */}
             <select
               value={tpFilter}
               onChange={(e) => { setTpFilter(e.target.value); resetPage(); }}
@@ -642,17 +699,6 @@ export default function TransactionsPage() {
               <option value="all">All Dates</option>
               {displayDates.map((d) => (
                 <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-
-            <select
-              value={envFilter}
-              onChange={(e) => { setEnvFilter(e.target.value); resetPage(); }}
-              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
-            >
-              <option value="all">All Environments</option>
-              {displayEnvironments.map((e) => (
-                <option key={e} value={e}>{e}</option>
               ))}
             </select>
           </div>

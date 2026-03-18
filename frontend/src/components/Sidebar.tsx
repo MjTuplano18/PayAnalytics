@@ -49,21 +49,19 @@ export function Sidebar() {
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Toggle button + Logo */}
-        <div className={`flex items-center p-4 ${isCollapsed ? "justify-center" : "flex-col items-center px-5"}`}>
+        <div className={`flex items-center p-4 ${isCollapsed ? "justify-center" : "justify-between pl-7 pr-5"}`}>
           {!isCollapsed && (
             <>
-              <div className="flex items-center justify-center w-full mb-2">
-                <Image
-                  src="/SVG Lgo.svg"
-                  alt="Logo"
-                  width={160}
-                  height={48}
-                  className="flex-shrink-0"
-                />
-              </div>
+              <Image
+                src="/SVG Lgo.svg"
+                alt="Logo"
+                width={160}
+                height={48}
+                className="flex-shrink-0"
+              />
               <button
                 onClick={toggleCollapsed}
-                className="self-end rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
+                className="rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
                 aria-label="Collapse sidebar"
               >
                 <ChevronsLeft className="h-5 w-5" />

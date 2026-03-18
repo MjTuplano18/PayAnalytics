@@ -62,6 +62,13 @@ class TouchpointSummary(BaseModel):
     percentage: float
 
 
+class EnvironmentCampaignMap(BaseModel):
+    """Maps each environment to its banks, and each bank to its touchpoints."""
+    environment: str
+    banks: list[str]
+    touchpoints_by_bank: dict[str, list[str]]
+
+
 class DashboardSummary(BaseModel):
     total_payments: int
     total_amount: float
@@ -71,6 +78,7 @@ class DashboardSummary(BaseModel):
     touchpoints: list[TouchpointSummary]
     dates: list[str] = []
     environments: list[str] = []
+    environment_map: list[EnvironmentCampaignMap] = []
     session_id: str | None = None
 
 
