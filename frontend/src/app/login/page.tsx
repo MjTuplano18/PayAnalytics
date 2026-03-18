@@ -31,7 +31,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-950">
+    <div className="relative flex min-h-screen items-center justify-end overflow-hidden bg-gray-950 pr-8 sm:pr-16 lg:pr-32">
       {/* Background SVG */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -41,7 +41,7 @@ export default function LoginPage() {
       />
 
       {/* Glassmorphism card */}
-      <div className="relative z-10 w-full max-w-[600px] mx-4 rounded-[40px] border border-white/5 bg-[rgba(56,56,56,0.20)] px-8 py-10 sm:px-16 sm:py-14 backdrop-blur-md shadow-2xl">
+      <div className="relative z-10 w-full max-w-[600px] mx-4 rounded-[40px] border border-white/10 bg-white/5 px-8 py-10 sm:px-16 sm:py-14 backdrop-blur-xl shadow-2xl">
         {/* Logo SVG centered */}
         <div className="mb-10 flex justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
