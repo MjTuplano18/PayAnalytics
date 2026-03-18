@@ -32,7 +32,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-950">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#070D12]">
       {/* Background image */}
       <Image
         src="/BKGRD.svg"
@@ -41,17 +41,17 @@ export default function LoginPage() {
         className="pointer-events-none absolute inset-0 object-cover opacity-60"
         priority
       />
-      <div className="pointer-events-none absolute inset-0 bg-gray-950/40" />
+      <div className="pointer-events-none absolute inset-0" />
 
       {/* Glassmorphism card */}
       <div className="relative z-10 w-full max-w-[440px] mx-4 rounded-[40px] border border-white/5 bg-[rgba(56,56,56,0.20)] px-8 py-10 sm:px-14 sm:py-14 backdrop-blur-md shadow-2xl flex flex-col min-h-[620px]">
         {/* Brand: Logo */}
-        <div className="mb-10 flex items-center justify-center">
+        <div className="mt-6 mb-10 flex items-center justify-center">
           <Image
             src="/SVG Lgo.svg"
             alt="Logo"
-            width={220}
-            height={64}
+            width={320}
+            height={92}
             className="flex-shrink-0"
           />
         </div>
@@ -63,7 +63,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-7 mt-8">
           {/* Email */}
           <div className="space-y-1.5">
             <label htmlFor="email" className="text-sm text-[#939393]">
