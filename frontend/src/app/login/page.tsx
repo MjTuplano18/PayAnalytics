@@ -63,7 +63,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 mt-4">
           {/* Email */}
           <div className="space-y-1.5">
             <label htmlFor="email" className="text-sm text-[#939393]">
@@ -117,7 +117,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-[12px] bg-[#5B66E2] px-8 py-3 text-base font-normal text-white transition-all hover:bg-[#4B56D2] disabled:opacity-50 shadow-lg"
+              className="rounded-[10px] bg-[#5B66E2] px-6 py-2 text-sm font-normal text-white transition-all hover:bg-[#4B56D2] disabled:opacity-50 shadow-lg"
             >
               {isSubmitting ? "Signing in…" : "Login"}
             </button>
