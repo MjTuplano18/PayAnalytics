@@ -34,36 +34,26 @@ export default function LoginPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-950">
       {/* Background image */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=1920&q=80&auto=format"
+      <Image
+        src="/BKGRD.svg"
         alt=""
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-60"
+        fill
+        className="pointer-events-none absolute inset-0 object-cover opacity-60"
+        priority
       />
       <div className="pointer-events-none absolute inset-0 bg-gray-950/40" />
 
       {/* Glassmorphism card */}
       <div className="relative z-10 w-full max-w-[694px] mx-4 rounded-[40px] border border-white/5 bg-[rgba(56,56,56,0.20)] px-8 py-12 sm:px-20 sm:py-16 backdrop-blur-md shadow-2xl">
-        {/* Brand: Logo combined with PayAnalytics */}
+        {/* Brand: Logo */}
         <div className="mb-12 flex items-center justify-center">
           <Image
-            src="/logo.svg"
-            alt="PayAnalytics Logo"
-            width={70}
-            height={66}
-            className="flex-shrink-0 -mr-1"
+            src="/SVG Lgo.svg"
+            alt="Logo"
+            width={280}
+            height={80}
+            className="flex-shrink-0"
           />
-          <h1
-            className="text-5xl sm:text-6xl font-bold"
-            style={{
-              background: "linear-gradient(90deg, #2DD4BF 0%, #67E8F9 32.21%)",
-              backgroundClip: "text",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            PayAnalytics
-          </h1>
         </div>
 
         {/* Error message */}
@@ -138,6 +128,15 @@ export default function LoginPage() {
         <p className="mt-10 text-center text-lg text-[#939393]">
           Contact your administrator for account access
         </p>
+        <div className="mt-6 flex justify-center">
+          <Image
+            src="/SPMADRID WHITE.svg"
+            alt="SPMADRID"
+            width={180}
+            height={40}
+            className="opacity-80"
+          />
+        </div>
       </div>
     </div>
   );

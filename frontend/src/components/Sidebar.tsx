@@ -49,22 +49,21 @@ export function Sidebar() {
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Toggle button + Logo */}
-        <div className={`flex items-center p-4 ${isCollapsed ? "justify-center" : "justify-between px-5"}`}>
+        <div className={`flex items-center p-4 ${isCollapsed ? "justify-center" : "flex-col items-center px-5"}`}>
           {!isCollapsed && (
             <>
-              <Image
-                src="/logo.svg"
-                alt="PayAnalytics Logo"
-                width={26}
-                height={26}
-                className="flex-shrink-0"
-              />
-              <h1 className="text-xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent">
-                PayAnalytics
-              </h1>
+              <div className="flex items-center justify-center w-full mb-2">
+                <Image
+                  src="/SVG Lgo.svg"
+                  alt="Logo"
+                  width={160}
+                  height={48}
+                  className="flex-shrink-0"
+                />
+              </div>
               <button
                 onClick={toggleCollapsed}
-                className="flex-shrink-0 rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
+                className="self-end rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
                 aria-label="Collapse sidebar"
               >
                 <ChevronsLeft className="h-5 w-5" />
