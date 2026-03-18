@@ -125,10 +125,10 @@ export default function LoginPage() {
         </form>
 
         {/* Footer */}
-        <p className="mt-10 text-center text-base text-[#939393]">
+        <p className="mt-10 text-center text-xs text-[#939393]">
           Contact your administrator for account access
         </p>
-        <div className="mt-4 flex justify-center">
+        <div className="mt-6 flex justify-center">
           <Image
             src="/SPMADRID WHITE.svg"
             alt="S.P. Madrid"
