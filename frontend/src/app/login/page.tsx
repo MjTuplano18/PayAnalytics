@@ -43,7 +43,7 @@ export default function LoginPage() {
       <div className="pointer-events-none absolute inset-0 bg-gray-950/40" />
 
       {/* Glassmorphism card */}
-      <div className="relative z-10 w-full max-w-[440px] mx-4 rounded-[40px] border border-white/10 bg-[rgba(30,30,30,0.45)] px-8 py-[52px] sm:px-12 sm:py-[75px] backdrop-blur-sm shadow-2xl">
+      <div className="relative z-10 w-full max-w-[440px] mx-4 rounded-[40px] border border-white/10 bg-[rgba(30,30,30,0.45)] px-8 py-[52px] sm:px-12 sm:py-[75px] backdrop-blur-sm shadow-2xl flex flex-col">
         {/* Brand Logo */}
         <div className="mb-12 flex justify-center">
           <Image
@@ -117,7 +117,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-[12px] bg-[#5B66E2] px-8 py-3 text-lg font-normal text-white transition-all hover:bg-[#4B56D2] disabled:opacity-50 shadow-lg"
+              className="rounded-[10px] bg-[#5B66E2] px-6 py-2 text-base font-normal text-white transition-all hover:bg-[#4B56D2] disabled:opacity-50 shadow-lg"
             >
               {isSubmitting ? "Signing in…" : "Login"}
             </button>
@@ -125,17 +125,19 @@ export default function LoginPage() {
         </form>
 
         {/* Footer */}
-        <p className="mt-10 text-center text-xs text-[#939393]">
-          Contact your administrator for account access
-        </p>
-        <div className="mt-6 flex justify-center">
-          <Image
-            src="/SPMADRID WHITE.svg"
-            alt="S.P. Madrid"
-            width={120}
-            height={30}
-            className="h-auto w-auto max-w-[120px]"
-          />
+        <div className="mt-auto pt-10 text-center">
+          <p className="text-xs text-[#939393] mb-2">
+            Contact your administrator for account access
+          </p>
+          <div className="flex justify-center">
+            <Image
+              src="/SPMADRID WHITE.svg"
+              alt="S.P. Madrid"
+              width={120}
+              height={30}
+              className="h-auto w-auto max-w-[120px]"
+            />
+          </div>
         </div>
       </div>
     </div>
