@@ -34,22 +34,24 @@ export default function LoginPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-950">
       {/* Background image */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=1920&q=80"
+        src="https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=1920&q=80&auto=format"
         alt=""
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-60"
       />
+      <div className="pointer-events-none absolute inset-0 bg-gray-950/40" />
 
       {/* Glassmorphism card */}
       <div className="relative z-10 w-full max-w-[694px] mx-4 rounded-[40px] border border-white/5 bg-[rgba(56,56,56,0.20)] px-8 py-12 sm:px-20 sm:py-16 backdrop-blur-md shadow-2xl">
-        {/* Brand: Logo + PayAnalytics */}
-        <div className="mb-12 flex items-center justify-center gap-3">
+        {/* Brand: Logo combined with PayAnalytics */}
+        <div className="mb-12 flex items-center justify-center">
           <Image
             src="/logo.svg"
             alt="PayAnalytics Logo"
-            width={60}
-            height={57}
-            className="flex-shrink-0"
+            width={70}
+            height={66}
+            className="flex-shrink-0 -mr-1"
           />
           <h1
             className="text-5xl sm:text-6xl font-bold"
