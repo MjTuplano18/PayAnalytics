@@ -36,34 +36,24 @@ export default function LoginPage() {
       {/* Background image */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=1920&q=80&auto=format"
+        src="/BKGRD.svg"
         alt=""
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-60"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
       />
       <div className="pointer-events-none absolute inset-0 bg-gray-950/40" />
 
       {/* Glassmorphism card */}
       <div className="relative z-10 w-full max-w-[440px] mx-4 rounded-[40px] border border-white/5 bg-[rgba(56,56,56,0.20)] px-8 py-14 sm:px-12 sm:py-20 backdrop-blur-md shadow-2xl">
-        {/* Brand: Logo combined with PayAnalytics */}
-        <div className="mb-12 flex items-center justify-center">
+        {/* Brand Logo */}
+        <div className="mb-12 flex justify-center">
           <Image
-            src="/logo.svg"
+            src="/SVG Lgo.svg"
             alt="PayAnalytics Logo"
-            width={55}
-            height={52}
-            className="flex-shrink-0 -mr-1"
+            width={300}
+            height={80}
+            className="h-auto w-auto max-w-[280px]"
+            priority
           />
-          <h1
-            className="text-4xl sm:text-5xl font-bold"
-            style={{
-              background: "linear-gradient(90deg, #2DD4BF 0%, #67E8F9 32.21%)",
-              backgroundClip: "text",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            PayAnalytics
-          </h1>
         </div>
 
         {/* Error message */}
@@ -138,6 +128,15 @@ export default function LoginPage() {
         <p className="mt-10 text-center text-base text-[#939393]">
           Contact your administrator for account access
         </p>
+        <div className="mt-4 flex justify-center">
+          <Image
+            src="/SPMADRID WHITE.svg"
+            alt="S.P. Madrid"
+            width={120}
+            height={30}
+            className="h-auto w-auto max-w-[120px]"
+          />
+        </div>
       </div>
     </div>
   );
