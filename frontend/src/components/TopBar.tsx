@@ -2,12 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Search, Sun, Moon, X, CheckCircle2, XCircle } from "lucide-react";
+import { Menu, Search, Sun, Moon, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSidebar } from "@/context/SidebarContext";
 import { useData } from "@/context/DataContext";
-
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
 
 interface SearchResult {
   type: "transaction" | "bank" | "account" | "page";
@@ -28,25 +26,9 @@ export function TopBar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [syncStatus, setSyncStatus] = useState<"synced" | "error" | "checking">("checking");
 
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  // Health check polling
-  useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/health`, { method: "GET" });
-        setSyncStatus(res.ok ? "synced" : "error");
-      } catch {
-        setSyncStatus("error");
-      }
-    };
-    checkHealth();
-    const interval = setInterval(checkHealth, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   // Close dropdown and collapse search when clicking outside (preserve text)
@@ -218,27 +200,8 @@ export function TopBar() {
         )}
       </div>
 
-      {/* Right: sync indicator + search icon + theme toggle */}
+      {/* Right: search icon + theme toggle */}
       <div className="flex items-center gap-2" ref={searchRef}>
-        {/* Sync status indicator */}
-        <div
-          className={`hidden sm:flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-            syncStatus === "synced"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
-              : syncStatus === "error"
-                ? "border-red-500/30 bg-red-500/10 text-red-500"
-                : "border-gray-400/30 bg-gray-400/10 text-gray-400"
-          }`}
-        >
-          {syncStatus === "synced" ? (
-            <CheckCircle2 className="h-3.5 w-3.5" />
-          ) : syncStatus === "error" ? (
-            <XCircle className="h-3.5 w-3.5" />
-          ) : (
-            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          )}
-          {syncStatus === "synced" ? "Synced" : syncStatus === "error" ? "Not Synced" : "Checking"}
-        </div>
 
         {/* Expandable search */}
         <div className="relative flex items-center">
