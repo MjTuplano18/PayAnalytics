@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -34,60 +32,70 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-950 px-4">
-      {/* Background decoration */}
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-teal-500/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-teal-400/10 blur-3xl" />
-      </div>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-950">
+      {/* Background image */}
+      <img
+        src="https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=1920&q=80"
+        alt=""
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+      />
 
-      <Card className="relative z-10 w-full max-w-md border-gray-800 bg-gray-900 p-8 shadow-2xl">
-        {/* Brand */}
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-teal-400 to-cyan-300 bg-clip-text text-transparent">
+      {/* Glassmorphism card */}
+      <div className="relative z-10 w-full max-w-[694px] mx-4 rounded-[40px] border border-white/5 bg-[rgba(56,56,56,0.20)] px-8 py-12 sm:px-20 sm:py-16 backdrop-blur-md shadow-2xl">
+        {/* Brand: Logo + PayAnalytics */}
+        <div className="mb-12 flex items-center justify-center gap-3">
+          <Image
+            src="/logo.svg"
+            alt="PayAnalytics Logo"
+            width={60}
+            height={57}
+            className="flex-shrink-0"
+          />
+          <h1
+            className="text-5xl sm:text-6xl font-bold"
+            style={{
+              background: "linear-gradient(90deg, #2DD4BF 0%, #67E8F9 32.21%)",
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
             PayAnalytics
           </h1>
-          <p className="mt-2 text-sm text-gray-400">
-            Sign in to your account
-          </p>
         </div>
 
         {/* Error message */}
         {error && (
-          <div className="mb-4 rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-3 text-sm text-red-400 text-center">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-gray-300">
+            <label htmlFor="email" className="text-lg text-[#939393]">
               Email
-            </Label>
-            <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                className="border-gray-700 bg-gray-800 pl-10 text-gray-100 placeholder:text-gray-500 focus-visible:border-teal-500 focus-visible:ring-teal-500/30"
-              />
-            </div>
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              className="w-full rounded-[15px] bg-[#ACACAC]/40 px-5 py-4 text-lg text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 transition-all"
+            />
           </div>
 
           {/* Password */}
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-gray-300">
+            <label htmlFor="password" className="text-lg text-[#939393]">
               Password
-            </Label>
+            </label>
             <div className="relative">
-              <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-              <Input
+              <input
                 id="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
@@ -95,37 +103,40 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="border-gray-700 bg-gray-800 pl-10 pr-10 text-gray-100 placeholder:text-gray-500 focus-visible:border-teal-500 focus-visible:ring-teal-500/30"
+                className="w-full rounded-[15px] bg-[#ACACAC]/40 px-5 py-4 pr-12 text-lg text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
                 tabIndex={-1}
               >
                 {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
+                  <EyeOff className="h-5 w-5" />
                 ) : (
-                  <Eye className="h-4 w-4" />
+                  <Eye className="h-5 w-5" />
                 )}
               </button>
             </div>
           </div>
 
           {/* Submit */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-md bg-gradient-to-r from-teal-500 to-cyan-400 px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            {isSubmitting ? "Signing in…" : "Sign In"}
-          </button>
+          <div className="flex justify-end pt-4">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-[15px] bg-[#5B66E2] px-10 py-4 text-xl font-normal text-white transition-all hover:bg-[#4B56D2] disabled:opacity-50 shadow-lg"
+            >
+              {isSubmitting ? "Signing in…" : "Login"}
+            </button>
+          </div>
         </form>
 
-        <p className="mt-6 text-center text-xs text-gray-500">
+        {/* Footer */}
+        <p className="mt-10 text-center text-lg text-[#939393]">
           Contact your administrator for account access
         </p>
-      </Card>
+      </div>
     </div>
   );
 }
