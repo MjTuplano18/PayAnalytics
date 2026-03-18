@@ -29,7 +29,7 @@ export function ChartSelector({ selectedType, onTypeChange }: ChartSelectorProps
           onClick={() => onTypeChange(type)}
           className={
             selectedType === type
-              ? "bg-teal-600 text-white hover:bg-teal-700"
+              ? "bg-[#4a55d1] text-white hover:bg-[#4048c0]"
               : ""
           }
         >

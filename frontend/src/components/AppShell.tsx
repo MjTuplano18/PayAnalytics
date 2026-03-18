@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { DataProvider } from "@/context/DataContext";
@@ -77,33 +78,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Show a full-page skeleton while checking auth
   if (isLoading && !isLoginPage) {
     return (
-      <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="relative flex min-h-screen bg-[#070D12]">
+        {/* Blurred background */}
+        <div className="fixed inset-0 z-0 overflow-hidden">
+          <Image
+            src="/BKGRD.svg"
+            alt=""
+            fill
+            className="object-cover opacity-60"
+            style={{ filter: "blur(8px)", transform: "scale(1.05)" }}
+            priority
+          />
+        </div>
         {/* Sidebar skeleton */}
-        <div className="hidden lg:flex h-screen w-64 flex-col border-r bg-gray-900 border-gray-800 p-6 gap-6">
-          <Skeleton className="h-8 w-36 bg-gray-800" />
+        <div className="relative z-10 hidden lg:flex h-screen w-64 flex-col border-r bg-[rgba(7,13,18,0.85)] border-white/10 p-6 gap-6 backdrop-blur-xl">
+          <Skeleton className="h-8 w-36 bg-white/10" />
           <div className="space-y-3 mt-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full bg-gray-800" />
+              <Skeleton key={i} className="h-10 w-full bg-white/10" />
             ))}
           </div>
         </div>
         {/* Main content skeleton */}
-        <div className="flex-1">
+        <div className="relative z-10 flex-1">
           {/* Top bar skeleton */}
-          <div className="h-16 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center px-8">
-            <Skeleton className="h-5 w-32" />
+          <div className="h-16 border-b border-white/10 bg-[rgba(7,13,18,0.75)] backdrop-blur-xl flex items-center px-8">
+            <Skeleton className="h-5 w-32 bg-white/10" />
             <div className="flex-1" />
-            <Skeleton className="h-8 w-8 rounded-full" />
+            <Skeleton className="h-8 w-8 rounded-full bg-white/10" />
           </div>
           {/* Page skeleton */}
           <div className="p-8 space-y-6">
-            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-8 w-48 bg-white/10" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-28 rounded-lg" />
+                <Skeleton key={i} className="h-28 rounded-lg bg-white/10" />
               ))}
             </div>
-            <Skeleton className="h-72 rounded-lg" />
+            <Skeleton className="h-72 rounded-lg bg-white/10" />
           </div>
         </div>
       </div>
@@ -123,8 +135,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Not authenticated and not on login — show skeleton while redirect happens
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-950">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-400 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-[#070D12]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#5B66E2] border-t-transparent" />
       </div>
     );
   }
@@ -142,7 +154,18 @@ function UploadEventListener() {
       <SessionRestorer />
       <UploadEventListener />
       <SidebarProvider>
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Fixed blurred background – always behind everything */}
+        <div className="fixed inset-0 z-0 overflow-hidden bg-[#070D12]">
+          <Image
+            src="/BKGRD.svg"
+            alt=""
+            fill
+            className="object-cover opacity-60"
+            style={{ filter: "blur(8px)", transform: "scale(1.05)" }}
+            priority
+          />
+        </div>
+        <div className="relative z-10 min-h-screen">
           <Sidebar />
           <MainContent>{children}</MainContent>
         </div>

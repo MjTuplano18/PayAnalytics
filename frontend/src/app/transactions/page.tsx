@@ -559,7 +559,7 @@ export default function TransactionsPage() {
   if (!data && !sessionId) {
     return (
       <div className="px-4 sm:px-8 py-8 min-h-screen">
-        <div className="p-12 rounded-lg text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        <div className="p-12 rounded-lg text-center bg-card border border-border">
           <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
             No Data Available
           </h2>
@@ -581,7 +581,7 @@ export default function TransactionsPage() {
             onClick={() => setActiveTab(tab)}
             className={`px-5 py-3 text-sm font-medium transition-colors -mb-px ${
               activeTab === tab
-                ? "border-b-2 border-teal-500 text-teal-500 bg-teal-500/5"
+                ? "border-b-2 border-[#5B66E2] text-[#5B66E2] bg-[#5B66E2]/5"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
@@ -604,7 +604,7 @@ export default function TransactionsPage() {
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <Popover open={exportOpen} onOpenChange={setExportOpen}>
               <PopoverTrigger asChild>
-                <Button className="bg-teal-600 hover:bg-teal-700 text-white">
+                <Button className="bg-[#4a55d1] hover:bg-[#4048c0] text-white">
                   <Download className="w-4 h-4 mr-1" />
                   Export
                   <ChevronDown className="w-3 h-3 ml-1" />
@@ -642,7 +642,7 @@ export default function TransactionsPage() {
 
 
         {/* Filters */}
-        <div className="p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mb-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+        <div className="p-4 rounded-lg bg-card border border-border mb-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div className="relative sm:col-span-2 lg:col-span-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
@@ -651,7 +651,7 @@ export default function TransactionsPage() {
                 placeholder="Search bank, account, touchpoint..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); }}
-                className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+                className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#5B66E2] text-sm"
               />
             </div>
 
@@ -659,7 +659,7 @@ export default function TransactionsPage() {
             <select
               value={envFilter}
               onChange={(e) => { setEnvFilter(e.target.value); setBankFilter("all"); setTpFilter("all"); resetPage(); }}
-              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#5B66E2] text-sm"
             >
               <option value="all">All Environments</option>
               {displayEnvironments.map((e) => (
@@ -671,7 +671,7 @@ export default function TransactionsPage() {
             <select
               value={bankFilter}
               onChange={(e) => { setBankFilter(e.target.value); setTpFilter("all"); resetPage(); }}
-              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#5B66E2] text-sm"
             >
               <option value="all">All Banks</option>
               {displayBanks.map((b) => (
@@ -683,7 +683,7 @@ export default function TransactionsPage() {
             <select
               value={tpFilter}
               onChange={(e) => { setTpFilter(e.target.value); resetPage(); }}
-              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#5B66E2] text-sm"
             >
               <option value="all">All Touchpoints</option>
               {displayTouchpoints.map((t) => (
@@ -694,7 +694,7 @@ export default function TransactionsPage() {
             <select
               value={dateFilter}
               onChange={(e) => { setDateFilter(e.target.value); resetPage(); }}
-              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+              className="px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#5B66E2] text-sm"
             >
               <option value="all">All Dates</option>
               {displayDates.map((d) => (
@@ -705,7 +705,7 @@ export default function TransactionsPage() {
         </div>
 
         {/* Table */}
-        <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+        <div className="rounded-lg border bg-card border-border overflow-x-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
           {apiLoading ? (
             <div className="p-4">
               {Array.from({ length: 10 }).map((_, i) => (
@@ -714,7 +714,7 @@ export default function TransactionsPage() {
             </div>
           ) : (
           <table className="w-full min-w-[850px]">
-            <thead className="bg-gray-50 dark:bg-gray-900">
+            <thead className="bg-muted">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Bank
@@ -748,7 +748,7 @@ export default function TransactionsPage() {
                 return (
                 <tr
                   key={`${currentPage}-${i}`}
-                  className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200"
+                  className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200"
                 >
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
                     {isEditing ? <Input value={editForm.bank} onChange={(e) => setEditForm({ ...editForm, bank: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" /> : p.bank}
@@ -766,7 +766,7 @@ export default function TransactionsPage() {
                     {isEditing ? (
                       <Input value={editForm.touchpoint} onChange={(e) => setEditForm({ ...editForm, touchpoint: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" />
                     ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#5B66E2]/10 text-[#5B66E2] dark:bg-[#5B66E2]/20 dark:text-[#8B96F2]">
                         {p.touchpoint}
                       </span>
                     )}
@@ -810,14 +810,14 @@ export default function TransactionsPage() {
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 First
               </button>
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Prev
               </button>
@@ -835,8 +835,8 @@ export default function TransactionsPage() {
                     onClick={() => setCurrentPage(pg)}
                     className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${
                       pg === currentPage
-                        ? "bg-teal-600 text-white border-teal-600 shadow-sm"
-                        : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200"
+                        ? "bg-[#4a55d1] text-white border-[#4a55d1] shadow-sm"
+                        : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2]"
                     }`}
                   >
                     {pg}
@@ -847,14 +847,14 @@ export default function TransactionsPage() {
               <button
                 onClick={() => setCurrentPage((p) => Math.min(displayTotalPages, p + 1))}
                 disabled={currentPage === displayTotalPages}
-                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Next
               </button>
               <button
                 onClick={() => setCurrentPage(displayTotalPages)}
                 disabled={currentPage === displayTotalPages}
-                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Last
               </button>
@@ -878,7 +878,7 @@ export default function TransactionsPage() {
             <PopoverTrigger asChild>
               <Button
                 disabled={reportExporting}
-                className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
+                className="bg-[#4a55d1] hover:bg-[#4048c0] text-white gap-2"
               >
                 <Download className="w-4 h-4" />
                 {reportExporting ? "Exporting..." : "Export"}
@@ -906,15 +906,15 @@ export default function TransactionsPage() {
 
         {/* Summary stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 animate-fade-in-up">
-          <div className="p-5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <div className="p-5 rounded-lg bg-card border border-border">
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Records</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmt(reportTotalRecords)}</p>
           </div>
-          <div className="p-5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <div className="p-5 rounded-lg bg-card border border-border">
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Amount</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">₱{fmt(reportTotalAmount)}</p>
           </div>
-          <div className="p-5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+          <div className="p-5 rounded-lg bg-card border border-border">
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Banks</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmt(reportBankCount)}</p>
           </div>
@@ -922,13 +922,13 @@ export default function TransactionsPage() {
 
         {/* Bank breakdown table */}
         {data && data.bankAnalytics.length > 0 && (
-          <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <div className="rounded-lg border bg-card border-border overflow-x-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-teal-500" />
+              <BarChart3 className="w-5 h-5 text-[#5B66E2]" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Bank Summary</h3>
             </div>
             <table className="w-full min-w-[500px]">
-              <thead className="bg-gray-50 dark:bg-gray-900">
+              <thead className="bg-muted">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bank</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Payments</th>
@@ -938,7 +938,7 @@ export default function TransactionsPage() {
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {data.bankAnalytics.map((b) => (
-                  <tr key={b.bank} className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors">
+                  <tr key={b.bank} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{b.bank}</td>
                     <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.paymentCount)}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400">₱{fmt(b.totalAmount)}</td>
@@ -964,7 +964,7 @@ export default function TransactionsPage() {
           </button>
           <button
             onClick={() => setShowAddForm(true)}
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center"
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center"
             title="Add Transaction"
           >
             <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1027,7 +1027,7 @@ export default function TransactionsPage() {
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <Button onClick={handleAddTransaction} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white">Add Transaction</Button>
+              <Button onClick={handleAddTransaction} className="flex-1 bg-[#4a55d1] hover:bg-[#4048c0] text-white">Add Transaction</Button>
               <Button variant="outline" onClick={() => setShowAddForm(false)} className="flex-1">Cancel</Button>
             </div>
           </div>

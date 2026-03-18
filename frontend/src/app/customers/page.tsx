@@ -54,7 +54,7 @@ export default function AccountsPage() {
   if (!data) {
     return (
       <div className="px-4 sm:px-8 py-8 min-h-screen">
-        <div className="p-12 rounded-lg text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        <div className="p-12 rounded-lg text-center bg-card border border-border">
           <h2 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
             No Data Available
           </h2>
@@ -83,19 +83,19 @@ export default function AccountsPage() {
       label: "Total Accounts",
       value: fmt(data.totalAccounts),
       icon: Users,
-      iconBg: "bg-teal-600",
+      iconBg: "bg-[#4a55d1]",
     },
     {
       label: "Avg Payments / Account",
       value: avgPayments.toFixed(1),
       icon: FileText,
-      iconBg: "bg-teal-500",
+      iconBg: "bg-[#5B66E2]",
     },
     {
       label: "Avg Amount / Account",
       value: `₱${fmt(Math.round(avgAmount))}`,
       icon: DollarSign,
-      iconBg: "bg-teal-500",
+      iconBg: "bg-[#5B66E2]",
     },
   ];
 
@@ -126,7 +126,7 @@ export default function AccountsPage() {
           return (
             <Card
               key={m.label}
-              className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+              className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -173,14 +173,14 @@ export default function AccountsPage() {
         for (let i = ps; i <= pe; i++) pageNums.push(i);
 
         return (
-          <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto">
+          <div className="rounded-lg border bg-card border-border overflow-x-auto">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Account Details
               </h3>
             </div>
             <table className="w-full min-w-[600px]">
-              <thead className="bg-gray-50 dark:bg-gray-900">
+              <thead className="bg-muted">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                     Account
@@ -200,7 +200,7 @@ export default function AccountsPage() {
                 {pageRows.map((a) => (
                   <tr
                     key={a.account}
-                    className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200"
+                    className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200"
                   >
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                       {a.account}
@@ -226,14 +226,14 @@ export default function AccountsPage() {
                 <button
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
-                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   First
                 </button>
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Prev
                 </button>
@@ -243,8 +243,8 @@ export default function AccountsPage() {
                     onClick={() => setCurrentPage(pg)}
                     className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${
                       pg === currentPage
-                        ? "bg-teal-600 text-white border-teal-600 shadow-sm"
-                        : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200"
+                        ? "bg-[#4a55d1] text-white border-[#4a55d1] shadow-sm"
+                        : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2]"
                     }`}
                   >
                     {pg}
@@ -253,14 +253,14 @@ export default function AccountsPage() {
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>
                 <button
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={currentPage === totalPages}
-                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-teal-50 hover:border-teal-400 hover:text-teal-700 dark:hover:bg-teal-900/40 dark:hover:border-teal-500 dark:hover:text-teal-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Last
                 </button>

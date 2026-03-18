@@ -183,7 +183,7 @@ export function DataFlowchart({
   return (
     <div
       style={{ height }}
-      className="overflow-hidden rounded-lg bg-gray-50 dark:bg-gray-900"
+      className="overflow-hidden rounded-lg bg-muted"
     >
       <ReactFlow
         nodes={nodes}

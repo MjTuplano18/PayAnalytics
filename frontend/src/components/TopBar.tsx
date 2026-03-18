@@ -183,18 +183,18 @@ export function TopBar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 px-4 sm:px-8">
+    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-[rgba(7,13,18,0.75)] backdrop-blur-xl border-white/10 px-4 sm:px-8">
       {/* Left: hamburger + file name */}
       <div className="flex items-center gap-4">
         <button
           onClick={toggle}
-          className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 lg:hidden"
+          className="rounded-lg p-2 text-[#939393] hover:bg-white/10 hover:text-white lg:hidden"
           aria-label="Toggle sidebar"
         >
           <Menu className="h-5 w-5" />
         </button>
         {fileName && (
-          <span className="hidden sm:inline text-sm text-gray-500 dark:text-gray-400 truncate max-w-[500px]">
+          <span className="hidden sm:inline text-sm text-[#939393] truncate max-w-[500px]">
             {fileName}
           </span>
         )}
@@ -208,7 +208,7 @@ export function TopBar() {
           {searchOpen ? (
             <form onSubmit={handleSearch} className="relative">
               <div className="relative flex items-center">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#939393]" />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -216,7 +216,7 @@ export function TopBar() {
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   onFocus={() => searchQuery && setShowResults(true)}
-                  className="w-64 sm:w-80 rounded-lg border bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-700 py-2 pl-10 pr-9 text-sm text-gray-900 dark:text-gray-200 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all duration-200"
+                  className="w-64 sm:w-80 rounded-lg border bg-[rgba(7,13,18,0.60)] border-white/20 py-2 pl-10 pr-9 text-sm text-white placeholder:text-[#939393] focus:outline-none focus:ring-2 focus:ring-[#5B66E2] transition-all duration-200"
                 />
                 {searchQuery && (
                   <button
@@ -227,7 +227,7 @@ export function TopBar() {
                       setResults([]);
                       searchInputRef.current?.focus();
                     }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#939393] hover:text-white"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -236,7 +236,7 @@ export function TopBar() {
 
               {/* Search Results Dropdown */}
               {showResults && results.length > 0 && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                <div className="absolute top-full right-0 mt-2 w-80 bg-[rgba(7,13,18,0.95)] backdrop-blur-xl border border-white/10 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
                   {(() => {
                     const grouped: Record<string, SearchResult[]> = {};
                     results.forEach((result) => {
@@ -256,23 +256,23 @@ export function TopBar() {
                       (type) =>
                         grouped[type] && (
                           <div key={type}>
-                            <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 sticky top-0">
+                            <div className="px-4 py-2 text-xs font-semibold text-[#939393] bg-[rgba(7,13,18,0.60)] sticky top-0">
                               {typeLabels[type]}
                             </div>
                             {grouped[type].map((result, idx) => (
                               <button
                                 key={`${type}-${idx}`}
                                 onClick={result.action}
-                                className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 last:border-b-0 transition-colors"
+                                className="w-full text-left px-4 py-3 hover:bg-white/10 border-b border-white/10 last:border-b-0 transition-colors"
                               >
                                 <div className="flex items-start gap-3">
                                   <span className="text-lg">{getResultIcon(type)}</span>
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                    <div className="text-sm font-medium text-white truncate">
                                       {result.title}
                                     </div>
                                     {result.subtitle && (
-                                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      <div className="text-xs text-[#939393]">
                                         {result.subtitle}
                                       </div>
                                     )}
@@ -288,7 +288,7 @@ export function TopBar() {
               )}
 
               {showResults && results.length === 0 && searchQuery && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg z-50 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                <div className="absolute top-full right-0 mt-2 w-80 bg-[rgba(7,13,18,0.95)] backdrop-blur-xl border border-white/10 rounded-lg shadow-lg z-50 p-4 text-center text-sm text-[#939393]">
                   No results found
                 </div>
               )}
@@ -302,7 +302,7 @@ export function TopBar() {
                   if (searchQuery) performSearch(searchQuery);
                 }, 50);
               }}
-              className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+              className="rounded-lg p-2 text-[#939393] hover:bg-white/10 hover:text-white"
               aria-label="Open search"
             >
               <Search className="h-5 w-5" />
@@ -313,7 +313,7 @@ export function TopBar() {
         {mounted ? (
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            className="rounded-lg p-2 text-[#939393] hover:bg-white/10 hover:text-white"
             aria-label="Toggle theme"
           >
             {theme === "dark" ? (

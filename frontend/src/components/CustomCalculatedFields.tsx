@@ -152,12 +152,12 @@ export function CustomCalculatedFields({ payments }: CustomCalculatedFieldsProps
     <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden animate-fade-in-up">
       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Calculator className="w-4 h-4 text-teal-500" />
+          <Calculator className="w-4 h-4 text-[#5B66E2]" />
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Custom Metrics</h3>
         </div>
         <Button
           onClick={() => setShowAdd(!showAdd)}
-          className="h-7 px-3 text-xs bg-teal-600 hover:bg-teal-700 text-white gap-1"
+          className="h-7 px-3 text-xs bg-[#4a55d1] hover:bg-[#4048c0] text-white gap-1"
         >
           <Plus className="w-3 h-3" />
           Add
@@ -166,7 +166,7 @@ export function CustomCalculatedFields({ payments }: CustomCalculatedFieldsProps
 
       {/* Add New Field Form */}
       {showAdd && (
-        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-4 py-3 bg-muted border-b border-gray-200 dark:border-gray-700">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[140px]">
               <label className="text-xs text-gray-500 mb-1 block">Name</label>
@@ -202,7 +202,7 @@ export function CustomCalculatedFields({ payments }: CustomCalculatedFieldsProps
                 ))}
               </select>
             </div>
-            <Button onClick={addField} disabled={!newName.trim()} className="h-8 px-4 text-xs bg-teal-600 hover:bg-teal-700 text-white">
+            <Button onClick={addField} disabled={!newName.trim()} className="h-8 px-4 text-xs bg-[#4a55d1] hover:bg-[#4048c0] text-white">
               Create
             </Button>
           </div>
@@ -220,7 +220,7 @@ export function CustomCalculatedFields({ payments }: CustomCalculatedFieldsProps
             const isCollapsed = collapsed.has(field.id);
             return (
               <div key={field.id}>
-                <div className="flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                <div className="flex items-center gap-2 px-4 py-2.5 hover:bg-muted/50 dark:hover:bg-muted/30">
                   <button onClick={() => toggleCollapse(field.id)} className="p-0.5">
                     {isCollapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
                   </button>

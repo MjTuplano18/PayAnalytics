@@ -44,7 +44,7 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r bg-gray-900 border-gray-800 transition-all duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r bg-[rgba(7,13,18,0.85)] border-white/10 backdrop-blur-xl transition-all duration-300 ease-in-out lg:translate-x-0 ${
           isCollapsed ? "w-20" : "w-64"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
@@ -61,7 +61,7 @@ export function Sidebar() {
               />
               <button
                 onClick={toggleCollapsed}
-                className="rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
+                className="rounded-lg p-1.5 transition-colors duration-200 text-[#939393] hover:bg-white/10 hover:text-white"
                 aria-label="Collapse sidebar"
               >
                 <ChevronsLeft className="h-5 w-5" />
@@ -71,7 +71,7 @@ export function Sidebar() {
           {isCollapsed && (
             <button
               onClick={toggleCollapsed}
-              className="rounded-lg p-1.5 transition-colors duration-200 text-gray-400 hover:bg-gray-800 hover:text-white"
+              className="rounded-lg p-1.5 transition-colors duration-200 text-[#939393] hover:bg-white/10 hover:text-white"
               aria-label="Expand sidebar"
             >
               <ChevronsRight className="h-5 w-5" />
@@ -94,8 +94,8 @@ export function Sidebar() {
                   isCollapsed ? "justify-center px-2" : ""
                 } ${
                   active
-                    ? "bg-teal-600 text-white shadow-lg shadow-teal-600/30"
-                    : "text-gray-400 hover:bg-gray-800 hover:text-white hover:translate-x-1"
+                    ? "bg-[#5B66E2] text-white shadow-lg shadow-[#5B66E2]/30"
+                    : "text-[#939393] hover:bg-white/10 hover:text-white hover:translate-x-1"
                 }`}
               >
                 <Icon className="h-5 w-5 flex-shrink-0" />
@@ -108,17 +108,17 @@ export function Sidebar() {
         </nav>
 
         {/* Profile & Sign Out */}
-        <div className="border-t border-gray-800 p-4">
+        <div className="border-t border-white/10 p-4">
           {user && !isCollapsed && (
             <div className="mb-3 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-sm font-semibold text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] text-sm font-semibold text-white">
                 {user.full_name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="truncate text-sm font-medium text-gray-200">
+                <p className="truncate text-sm font-medium text-white">
                   {user.full_name}
                 </p>
-                <p className="truncate text-xs text-gray-500">
+                <p className="truncate text-xs text-[#939393]">
                   {user.email}
                 </p>
               </div>
@@ -126,7 +126,7 @@ export function Sidebar() {
           )}
           {user && isCollapsed && (
             <div className="mb-3 flex justify-center">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-sm font-semibold text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] text-sm font-semibold text-white">
                 {user.full_name.charAt(0).toUpperCase()}
               </div>
             </div>
@@ -134,7 +134,7 @@ export function Sidebar() {
           <button
             onClick={logout}
             title={isCollapsed ? "Sign Out" : undefined}
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-gray-400 transition-all duration-200 hover:bg-gray-800 hover:text-white ${
+            className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-[#939393] transition-all duration-200 hover:bg-white/10 hover:text-white ${
               isCollapsed ? "justify-center px-2" : ""
             }`}
           >

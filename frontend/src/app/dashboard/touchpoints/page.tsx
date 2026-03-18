@@ -104,10 +104,10 @@ export default function TouchpointsDashboardPage() {
   const noData = filteredAnalytics.length === 0 && !apiLoading;
 
   const metricCards = [
-    { label: "Total Transactions", value: fmt(totalTransactions), icon: Hash, iconBg: "bg-teal-500" },
-    { label: "Total Amount", value: `₱${fmt(totalAmount)}`, icon: DollarSign, iconBg: "bg-teal-600" },
-    { label: "Unique Touchpoints", value: fmt(uniqueTouchpoints), icon: Waypoints, iconBg: "bg-teal-500" },
-    { label: "Top Touchpoint", value: topTouchpoint, icon: BarChart3, iconBg: "bg-teal-700" },
+    { label: "Total Transactions", value: fmt(totalTransactions), icon: Hash, iconBg: "bg-[#5B66E2]" },
+    { label: "Total Amount", value: `₱${fmt(totalAmount)}`, icon: DollarSign, iconBg: "bg-[#4a55d1]" },
+    { label: "Unique Touchpoints", value: fmt(uniqueTouchpoints), icon: Waypoints, iconBg: "bg-[#5B66E2]" },
+    { label: "Top Touchpoint", value: topTouchpoint, icon: BarChart3, iconBg: "bg-[#4048c0]" },
   ];
 
   return (
@@ -125,7 +125,7 @@ export default function TouchpointsDashboardPage() {
           <div ref={tpDropdownRef} className="relative">
             <button
               onClick={() => setTpDropdownOpen((v) => !v)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
             >
               <Waypoints className="h-4 w-4" />
               {selectedTouchpoints.size === 0
@@ -138,7 +138,7 @@ export default function TouchpointsDashboardPage() {
                 {selectedTouchpoints.size > 0 && (
                   <button
                     onClick={clearTpFilter}
-                    className="w-full px-3 py-2 text-left text-xs text-teal-600 dark:text-teal-400 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700"
+                    className="w-full px-3 py-2 text-left text-xs text-[#5B66E2] dark:text-[#8B96F2] hover:bg-muted/50 dark:hover:bg-muted border-b border-gray-200 dark:border-gray-700"
                   >
                     Clear selection
                   </button>
@@ -147,11 +147,11 @@ export default function TouchpointsDashboardPage() {
                   <button
                     key={tp}
                     onClick={() => toggleTouchpoint(tp)}
-                    className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
                   >
                     <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${
                       selectedTouchpoints.has(tp)
-                        ? "bg-teal-500 border-teal-500"
+                        ? "bg-[#5B66E2] border-[#5B66E2]"
                         : "border-gray-300 dark:border-gray-600"
                     }`}>
                       {selectedTouchpoints.has(tp) && <Check className="h-3 w-3 text-white" />}
@@ -174,7 +174,7 @@ export default function TouchpointsDashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
         {apiLoading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+              <Card key={i} className="p-6 bg-card border-border">
                 <div className="flex items-center justify-between mb-2">
                   <Skeleton className="h-4 w-32" />
                   <Skeleton className="h-9 w-9 rounded-lg" />
@@ -187,7 +187,7 @@ export default function TouchpointsDashboardPage() {
               return (
                 <Card
                   key={card.label}
-                  className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                  className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -206,7 +206,7 @@ export default function TouchpointsDashboardPage() {
       </div>
 
       {noData && (
-        <div className="mb-6 p-4 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20 text-sm text-teal-700 dark:text-teal-300 text-center">
+        <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
           No records found for the selected time range. Upload data or try a different filter.
         </div>
       )}
@@ -298,21 +298,21 @@ export default function TouchpointsDashboardPage() {
 
       {/* Touchpoint Table */}
       {apiLoading ? (
-        <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-8 p-6">
+        <div className="rounded-lg border bg-card border-border mb-8 p-6">
           <Skeleton className="h-6 w-40 mb-4" />
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+        <div className="rounded-lg border bg-card border-border overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Touchpoint Analytics
             </h3>
           </div>
           <table className="w-full min-w-[500px]">
-            <thead className="bg-gray-50 dark:bg-gray-900">
+            <thead className="bg-muted">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Touchpoint
@@ -330,14 +330,14 @@ export default function TouchpointsDashboardPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {/* Totals row */}
-              <tr className="bg-gray-50 dark:bg-gray-900 font-semibold">
+              <tr className="bg-muted font-semibold">
                 <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">Total</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(totalTransactions)}</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmt(totalAmount)}</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">100.0%</td>
               </tr>
               {filteredAnalytics.map((t) => (
-                <tr key={t.touchpoint} className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200">
+                <tr key={t.touchpoint} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
                     {t.touchpoint}
                   </td>

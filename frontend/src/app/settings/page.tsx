@@ -48,7 +48,7 @@ export default function SettingsPage() {
             onClick={() => setActiveTab("settings")}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors rounded-t-md ${
               activeTab === "settings"
-                ? "border-b-2 border-teal-500 text-teal-500 bg-teal-500/5"
+                ? "border-b-2 border-[#5B66E2] text-[#5B66E2] bg-[#5B66E2]/5"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             }`}
           >
@@ -59,7 +59,7 @@ export default function SettingsPage() {
             onClick={() => setActiveTab("users")}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors rounded-t-md ${
               activeTab === "users"
-                ? "border-b-2 border-teal-500 text-teal-500 bg-teal-500/5"
+                ? "border-b-2 border-[#5B66E2] text-[#5B66E2] bg-[#5B66E2]/5"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             }`}
           >
@@ -127,7 +127,7 @@ function ChangePasswordSection({ token }: { token: string | null }) {
   return (
     <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
       <div className="flex items-center gap-2 mb-4">
-        <Lock className="h-5 w-5 text-teal-400" />
+        <Lock className="h-5 w-5 text-[#8B96F2]" />
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           Change Password
         </h2>
@@ -142,7 +142,7 @@ function ChangePasswordSection({ token }: { token: string | null }) {
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
-              className="pr-10 bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-teal-500 focus-visible:ring-teal-500/30"
+              className="pr-10 bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-[#5B66E2] focus-visible:ring-[#5B66E2]/30"
             />
             <button
               type="button"
@@ -164,7 +164,7 @@ function ChangePasswordSection({ token }: { token: string | null }) {
               onChange={(e) => setNewPassword(e.target.value)}
               required
               placeholder="Min. 8 characters"
-              className="pr-10 bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-teal-500 focus-visible:ring-teal-500/30"
+              className="pr-10 bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-[#5B66E2] focus-visible:ring-[#5B66E2]/30"
             />
             <button
               type="button"
@@ -184,14 +184,14 @@ function ChangePasswordSection({ token }: { token: string | null }) {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-teal-500 focus-visible:ring-teal-500/30"
+            className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-[#5B66E2] focus-visible:ring-[#5B66E2]/30"
           />
         </div>
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-md bg-gradient-to-r from-teal-500 to-cyan-400 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="rounded-md bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {isSubmitting ? "Updating…" : "Update Password"}
         </button>
@@ -265,14 +265,14 @@ function UserManagementSection({
     <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-teal-400" />
+          <Shield className="h-5 w-5 text-[#8B96F2]" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             User Management
           </h2>
         </div>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="flex items-center gap-1.5 rounded-md bg-gradient-to-r from-teal-500 to-cyan-400 px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="flex items-center gap-1.5 rounded-md bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
           <Plus className="h-4 w-4" />
           Add User
@@ -289,7 +289,7 @@ function UserManagementSection({
       {showCreateForm && (
         <form
           onSubmit={handleCreateUser}
-          className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 space-y-3"
+          className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-muted p-4 space-y-3"
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
@@ -326,7 +326,7 @@ function UserManagementSection({
             <button
               type="submit"
               disabled={isCreating}
-              className="rounded-md bg-gradient-to-r from-teal-500 to-cyan-400 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="rounded-md bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {isCreating ? "Creating…" : "Create Account"}
             </button>
@@ -373,13 +373,13 @@ function UserManagementSection({
               >
                 <td className="py-3">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 text-xs font-semibold text-white">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] text-xs font-semibold text-white">
                       {u.full_name.charAt(0).toUpperCase()}
                     </div>
                     <span className="text-gray-900 dark:text-gray-200">
                       {u.full_name}
                       {u.id === currentUserId && (
-                        <span className="ml-1.5 text-xs text-teal-400">(you)</span>
+                        <span className="ml-1.5 text-xs text-[#8B96F2]">(you)</span>
                       )}
                     </span>
                   </div>
@@ -452,7 +452,7 @@ function UnifiedAuditLogSection({ token }: { token: string | null }) {
   return (
     <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
       <div className="flex items-center gap-2 mb-4">
-        <ClipboardList className="h-5 w-5 text-teal-400" />
+        <ClipboardList className="h-5 w-5 text-[#8B96F2]" />
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Audit Log</h2>
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
@@ -484,7 +484,7 @@ function UnifiedAuditLogSection({ token }: { token: string | null }) {
               {entries.map((e) => {
                 const actionInfo = ACTION_LABELS[e.action] ?? { label: e.action, color: "bg-gray-500/10 text-gray-400" };
                 return (
-                  <tr key={e.id} className={`hover:bg-teal-50 dark:hover:bg-gray-700/50 transition-colors ${e.is_undone ? "opacity-50" : ""}`}>
+                  <tr key={e.id} className={`hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors ${e.is_undone ? "opacity-50" : ""}`}>
                     <td className="py-2.5">
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${actionInfo.color}`}>
                         {actionInfo.label}

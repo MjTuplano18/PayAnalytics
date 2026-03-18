@@ -77,7 +77,7 @@ export function DateFilter({ value, onChange, customRange }: DateFilterProps) {
         <PopoverTrigger asChild>
           <div>
             <Select value={value} onValueChange={handleSelectChange}>
-              <SelectTrigger className="h-8 w-auto min-w-[140px] gap-1.5 rounded-full border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 focus:ring-teal-500 data-[state=open]:ring-teal-500">
+              <SelectTrigger className="h-8 w-auto min-w-[140px] gap-1.5 rounded-full border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 focus:ring-[#5B66E2] data-[state=open]:ring-[#5B66E2]">
                 <SelectValue>
                   {displayLabel ?? options.find((o) => o.value === value)?.label}
                 </SelectValue>

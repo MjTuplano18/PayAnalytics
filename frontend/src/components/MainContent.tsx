@@ -12,7 +12,7 @@ export function MainContent({ children }: { children: ReactNode }) {
       isCollapsed ? "lg:ml-20" : "lg:ml-64"
     }`}>
       <TopBar />
-      <main className="min-h-[calc(100vh-4rem)]">{children}</main>
+      <main className="min-h-[calc(100vh-4rem)] bg-transparent">{children}</main>
     </div>
   );
 }

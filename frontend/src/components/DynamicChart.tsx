@@ -32,22 +32,22 @@ interface DynamicChartProps {
 
 /** Brand palette — 12 slots for multi-series / pie charts */
 const COLORS = [
-  "#14b8a6", // teal
-  "#5eead4", // light teal
-  "#0d9488", // dark teal
-  "#90E0D7", // soft teal-blue (IB SMS slot)
-  "#0f766e", // deep teal
-  "#2dd4bf", // medium teal
-  "#ccfbf1", // pale teal
-  "#e0faf6", // off-white teal
-  "#115e59", // forest teal
-  "#a0ece3", // soft light teal
-  "#a7f3d0", // mint
-  "#4dcfbb", // medium-light teal
+  "#5B66E2", // indigo
+  "#8B96F2", // light indigo
+  "#4a55d1", // dark indigo
+  "#A0A8F8", // soft indigo
+  "#3840b0", // deep indigo
+  "#7B86E8", // medium indigo
+  "#C8CCFA", // pale indigo
+  "#E0E3FD", // off-white indigo
+  "#2E3590", // navy indigo
+  "#B0B8F5", // soft light indigo
+  "#9AA3F0", // periwinkle
+  "#6B76E5", // medium-light indigo
 ];
 
-const BRAND = "#14b8a6";
-const BRAND_SECONDARY = "#0d9488";
+const BRAND = "#5B66E2";
+const BRAND_SECONDARY = "#4a55d1";
 
 /** Truncate long labels for chart axes/legends */
 function truncate(str: string, max: number): string {
@@ -137,8 +137,8 @@ export function DynamicChart({
           <BarChart data={processedData} margin={{ left: isCompact ? 10 : 30, right: isCompact ? 10 : 30, top: 15, bottom: 40 }}>
             <defs>
               <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0d9488" stopOpacity={1} />
-                <stop offset="100%" stopColor="#5eead4" stopOpacity={0.8} />
+                <stop offset="0%" stopColor="#4a55d1" stopOpacity={1} />
+                <stop offset="100%" stopColor="#8B96F2" stopOpacity={0.8} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -177,8 +177,8 @@ export function DynamicChart({
           >
             <defs>
               <linearGradient id="barhGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0d9488" stopOpacity={1} />
-                <stop offset="100%" stopColor="#5eead4" stopOpacity={0.8} />
+                <stop offset="0%" stopColor="#4a55d1" stopOpacity={1} />
+                <stop offset="100%" stopColor="#8B96F2" stopOpacity={0.8} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -238,7 +238,7 @@ export function DynamicChart({
           <AreaChart data={processedData} margin={{ left: 30, right: 30, top: 5, bottom: 5 }}>
             <defs>
               <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.85} />
+                <stop offset="0%" stopColor="#5B66E2" stopOpacity={0.85} />
                 <stop offset="100%" stopColor="#ffffff" stopOpacity={0.02} />
               </linearGradient>
             </defs>

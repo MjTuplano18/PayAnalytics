@@ -118,7 +118,7 @@ export function PeriodComparison({ payments }: PeriodComparisonProps) {
           <select
             value={effectiveA}
             onChange={(e) => setPeriodA(e.target.value)}
-            className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-[#5B66E2]"
           >
             {availableMonths.map((m) => (
               <option key={m} value={m}>{m}</option>
@@ -128,7 +128,7 @@ export function PeriodComparison({ payments }: PeriodComparisonProps) {
           <select
             value={effectiveB}
             onChange={(e) => setPeriodB(e.target.value)}
-            className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:outline-none focus:ring-1 focus:ring-[#5B66E2]"
           >
             {availableMonths.map((m) => (
               <option key={m} value={m}>{m}</option>

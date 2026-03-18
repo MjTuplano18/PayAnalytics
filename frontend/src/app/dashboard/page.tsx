@@ -253,10 +253,10 @@ export default function DashboardPage() {
   const tpNoData = filteredTpAnalytics.length === 0 && !apiLoading;
 
   const tpMetricCards = [
-    { label: "Total Transactions", value: fmt(tpTotalTransactions), icon: Hash, iconBg: "bg-teal-500" },
-    { label: "Total Amount", value: `₱${fmt(tpTotalAmount)}`, icon: DollarSign, iconBg: "bg-teal-600" },
-    { label: "Unique Touchpoints", value: fmt(tpUniqueTouchpoints), icon: Waypoints, iconBg: "bg-teal-500" },
-    { label: "Top Touchpoint", value: tpTopTouchpoint, icon: BarChart3, iconBg: "bg-teal-700" },
+    { label: "Total Transactions", value: fmt(tpTotalTransactions), icon: Hash, iconBg: "bg-[#5B66E2]" },
+    { label: "Total Amount", value: `₱${fmt(tpTotalAmount)}`, icon: DollarSign, iconBg: "bg-[#4a55d1]" },
+    { label: "Unique Touchpoints", value: fmt(tpUniqueTouchpoints), icon: Waypoints, iconBg: "bg-[#5B66E2]" },
+    { label: "Top Touchpoint", value: tpTopTouchpoint, icon: BarChart3, iconBg: "bg-[#4048c0]" },
   ];
 
   // ── Environments tab data (bank-only, filtered by environment) ──
@@ -290,17 +290,17 @@ export default function DashboardPage() {
   const envNoData = envFilteredPayments.length === 0 && !apiLoading;
 
   const envMetricCards = [
-    { label: "Total Payment Amount", value: `₱${fmt(envBankAnalytics.totalAmount)}`, icon: DollarSign, iconBg: "bg-teal-500" },
-    { label: "Count of Accounts", value: fmt(envBankAnalytics.totalAccounts), icon: Users, iconBg: "bg-teal-600" },
-    { label: "Total Transactions", value: fmt(envBankAnalytics.totalPayments), icon: FileText, iconBg: "bg-teal-500" },
-    { label: "Banks / Portfolios", value: fmt(envBankAnalytics.bankAnalytics.length), icon: Landmark, iconBg: "bg-teal-700" },
+    { label: "Total Payment Amount", value: `₱${fmt(envBankAnalytics.totalAmount)}`, icon: DollarSign, iconBg: "bg-[#5B66E2]" },
+    { label: "Count of Accounts", value: fmt(envBankAnalytics.totalAccounts), icon: Users, iconBg: "bg-[#4a55d1]" },
+    { label: "Total Transactions", value: fmt(envBankAnalytics.totalPayments), icon: FileText, iconBg: "bg-[#5B66E2]" },
+    { label: "Banks / Portfolios", value: fmt(envBankAnalytics.bankAnalytics.length), icon: Landmark, iconBg: "bg-[#4048c0]" },
   ];
 
   const metricCards = [
-    { label: "Total Payment Amount", value: `₱${fmt(fa.totalAmount)}`, icon: DollarSign, iconBg: "bg-teal-500" },
-    { label: "Count of Accounts", value: fmt(fa.totalAccounts), icon: Users, iconBg: "bg-teal-600" },
-    { label: "Total Transactions", value: fmt(fa.totalPayments), icon: FileText, iconBg: "bg-teal-500" },
-    { label: "Banks / Portfolios", value: fmt(fa.bankAnalytics.length), icon: Landmark, iconBg: "bg-teal-700" },
+    { label: "Total Payment Amount", value: `₱${fmt(fa.totalAmount)}`, icon: DollarSign, iconBg: "bg-[#5B66E2]" },
+    { label: "Count of Accounts", value: fmt(fa.totalAccounts), icon: Users, iconBg: "bg-[#4a55d1]" },
+    { label: "Total Transactions", value: fmt(fa.totalPayments), icon: FileText, iconBg: "bg-[#5B66E2]" },
+    { label: "Banks / Portfolios", value: fmt(fa.bankAnalytics.length), icon: Landmark, iconBg: "bg-[#4048c0]" },
   ];
 
   return (
@@ -319,7 +319,7 @@ export default function DashboardPage() {
             <div ref={envDropdownRef} className="relative">
               <button
                 onClick={() => setEnvDropdownOpen((v) => !v)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
               >
                 <Globe className="h-4 w-4" />
                 {selectedEnvironments.size === 0
@@ -332,7 +332,7 @@ export default function DashboardPage() {
                   {selectedEnvironments.size > 0 && (
                     <button
                       onClick={clearEnvFilter}
-                      className="w-full px-3 py-2 text-left text-xs text-teal-600 dark:text-teal-400 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700"
+                      className="w-full px-3 py-2 text-left text-xs text-[#5B66E2] dark:text-[#8B96F2] hover:bg-muted/50 dark:hover:bg-muted border-b border-gray-200 dark:border-gray-700"
                     >
                       Clear selection
                     </button>
@@ -341,11 +341,11 @@ export default function DashboardPage() {
                     <button
                       key={env}
                       onClick={() => toggleEnvironment(env)}
-                      className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
                     >
                       <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${
                         selectedEnvironments.has(env)
-                          ? "bg-teal-500 border-teal-500"
+                          ? "bg-[#5B66E2] border-[#5B66E2]"
                           : "border-gray-300 dark:border-gray-600"
                       }`}>
                         {selectedEnvironments.has(env) && <Check className="h-3 w-3 text-white" />}
@@ -362,7 +362,7 @@ export default function DashboardPage() {
             <div ref={tpDropdownRef} className="relative">
               <button
                 onClick={() => setTpDropdownOpen((v) => !v)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
               >
                 <Waypoints className="h-4 w-4" />
                 {selectedTouchpoints.size === 0
@@ -375,7 +375,7 @@ export default function DashboardPage() {
                   {selectedTouchpoints.size > 0 && (
                     <button
                       onClick={clearTpFilter}
-                      className="w-full px-3 py-2 text-left text-xs text-teal-600 dark:text-teal-400 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700"
+                      className="w-full px-3 py-2 text-left text-xs text-[#5B66E2] dark:text-[#8B96F2] hover:bg-muted/50 dark:hover:bg-muted border-b border-gray-200 dark:border-gray-700"
                     >
                       Clear selection
                     </button>
@@ -384,11 +384,11 @@ export default function DashboardPage() {
                     <button
                       key={tp}
                       onClick={() => toggleTouchpoint(tp)}
-                      className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
                     >
                       <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${
                         selectedTouchpoints.has(tp)
-                          ? "bg-teal-500 border-teal-500"
+                          ? "bg-[#5B66E2] border-[#5B66E2]"
                           : "border-gray-300 dark:border-gray-600"
                       }`}>
                         {selectedTouchpoints.has(tp) && <Check className="h-3 w-3 text-white" />}
@@ -416,7 +416,7 @@ export default function DashboardPage() {
             onClick={() => setActiveTab(tab)}
             className={`px-5 py-3 text-sm font-medium transition-colors -mb-px ${
               activeTab === tab
-                ? "border-b-2 border-teal-500 text-teal-500 bg-teal-500/5"
+                ? "border-b-2 border-[#5B66E2] text-[#5B66E2] bg-[#5B66E2]/5"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
@@ -432,7 +432,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
         {apiLoading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+              <Card key={i} className="p-6 bg-card border-border">
                 <div className="flex items-center justify-between mb-2">
                   <Skeleton className="h-4 w-32" />
                   <Skeleton className="h-9 w-9 rounded-lg" />
@@ -445,7 +445,7 @@ export default function DashboardPage() {
               return (
                 <Card
                   key={card.label}
-                  className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                  className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -464,7 +464,7 @@ export default function DashboardPage() {
       </div>
 
       {envNoData && (
-        <div className="mb-6 p-4 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20 text-sm text-teal-700 dark:text-teal-300 text-center">
+        <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
           No records found for the selected filters. Upload data or try a different filter.
         </div>
       )}
@@ -479,7 +479,7 @@ export default function DashboardPage() {
             <select
               value={envBankTopN === "all" ? "all" : String(envBankTopN)}
               onChange={(e) => setEnvBankTopN(e.target.value === "all" ? "all" : parseInt(e.target.value))}
-              className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#5B66E2]"
             >
               <option value="10">Top 10</option>
               <option value="20">Top 20</option>
@@ -582,21 +582,21 @@ export default function DashboardPage() {
 
       {/* Bank Analytics Table */}
       {apiLoading ? (
-        <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-8 p-6">
+        <div className="rounded-lg border bg-card border-border mb-8 p-6">
           <Skeleton className="h-6 w-40 mb-4" />
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />
           ))}
         </div>
       ) : (
-      <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+      <div className="rounded-lg border bg-card border-border overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             Bank Analytics
           </h3>
         </div>
         <table className="w-full min-w-[700px]">
-          <thead className="bg-gray-50 dark:bg-gray-900">
+          <thead className="bg-muted">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bank</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Count of Account</th>
@@ -607,7 +607,7 @@ export default function DashboardPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            <tr className="bg-gray-50 dark:bg-gray-900 font-semibold">
+            <tr className="bg-muted font-semibold">
               <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">Total</td>
               <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(envBankAnalytics.totalAccounts)}</td>
               <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmt(envBankAnalytics.totalAmount)}</td>
@@ -616,7 +616,7 @@ export default function DashboardPage() {
               <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(envBankAnalytics.totalPayments)}</td>
             </tr>
             {envBankAnalytics.bankAnalytics.map((b) => (
-              <tr key={b.bank} className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200">
+              <tr key={b.bank} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200">
                 <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{b.bank}</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.accountCount)}</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">₱{fmt(b.totalAmount)}</td>
@@ -636,7 +636,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
         {apiLoading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+              <Card key={i} className="p-6 bg-card border-border">
                 <div className="flex items-center justify-between mb-2">
                   <Skeleton className="h-4 w-32" />
                   <Skeleton className="h-9 w-9 rounded-lg" />
@@ -649,7 +649,7 @@ export default function DashboardPage() {
               return (
                 <Card
                   key={card.label}
-                  className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                  className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -669,7 +669,7 @@ export default function DashboardPage() {
 
       {/* No data notice when a date filter yields no results */}
       {noData && (
-        <div className="mb-6 p-4 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20 text-sm text-teal-700 dark:text-teal-300 text-center">
+        <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
           No records found for the selected time range. Upload data or try a different filter.
         </div>
       )}
@@ -684,7 +684,7 @@ export default function DashboardPage() {
             <select
               value={bankTopN === "all" ? "all" : String(bankTopN)}
               onChange={(e) => setBankTopN(e.target.value === "all" ? "all" : parseInt(e.target.value))}
-              className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#5B66E2]"
             >
               <option value="10">Top 10</option>
               <option value="20">Top 20</option>
@@ -784,21 +784,21 @@ export default function DashboardPage() {
 
       {/* Bank Analytics Table */}
       {apiLoading ? (
-        <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-8 p-6">
+        <div className="rounded-lg border bg-card border-border mb-8 p-6">
           <Skeleton className="h-6 w-40 mb-4" />
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />
           ))}
         </div>
       ) : (
-      <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+      <div className="rounded-lg border bg-card border-border overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             Bank Analytics
           </h3>
         </div>
         <table className="w-full min-w-[700px]">
-          <thead className="bg-gray-50 dark:bg-gray-900">
+          <thead className="bg-muted">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Bank
@@ -822,7 +822,7 @@ export default function DashboardPage() {
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {/* Totals row - at the top */}
-            <tr className="bg-gray-50 dark:bg-gray-900 font-semibold">
+            <tr className="bg-muted font-semibold">
               <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                 Total
               </td>
@@ -845,7 +845,7 @@ export default function DashboardPage() {
             {fa.bankAnalytics.map((b) => (
               <tr
                 key={b.bank}
-                className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200"
+                className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200"
               >
                 <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
                   {b.bank}
@@ -879,7 +879,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
         {apiLoading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+              <Card key={i} className="p-6 bg-card border-border">
                 <div className="flex items-center justify-between mb-2">
                   <Skeleton className="h-4 w-32" />
                   <Skeleton className="h-9 w-9 rounded-lg" />
@@ -892,7 +892,7 @@ export default function DashboardPage() {
               return (
                 <Card
                   key={card.label}
-                  className="p-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                  className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -911,7 +911,7 @@ export default function DashboardPage() {
       </div>
 
       {tpNoData && (
-        <div className="mb-6 p-4 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-900/20 text-sm text-teal-700 dark:text-teal-300 text-center">
+        <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
           No records found for the selected time range. Upload data or try a different filter.
         </div>
       )}
@@ -1003,21 +1003,21 @@ export default function DashboardPage() {
 
       {/* Touchpoint Table */}
       {apiLoading ? (
-        <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-8 p-6">
+        <div className="rounded-lg border bg-card border-border mb-8 p-6">
           <Skeleton className="h-6 w-40 mb-4" />
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+        <div className="rounded-lg border bg-card border-border overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Touchpoint Analytics
             </h3>
           </div>
           <table className="w-full min-w-[500px]">
-            <thead className="bg-gray-50 dark:bg-gray-900">
+            <thead className="bg-muted">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Touchpoint
@@ -1035,7 +1035,7 @@ export default function DashboardPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {/* Totals row */}
-              <tr className="bg-gray-50 dark:bg-gray-900 font-semibold">
+              <tr className="bg-muted font-semibold">
                 <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">Total</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(tpTotalTransactions)}</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmt(tpTotalAmount)}</td>
@@ -1044,7 +1044,7 @@ export default function DashboardPage() {
               {filteredTpAnalytics.map((t) => (
                 <tr
                   key={t.touchpoint}
-                  className="hover:bg-teal-50 dark:hover:bg-gray-700/60 transition-colors duration-200"
+                  className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200"
                 >
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
                     {t.touchpoint}

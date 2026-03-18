@@ -14,91 +14,91 @@
 :root {
   --font-size: 16px;
 
-  /* Light mode – clean neutral tone */
+  /* Light mode – white cards, new indigo accent */
   --background: #f4f7f9;
   --foreground: #1f2833;
   --card: #ffffff;
   --card-foreground: #1f2833;
   --popover: #ffffff;
   --popover-foreground: #1f2833;
-  --primary: #14b8a6;
+  --primary: #5b66e2;
   --primary-foreground: #ffffff;
   --secondary: #e2ecee;
   --secondary-foreground: #1f2833;
   --muted: #e9f0f0;
   --muted-foreground: #5a6e6e;
-  --accent: #0d9488;
-  --accent-foreground: #0b0c10;
+  --accent: #4a55d1;
+  --accent-foreground: #ffffff;
   --destructive: #d4183d;
   --destructive-foreground: #ffffff;
   --border: rgba(31, 40, 51, 0.12);
   --input: #f0f6f6;
   --input-background: #f0f6f6;
-  --switch-background: #c5c6c7;
+  --switch-background: #5b66e2;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: #14b8a6;
+  --ring: #5b66e2;
 
   /* Chart colours (light mode) */
-  --chart-1: #14b8a6;
-  --chart-2: #5eead4;
-  --chart-3: #0d9488;
-  --chart-4: #2dd4bf;
-  --chart-5: #c5c6c7;
+  --chart-1: #5b66e2;
+  --chart-2: #8b96f2;
+  --chart-3: #4a55d1;
+  --chart-4: #7b86e8;
+  --chart-5: #939393;
 
   --radius: 0.625rem;
 
   /* Sidebar */
-  --sidebar-background: #1f2833;
-  --sidebar-foreground: #c5c6c7;
-  --sidebar-primary: #14b8a6;
-  --sidebar-primary-foreground: #0b0c10;
-  --sidebar-accent: #0b0c10;
-  --sidebar-accent-foreground: #c5c6c7;
-  --sidebar-border: rgba(20, 184, 166, 0.25);
-  --sidebar-ring: #14b8a6;
+  --sidebar-background: rgba(7, 13, 18, 0.85);
+  --sidebar-foreground: #939393;
+  --sidebar-primary: #5b66e2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-accent-foreground: #e5e5e8;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #5b66e2;
 }
 
 .dark {
-  /* Dark mode – full brand palette */
-  --background: #0b0c10;
-  --foreground: #c5c6c7;
-  --card: #1f2833;
-  --card-foreground: #c5c6c7;
-  --popover: #1f2833;
-  --popover-foreground: #c5c6c7;
-  --primary: #14b8a6;
-  --primary-foreground: #0b0c10;
-  --secondary: #1f2833;
-  --secondary-foreground: #c5c6c7;
-  --muted: #1f2833;
-  --muted-foreground: #8a9ba8;
-  --accent: #0d9488;
+  /* Dark mode – login page palette */
+  --background: #070d12;
+  --foreground: #e5e5e8;
+  --card: rgba(20, 22, 36, 0.80);
+  --card-foreground: #e5e5e8;
+  --popover: rgba(10, 12, 20, 0.95);
+  --popover-foreground: #e5e5e8;
+  --primary: #5b66e2;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(30, 32, 50, 0.60);
+  --secondary-foreground: #e5e5e8;
+  --muted: rgba(30, 32, 50, 0.60);
+  --muted-foreground: #939393;
+  --accent: #4a55d1;
   --accent-foreground: #ffffff;
   --destructive: #f05060;
-  --destructive-foreground: #0b0c10;
-  --border: rgba(20, 184, 166, 0.18);
-  --input: #1f2833;
-  --input-background: #1f2833;
-  --switch-background: #14b8a6;
-  --ring: #14b8a6;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(172, 172, 172, 0.20);
+  --input-background: rgba(172, 172, 172, 0.20);
+  --switch-background: #5b66e2;
+  --ring: #5b66e2;
 
   /* Chart colours (dark mode) */
-  --chart-1: #14b8a6;
-  --chart-2: #5eead4;
-  --chart-3: #2dd4bf;
-  --chart-4: #0d9488;
-  --chart-5: #c5c6c7;
+  --chart-1: #5b66e2;
+  --chart-2: #8b96f2;
+  --chart-3: #4a55d1;
+  --chart-4: #7b86e8;
+  --chart-5: #939393;
 
   /* Sidebar */
-  --sidebar-background: #1f2833;
-  --sidebar-foreground: #c5c6c7;
-  --sidebar-primary: #14b8a6;
-  --sidebar-primary-foreground: #0b0c10;
-  --sidebar-accent: #0b0c10;
-  --sidebar-accent-foreground: #c5c6c7;
-  --sidebar-border: rgba(20, 184, 166, 0.25);
-  --sidebar-ring: #14b8a6;
+  --sidebar-background: rgba(7, 13, 18, 0.85);
+  --sidebar-foreground: #939393;
+  --sidebar-primary: #5b66e2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-accent-foreground: #e5e5e8;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #5b66e2;
 }
 
 @theme inline {
@@ -152,6 +152,11 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+  }
+  /* Glass card effect – cards sit on top of the blurred background */
+  [data-slot="card"] {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
   html {
     font-size: var(--font-size);

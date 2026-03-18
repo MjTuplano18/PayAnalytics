@@ -77,7 +77,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 text-sm text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 transition-all [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgba(172,172,172,0.4)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[caret-color:white]"
+              className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 text-sm text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-[#5B66E2]/50 transition-all [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgba(172,172,172,0.4)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[caret-color:white]"
             />
           </div>
 
@@ -95,7 +95,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 pr-10 text-sm text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-teal-400/50 transition-all [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgba(172,172,172,0.4)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[caret-color:white]"
+                className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 pr-10 text-sm text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-[#5B66E2]/50 transition-all [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgba(172,172,172,0.4)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[caret-color:white]"
               />
               <button
                 type="button"
@@ -132,9 +132,9 @@ export default function LoginPage() {
           <Image
             src="/SPMADRID WHITE.svg"
             alt="SPMADRID"
-            width={140}
-            height={32}
-            className="opacity-80"
+            width={200}
+            height={46}
+            className="opacity-90"
           />
         </div>
       </div>

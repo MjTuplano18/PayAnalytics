@@ -504,7 +504,7 @@ export default function UploadPage() {
         <div className="space-y-6">
           {/* Combined Upload & Merge Area */}
           <Card
-            className="p-8 sm:p-12 border-2 border-dashed bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-center cursor-pointer hover:border-teal-500 hover:shadow-lg transition-all duration-300 animate-fade-in-up"
+            className="p-8 sm:p-12 border-2 border-dashed bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-center cursor-pointer hover:border-[#5B66E2] hover:shadow-lg transition-all duration-300 animate-fade-in-up"
             style={{ animationDelay: '0.15s' }}
             onDrop={handleFileDrop}
             onDragOver={(e) => e.preventDefault()}
@@ -521,7 +521,7 @@ export default function UploadPage() {
               Drop a single file to import, or multiple files to merge them into one dataset
             </p>
             <Button
-              className="bg-teal-600 hover:bg-teal-700 text-white"
+              className="bg-[#4a55d1] hover:bg-[#4048c0] text-white"
               disabled={uploading || merging}
             >
               {uploading ? "Processing..." : merging ? "Merging..." : "Browse Files"}
@@ -538,9 +538,9 @@ export default function UploadPage() {
 
           {/* Merge file list (shown when multiple files queued) */}
           {mergeFiles.length > 0 && (
-            <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 animate-fade-in-up" style={{ animationDelay: '0.20s' }}>
+            <div className="p-6 rounded-lg bg-card border border-border animate-fade-in-up" style={{ animationDelay: '0.20s' }}>
               <div className="flex items-center gap-2 mb-3">
-                <Merge className="w-5 h-5 text-teal-400" />
+                <Merge className="w-5 h-5 text-[#8B96F2]" />
                 <h4 className="text-gray-900 dark:text-white font-semibold">Files to Merge</h4>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   — duplicates (same account + date + amount) will be removed automatically
@@ -549,8 +549,8 @@ export default function UploadPage() {
 
               <div className="flex flex-wrap gap-2 mb-4" onClick={(e) => e.stopPropagation()}>
                 {mergeFiles.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 dark:bg-teal-900/30 border border-teal-200 dark:border-teal-700 rounded-full text-sm">
-                    <FileSpreadsheet className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-[#5B66E2]/10 dark:bg-[#5B66E2]/20 border border-[#5B66E2]/30 dark:border-[#5B66E2]/30 rounded-full text-sm">
+                    <FileSpreadsheet className="w-4 h-4 text-[#5B66E2] dark:text-[#8B96F2]" />
                     <span className="text-gray-800 dark:text-gray-200 max-w-[200px] truncate">{f.name}</span>
                     <button onClick={(e) => { e.stopPropagation(); removeMergeFile(i); }} className="text-gray-400 hover:text-red-500 transition-colors">
                       <X className="w-3.5 h-3.5" />
@@ -570,7 +570,7 @@ export default function UploadPage() {
                 <Button
                   onClick={executeMerge}
                   disabled={merging || mergeFiles.length < 2}
-                  className="bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50"
+                  className="bg-[#4a55d1] hover:bg-[#4048c0] text-white disabled:opacity-50"
                 >
                   {merging ? "Merging..." : `Merge ${mergeFiles.length} File${mergeFiles.length !== 1 ? "s" : ""}`}
                 </Button>
@@ -601,9 +601,9 @@ export default function UploadPage() {
           )}
 
           {/* Import Instructions */}
-          <div className="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+          <div className="p-6 rounded-lg bg-card border border-border animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
             <div className="flex items-start gap-2 mb-4">
-              <AlertCircle className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-[#8B96F2] flex-shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-gray-900 dark:text-white font-semibold mb-2">
                   Import Instructions
@@ -655,12 +655,12 @@ export default function UploadPage() {
         {/* Upload History */}
         <div className="mt-10 animate-fade-in-up" style={{ animationDelay: '0.35s' }}>
           <div className="flex items-center gap-3 mb-4">
-            <History className="w-6 h-6 text-teal-500" />
+            <History className="w-6 h-6 text-[#5B66E2]" />
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Upload History</h2>
           </div>
 
           {sessions.length === 0 ? (
-            <div className="p-8 rounded-lg text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            <div className="p-8 rounded-lg text-center bg-card border border-border">
               <FileSpreadsheet className="w-10 h-10 mx-auto mb-3 text-gray-400" />
               <p className="text-gray-600 dark:text-gray-400">No uploads yet</p>
             </div>
@@ -673,8 +673,8 @@ export default function UploadPage() {
                     key={s.id}
                     className={`rounded-lg border p-5 bg-white dark:bg-gray-800 transition-all duration-200 ${
                       isActive
-                        ? "border-teal-500 ring-1 ring-teal-400/40 shadow-teal-100 dark:shadow-none"
-                        : "border-gray-200 dark:border-gray-700 hover:border-teal-300 dark:hover:border-teal-600"
+                        ? "border-[#5B66E2] ring-1 ring-[#5B66E2]/40 shadow-[#5B66E2]/10 dark:shadow-none"
+                        : "border-gray-200 dark:border-gray-700 hover:border-[#5B66E2]/50 dark:hover:border-[#5B66E2]/50"
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -685,7 +685,7 @@ export default function UploadPage() {
                             {s.file_name}
                           </span>
                           {isActive && (
-                            <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 rounded-full">
+                            <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-[#5B66E2]/10 text-[#5B66E2] dark:bg-[#5B66E2]/20 dark:text-[#8B96F2] rounded-full">
                               Active
                             </span>
                           )}
@@ -702,8 +702,8 @@ export default function UploadPage() {
                           disabled={restoring === s.id || deleting === s.id}
                           className={`flex items-center gap-2 ${
                             isActive
-                              ? "bg-teal-600 hover:bg-teal-700 text-white"
-                              : "bg-gray-100 dark:bg-gray-700 hover:bg-teal-50 dark:hover:bg-teal-900/30 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
+                              ? "bg-[#4a55d1] hover:bg-[#4048c0] text-white"
+                              : "bg-gray-100 dark:bg-gray-700 hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/20 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
                           }`}
                         >
                           <RotateCcw className="w-4 h-4" />
@@ -750,9 +750,9 @@ export default function UploadPage() {
       {/* Date Selection Popup */}
       {showDatePicker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md mx-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-2xl p-6 animate-fade-in-up">
+          <div className="w-full max-w-md mx-4 rounded-xl bg-card border border-border shadow-2xl p-6 animate-fade-in-up">
             <div className="flex items-center gap-3 mb-4">
-              <CalendarDays className="w-6 h-6 text-teal-500" />
+              <CalendarDays className="w-6 h-6 text-[#5B66E2]" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Select Import Date
               </h3>
@@ -780,9 +780,9 @@ export default function UploadPage() {
                     setDateTo("");
                   }
                 }}
-                className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-teal-600 focus:ring-teal-500 accent-teal-600"
+                className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-[#5B66E2] focus:ring-[#5B66E2] accent-[#5B66E2]"
               />
-              <span className="text-gray-900 dark:text-white font-medium group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+              <span className="text-gray-900 dark:text-white font-medium group-hover:text-[#5B66E2] dark:group-hover:text-[#8B96F2] transition-colors">
                 All Dates
               </span>
               <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -810,7 +810,7 @@ export default function UploadPage() {
                         setDateTo(e.target.value);
                       }
                     }}
-                    className="w-full px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#5B66E2]"
                   >
                     <option value="">Earliest</option>
                     {availableDates.map((d) => (
@@ -832,7 +832,7 @@ export default function UploadPage() {
                         setDateFrom(e.target.value);
                       }
                     }}
-                    className="w-full px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#5B66E2]"
                   >
                     <option value="">Latest</option>
                     {availableDates.map((d) => (
@@ -845,7 +845,7 @@ export default function UploadPage() {
 
             {/* Summary of selection */}
             {!allDates && (dateFrom || dateTo) && (
-              <div className="mt-4 p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 text-sm text-teal-700 dark:text-teal-300">
+              <div className="mt-4 p-3 rounded-lg bg-[#5B66E2]/10 dark:bg-[#5B66E2]/20 border border-[#5B66E2]/30 dark:border-[#5B66E2]/30 text-sm text-[#5B66E2] dark:text-[#8B96F2]">
                 <CheckCircle2 className="w-4 h-4 inline mr-2" />
                 {fmt(filteredRecordCount)} records will be imported
                 {dateFrom && dateTo && dateFrom === dateTo
@@ -865,7 +865,7 @@ export default function UploadPage() {
               <Button
                 onClick={handleDateConfirm}
                 disabled={!allDates && !dateFrom && !dateTo}
-                className="bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50"
+                className="bg-[#4a55d1] hover:bg-[#4048c0] text-white disabled:opacity-50"
               >
                 Import {!allDates && filteredRecordCount > 0 ? `(${fmt(filteredRecordCount)} records)` : ""}
               </Button>
