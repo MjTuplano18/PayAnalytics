@@ -183,18 +183,18 @@ export function TopBar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-[rgba(7,13,18,0.75)] backdrop-blur-xl border-white/10 px-4 sm:px-8">
+    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-white/75 dark:bg-[rgba(7,13,18,0.75)] backdrop-blur-xl border-gray-200 dark:border-white/10 px-4 sm:px-8">
       {/* Left: hamburger + file name */}
       <div className="flex items-center gap-4">
         <button
           onClick={toggle}
-          className="rounded-lg p-2 text-[#939393] hover:bg-white/10 hover:text-white lg:hidden"
+          className="rounded-lg p-2 text-gray-500 dark:text-[#939393] hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white lg:hidden"
           aria-label="Toggle sidebar"
         >
           <Menu className="h-5 w-5" />
         </button>
         {fileName && (
-          <span className="hidden sm:inline text-sm text-[#939393] truncate max-w-[500px]">
+          <span className="hidden sm:inline text-sm text-gray-500 dark:text-[#939393] truncate max-w-[500px]">
             {fileName}
           </span>
         )}
@@ -208,7 +208,7 @@ export function TopBar() {
           {searchOpen ? (
             <form onSubmit={handleSearch} className="relative">
               <div className="relative flex items-center">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#939393]" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#939393]" />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -216,7 +216,7 @@ export function TopBar() {
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   onFocus={() => searchQuery && setShowResults(true)}
-                  className="w-64 sm:w-80 rounded-lg border bg-[rgba(7,13,18,0.60)] border-white/20 py-2 pl-10 pr-9 text-sm text-white placeholder:text-[#939393] focus:outline-none focus:ring-2 focus:ring-[#5B66E2] transition-all duration-200"
+                  className="w-64 sm:w-80 rounded-lg border bg-gray-50 dark:bg-[rgba(7,13,18,0.60)] border-gray-300 dark:border-white/20 py-2 pl-10 pr-9 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-[#939393] focus:outline-none focus:ring-2 focus:ring-[#5B66E2] transition-all duration-200"
                 />
                 {searchQuery && (
                   <button
@@ -227,7 +227,7 @@ export function TopBar() {
                       setResults([]);
                       searchInputRef.current?.focus();
                     }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#939393] hover:text-white"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-[#939393] hover:text-gray-900 dark:hover:text-white"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -302,7 +302,7 @@ export function TopBar() {
                   if (searchQuery) performSearch(searchQuery);
                 }, 50);
               }}
-              className="rounded-lg p-2 text-[#939393] hover:bg-white/10 hover:text-white"
+              className="rounded-lg p-2 text-gray-500 dark:text-[#939393] hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
               aria-label="Open search"
             >
               <Search className="h-5 w-5" />
@@ -313,7 +313,7 @@ export function TopBar() {
         {mounted ? (
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="rounded-lg p-2 text-[#939393] hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-2 text-gray-500 dark:text-[#939393] hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
             aria-label="Toggle theme"
           >
             {theme === "dark" ? (

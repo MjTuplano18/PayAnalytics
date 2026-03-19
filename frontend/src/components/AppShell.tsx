@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { useAuth } from "@/context/AuthContext";
 import { DataProvider } from "@/context/DataContext";
 import { useData } from "@/context/DataContext";
@@ -72,6 +73,8 @@ function SessionRestorer() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const pathname = usePathname();
+  const { resolvedTheme } = useTheme();
+  const bgImage = resolvedTheme === "dark" ? "/BKGRD.svg" : "/BKGRD%20INV.svg";
 
   const isLoginPage = pathname === "/login";
 
@@ -82,7 +85,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Blurred background */}
         <div className="fixed inset-0 z-0 overflow-hidden">
           <Image
-            src="/BKGRD.svg"
+            src={bgImage}
             alt=""
             fill
             className="object-cover opacity-60"
@@ -155,9 +158,9 @@ function UploadEventListener() {
       <UploadEventListener />
       <SidebarProvider>
         {/* Fixed blurred background – always behind everything */}
-        <div className="fixed inset-0 z-0 overflow-hidden bg-[#070D12]">
+        <div className="fixed inset-0 z-0 overflow-hidden bg-[#070D12] dark:bg-[#070D12]" style={{ backgroundColor: resolvedTheme === "dark" ? "#070D12" : "#f4f7f9" }}>
           <Image
-            src="/BKGRD.svg"
+            src={bgImage}
             alt=""
             fill
             className="object-cover opacity-60"
