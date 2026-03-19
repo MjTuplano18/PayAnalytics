@@ -228,7 +228,7 @@ export function TopBar() {
 
               {/* Search Results Dropdown */}
               {showResults && results.length > 0 && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-[rgba(7,13,18,0.95)] backdrop-blur-xl border border-white/10 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-[rgba(7,13,18,0.95)] backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
                   {(() => {
                     const grouped: Record<string, SearchResult[]> = {};
                     results.forEach((result) => {
@@ -248,23 +248,23 @@ export function TopBar() {
                       (type) =>
                         grouped[type] && (
                           <div key={type}>
-                            <div className="px-4 py-2 text-xs font-semibold text-[#939393] bg-[rgba(7,13,18,0.60)] sticky top-0">
+                            <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-[#939393] bg-gray-100 dark:bg-[rgba(7,13,18,0.60)] sticky top-0">
                               {typeLabels[type]}
                             </div>
                             {grouped[type].map((result, idx) => (
                               <button
                                 key={`${type}-${idx}`}
                                 onClick={result.action}
-                                className="w-full text-left px-4 py-3 hover:bg-white/10 border-b border-white/10 last:border-b-0 transition-colors"
+                                className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-white/10 border-b border-gray-200 dark:border-white/10 last:border-b-0 transition-colors"
                               >
                                 <div className="flex items-start gap-3">
                                   <span className="text-lg">{getResultIcon(type)}</span>
                                   <div className="flex-1 min-w-0">
-                                    <div className="text-sm font-medium text-white truncate">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                       {result.title}
                                     </div>
                                     {result.subtitle && (
-                                      <div className="text-xs text-[#939393]">
+                                      <div className="text-xs text-gray-500 dark:text-[#939393]">
                                         {result.subtitle}
                                       </div>
                                     )}
@@ -280,7 +280,7 @@ export function TopBar() {
               )}
 
               {showResults && results.length === 0 && searchQuery && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-[rgba(7,13,18,0.95)] backdrop-blur-xl border border-white/10 rounded-lg shadow-lg z-50 p-4 text-center text-sm text-[#939393]">
+                <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-[rgba(7,13,18,0.95)] backdrop-blur-xl border border-gray-200 dark:border-white/10 rounded-lg shadow-lg z-50 p-4 text-center text-sm text-gray-500 dark:text-[#939393]">
                   No results found
                 </div>
               )}
