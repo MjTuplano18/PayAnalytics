@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Search, Sun, Moon, X } from "lucide-react";
+import { Search, Sun, Moon, X } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useSidebar } from "@/context/SidebarContext";
 import { useData } from "@/context/DataContext";
 
 interface SearchResult {
@@ -15,7 +14,6 @@ interface SearchResult {
 }
 
 export function TopBar() {
-  const { toggle } = useSidebar();
   const { theme, setTheme } = useTheme();
   const { fileName, data, setGlobalSearchQuery } = useData();
   const router = useRouter();
@@ -183,16 +181,10 @@ export function TopBar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-white/75 dark:bg-[rgba(7,13,18,0.75)] backdrop-blur-xl border-gray-200 dark:border-white/10 px-4 sm:px-8">
-      {/* Left: hamburger + file name */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={toggle}
-          className="rounded-lg p-2 text-gray-500 dark:text-[#939393] hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white lg:hidden"
-          aria-label="Toggle sidebar"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+    <header className="sticky top-0 z-[60] flex h-16 items-center justify-between border-b bg-white/75 dark:bg-[rgba(7,13,18,0.75)] backdrop-blur-xl border-gray-200 dark:border-white/10 px-4 sm:px-6">
+      {/* Left: logo + file name */}
+      <div className="flex items-center gap-6">
+        <img src="/SVG Lgo.svg" alt="Logo" className="h-7 w-auto flex-shrink-0" />
         {fileName && (
           <span className="hidden sm:inline text-sm text-gray-500 dark:text-[#939393] truncate max-w-[500px]">
             {fileName}
