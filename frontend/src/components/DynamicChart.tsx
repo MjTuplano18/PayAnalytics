@@ -270,7 +270,7 @@ export function DynamicChart({
           </AreaChart>
         );
       case "pie": {
-        const isNarrow = containerWidth < 500;
+        const isNarrow = containerWidth < 380;
         return (
           <PieChart>
             <Pie

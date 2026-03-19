@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
-import { DollarSign, Users, FileText, Landmark, Waypoints, Hash, BarChart3, ChevronDown, Check, Globe } from "lucide-react";
+import { DollarSign, Users, FileText, Landmark, Waypoints, Hash, BarChart3, ChevronDown, Check, Globe, Info } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useData } from "@/context/DataContext";
@@ -297,10 +297,10 @@ export default function DashboardPage() {
   ];
 
   const metricCards = [
-    { label: "Total Payment Amount", value: `₱${fmt(fa.totalAmount)}`, icon: DollarSign, iconBg: "bg-[#5B66E2]" },
-    { label: "Count of Accounts", value: fmt(fa.totalAccounts), icon: Users, iconBg: "bg-[#4a55d1]" },
-    { label: "Total Transactions", value: fmt(fa.totalPayments), icon: FileText, iconBg: "bg-[#5B66E2]" },
-    { label: "Banks / Portfolios", value: fmt(fa.bankAnalytics.length), icon: Landmark, iconBg: "bg-[#4048c0]" },
+    { label: "Total Payment Amount", value: `₱${fmt(fa.totalAmount)}`, icon: DollarSign, iconBg: "bg-[#5B66E2]", info: "Sum of all payment amounts" },
+    { label: "Count of Accounts", value: fmt(fa.totalAccounts), icon: Users, iconBg: "bg-[#4a55d1]", info: "Unique accounts in dataset" },
+    { label: "Total Transactions", value: fmt(fa.totalPayments), icon: FileText, iconBg: "bg-[#5B66E2]", info: "Total number of payments" },
+    { label: "Banks / Portfolios", value: fmt(fa.bankAnalytics.length), icon: Landmark, iconBg: "bg-[#4048c0]", info: "Distinct banks or portfolios" },
   ];
 
   return (
@@ -471,7 +471,7 @@ export default function DashboardPage() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
-        <div>
+        <Card className="p-6 bg-card border-border">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Payments per Bank
@@ -508,9 +508,9 @@ export default function DashboardPage() {
               </div>
             );
           })()}
-        </div>
+        </Card>
 
-        <div>
+        <Card className="p-6 bg-card border-border">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             Bank Distribution
           </h3>
@@ -528,11 +528,11 @@ export default function DashboardPage() {
               height={350}
             />
           )}
-        </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children mb-12">
-        <div>
+        <Card className="p-6 bg-card border-border">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             Amount Distribution by Bank
           </h3>
@@ -550,9 +550,9 @@ export default function DashboardPage() {
               height={300}
             />
           )}
-        </div>
+        </Card>
 
-        <div>
+        <Card className="p-6 bg-card border-border">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             % Share by Bank
           </h3>
@@ -577,7 +577,7 @@ export default function DashboardPage() {
               </div>
             );
           })()}
-        </div>
+        </Card>
       </div>
 
       {/* Bank Analytics Table */}
@@ -632,41 +632,6 @@ export default function DashboardPage() {
       </>
       ) : activeTab === "overview" ? (
       <>
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
-        {apiLoading
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-6 bg-card border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-9 w-9 rounded-lg" />
-                </div>
-                <Skeleton className="h-8 w-24 mt-2" />
-              </Card>
-            ))
-          : metricCards.map((card) => {
-              const Icon = card.icon;
-              return (
-                <Card
-                  key={card.label}
-                  className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {card.label}
-                    </span>
-                    <div className={`p-2 ${card.iconBg} rounded-lg`}>
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {card.value}
-                  </div>
-                </Card>
-              );
-            })}
-      </div>
-
       {/* No data notice when a date filter yields no results */}
       {noData && (
         <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
@@ -674,10 +639,11 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
-        <div>
-          <div className="flex items-center justify-between mb-4">
+      {/* Row 1: Bar chart (wide) + 2 stacked metric cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 mb-6 overflow-hidden">
+        {/* Bar chart */}
+        <Card className="p-4 bg-card border-border overflow-hidden min-w-0">
+          <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Payments per Bank
             </h3>
@@ -693,7 +659,7 @@ export default function DashboardPage() {
             </select>
           </div>
           {apiLoading ? (
-            <Skeleton className="h-[350px] w-full rounded-xl" />
+            <Skeleton className="h-[280px] w-full rounded-xl" />
           ) : (() => {
             const bankData = bankTopN === "all"
               ? fa.bankAnalytics
@@ -707,82 +673,149 @@ export default function DashboardPage() {
                     type="bar"
                     dataKey="amount"
                     xAxisKey="bank"
-                    height={350}
+                    height={280}
                   />
                 </div>
               </div>
             );
           })()}
-        </div>
+        </Card>
 
-        <div>
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+        {/* Card 1 + Card 2 stacked */}
+        <div className="flex flex-col gap-4">
+          {apiLoading
+            ? Array.from({ length: 2 }).map((_, i) => (
+                <Card key={i} className="flex-1 overflow-hidden bg-card border-border gap-0">
+                  <div className="h-1 bg-[#5B66E2]" />
+                  <div className="p-4">
+                    <Skeleton className="h-4 w-24 mb-3" />
+                    <Skeleton className="h-8 w-full rounded-full" />
+                  </div>
+                </Card>
+              ))
+            : metricCards.slice(0, 2).map((card) => {
+                const Icon = card.icon;
+                return (
+                  <Card
+                    key={card.label}
+                    className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                  >
+                    <div className="h-1 bg-[#5B66E2]" />
+                    <div className="flex flex-col h-[calc(100%-4px)] px-4 pt-1 pb-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                          {card.label}:
+                        </span>
+                        <div className={`p-2 mt-1 mr-0.5 ${card.iconBg} rounded-lg`}>
+                          <Icon className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                      <div className="flex-1 flex items-center justify-center">
+                        <span className="inline-block px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-lg font-bold text-gray-900 dark:text-white">
+                          {card.value}
+                        </span>
+                      </div>
+                      <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex items-center justify-between">
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{card.info}</span>
+                        <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+        </div>
+      </div>
+
+      {/* Row 2: Pie chart + Horizontal bar chart + 2 stacked metric cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_400px] gap-6 mb-6">
+        {/* Pie chart */}
+        <Card className="p-4 bg-card border-border">
+          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
             By Touchpoint
           </h3>
           {apiLoading ? (
-            <Skeleton className="h-[350px] w-full rounded-xl" />
+            <Skeleton className="h-[280px] w-full rounded-xl" />
           ) : (
-          <DynamicChart
-            data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({
-              touchpoint: t.touchpoint,
-              count: t.count,
-            }))}
-            type="pie"
-            dataKey="count"
-            xAxisKey="touchpoint"
-            height={350}
-          />
+            <DynamicChart
+              data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({
+                touchpoint: t.touchpoint,
+                count: t.count,
+              }))}
+              type="pie"
+              dataKey="count"
+              xAxisKey="touchpoint"
+              height={280}
+            />
           )}
-        </div>
-      </div>
+        </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children mb-12">
-        <div>
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Payment Trend Over Time
-          </h3>
-          {apiLoading ? (
-            <Skeleton className="h-[300px] w-full rounded-xl" />
-          ) : (
-          <DynamicChart
-            data={monthlyTrend}
-            type="area"
-            dataKey="amount"
-            xAxisKey="month"
-            height={300}
-          />
-          )}
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+        {/* Horizontal bar chart */}
+        <Card className="p-4 bg-card border-border">
+          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
             Amount Distribution by Bank
           </h3>
           {apiLoading ? (
-            <Skeleton className="h-[300px] w-full rounded-xl" />
+            <Skeleton className="h-[280px] w-full rounded-xl" />
           ) : (
-          <DynamicChart
-            data={fa.bankAnalytics.slice(0, 10).map((a) => ({
-              bank: a.bank,
-              amount: a.totalAmount,
-            }))}
-            type="barh"
-            dataKey="amount"
-            xAxisKey="bank"
-            height={300}
-          />
+            <DynamicChart
+              data={fa.bankAnalytics.slice(0, 10).map((a) => ({
+                bank: a.bank,
+                amount: a.totalAmount,
+              }))}
+              type="barh"
+              dataKey="amount"
+              xAxisKey="bank"
+              height={280}
+            />
           )}
+        </Card>
+
+        {/* Card 3 + Card 4 stacked */}
+        <div className="flex flex-col gap-4">
+          {apiLoading
+            ? Array.from({ length: 2 }).map((_, i) => (
+                <Card key={i} className="flex-1 overflow-hidden bg-card border-border gap-0">
+                  <div className="h-1 bg-[#5B66E2]" />
+                  <div className="p-4">
+                    <Skeleton className="h-4 w-24 mb-3" />
+                    <Skeleton className="h-8 w-full rounded-full" />
+                  </div>
+                </Card>
+              ))
+            : metricCards.slice(2, 4).map((card) => {
+                const Icon = card.icon;
+                return (
+                  <Card
+                    key={card.label}
+                    className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                  >
+                    <div className="h-1 bg-[#5B66E2]" />
+                    <div className="flex flex-col h-[calc(100%-4px)] px-4 pt-1 pb-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                          {card.label}:
+                        </span>
+                        <div className={`p-2 mt-1 mr-0.5 ${card.iconBg} rounded-lg`}>
+                          <Icon className="w-6 h-6 text-white" />
+                        </div>
+                      </div>
+                      <div className="flex-1 flex items-center justify-center">
+                        <span className="inline-block px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-lg font-bold text-gray-900 dark:text-white">
+                          {card.value}
+                        </span>
+                      </div>
+                      <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex items-center justify-between">
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{card.info}</span>
+                        <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
         </div>
       </div>
 
-      {/* Period-over-Period Comparison */}
-      {payments.length > 0 && !apiLoading && (
-        <div className="mb-6">
-          <PeriodComparison payments={payments} />
-        </div>
-      )}
-
-      {/* Bank Analytics Table */}
+      {/* Row 3: Bank Analytics Table (full width) */}
       {apiLoading ? (
         <div className="rounded-lg border bg-card border-border mb-8 p-6">
           <Skeleton className="h-6 w-40 mb-4" />
@@ -918,7 +951,7 @@ export default function DashboardPage() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
-        <div>
+        <Card className="p-6 bg-card border-border">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             Transactions per Touchpoint
           </h3>
@@ -936,9 +969,9 @@ export default function DashboardPage() {
               height={350}
             />
           )}
-        </div>
+        </Card>
 
-        <div>
+        <Card className="p-6 bg-card border-border">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             Touchpoint Distribution
           </h3>
@@ -956,11 +989,11 @@ export default function DashboardPage() {
               height={350}
             />
           )}
-        </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children mb-12">
-        <div>
+        <Card className="p-6 bg-card border-border">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             Amount by Touchpoint
           </h3>
@@ -978,9 +1011,9 @@ export default function DashboardPage() {
               height={300}
             />
           )}
-        </div>
+        </Card>
 
-        <div>
+        <Card className="p-6 bg-card border-border">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             % Share by Touchpoint
           </h3>
@@ -998,7 +1031,7 @@ export default function DashboardPage() {
               height={300}
             />
           )}
-        </div>
+        </Card>
       </div>
 
       {/* Touchpoint Table */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -74,7 +74,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const pathname = usePathname();
   const { resolvedTheme } = useTheme();
-  const bgImage = resolvedTheme === "dark" ? "/BKGRD.svg" : "/BKGRD%20INV.svg";
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  // Use dark as default to match the defaultTheme="dark" in ThemeProvider,
+  // preventing a hydration mismatch since resolvedTheme is undefined on the server.
+  const bgImage = !mounted || resolvedTheme === "dark" ? "/BKGRD.svg" : "/BKGRD%20INV.svg";
 
   const isLoginPage = pathname === "/login";
 
