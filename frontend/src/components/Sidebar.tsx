@@ -22,7 +22,6 @@ const menuItems = [
   { path: "/transactions", icon: FileText, label: "Transactions" },
   { path: "/customers", icon: UserCheck, label: "Accounts" },
   { path: "/upload", icon: Upload, label: "Upload Data" },
-  { path: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function Sidebar() {
@@ -107,7 +106,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Profile & Sign Out */}
+        {/* Profile, Settings & Sign Out */}
         <div className="border-t border-gray-200 dark:border-white/10 p-4">
           {user && !isCollapsed && (
             <div className="mb-3 flex items-center gap-3">
@@ -122,13 +121,37 @@ export function Sidebar() {
                   {user.email}
                 </p>
               </div>
+              <Link
+                href="/settings"
+                onClick={() => setIsOpen(false)}
+                className={`rounded-lg p-2 transition-all duration-200 ${
+                  isActive("/settings")
+                    ? "bg-[#5B66E2] text-white shadow-lg shadow-[#5B66E2]/30"
+                    : "text-gray-500 dark:text-[#939393] hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
+                }`}
+                title="Settings"
+              >
+                <Settings className="h-5 w-5" />
+              </Link>
             </div>
           )}
           {user && isCollapsed && (
-            <div className="mb-3 flex justify-center">
+            <div className="mb-3 flex flex-col items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] text-sm font-semibold text-white">
                 {user.full_name.charAt(0).toUpperCase()}
               </div>
+              <Link
+                href="/settings"
+                onClick={() => setIsOpen(false)}
+                className={`rounded-lg p-2 transition-all duration-200 ${
+                  isActive("/settings")
+                    ? "bg-[#5B66E2] text-white shadow-lg shadow-[#5B66E2]/30"
+                    : "text-gray-500 dark:text-[#939393] hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
+                }`}
+                title="Settings"
+              >
+                <Settings className="h-5 w-5" />
+              </Link>
             </div>
           )}
           <button
