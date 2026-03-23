@@ -12,7 +12,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { MainContent } from "@/components/MainContent";
 import { Toaster } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getUpload, listUploads } from "@/lib/api";
+import { getUpload, listUploads, type UploadSessionDetail } from "@/lib/api";
 import { ParsedData } from "@/types/data";
 import { useUploadEvents } from "@/lib/useUploadEvents";
 
@@ -24,7 +24,7 @@ function SessionRestorer() {
   const autoPickedRef = useRef(false);
 
   // Helper: build ParsedData from upload detail records
-  const hydrateFromDetail = (detail: { records: { bank: string; payment_date: string | null; payment_amount: number; account: string; touchpoint: string | null; environment?: string }[]; file_name: string; id: string }) => {
+  const hydrateFromDetail = (detail: UploadSessionDetail) => {
     const payments = detail.records.map((r) => ({
       bank: r.bank,
       paymentDate: r.payment_date ?? "",
