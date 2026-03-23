@@ -787,7 +787,16 @@ export default function TransactionsPage() {
                   </td>
                   <td className="px-4 py-3 text-sm whitespace-nowrap">
                     {isEditing ? (
-                      <Input value={editForm.touchpoint} onChange={(e) => setEditForm({ ...editForm, touchpoint: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" />
+                      <select
+                        value={editForm.touchpoint}
+                        onChange={(e) => setEditForm({ ...editForm, touchpoint: e.target.value })}
+                        className="h-7 text-xs rounded-md border bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-2"
+                      >
+                        <option value="">Select touchpoint...</option>
+                        {displayTouchpoints.map((tp) => (
+                          <option key={tp} value={tp}>{tp}</option>
+                        ))}
+                      </select>
                     ) : (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#5B66E2]/10 text-[#5B66E2] dark:bg-[#5B66E2]/20 dark:text-[#8B96F2]">
                         {p.touchpoint}
