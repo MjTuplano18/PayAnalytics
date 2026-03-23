@@ -235,6 +235,30 @@ async def delete_upload(
         await repo.delete_session(session_id, current_user.id)
 
 
+@router.post("/{session_id}/transactions", response_model=PaymentRecordOut, status_code=status.HTTP_201_CREATED)
+async def create_transaction(
+    session_id: str,
+    payload: PaymentRecordIn,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> PaymentRecordOut:
+    """Add a single transaction record to an existing upload session."""
+    repo = UploadRepository(db)
+    record = await repo.create_transaction(
+        session_id=session_id,
+        user_id=current_user.id,
+        bank=payload.bank,
+        account=payload.account,
+        payment_amount=payload.payment_amount,
+        touchpoint=payload.touchpoint,
+        payment_date=payload.payment_date,
+        environment=payload.environment,
+    )
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
+    return PaymentRecordOut.model_validate(record)
+
+
 @router.put("/{session_id}/transactions/{record_id}", response_model=PaymentRecordOut)
 async def update_transaction(
     session_id: str,

@@ -35,7 +35,7 @@ export default function LoginPage() {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#070D12]">
       {/* Background image */}
       <Image
-        src="/BKGRD.svg"
+        src="/BKGRD_ORIGINAL.svg"
         alt=""
         fill
         className="pointer-events-none absolute inset-0 object-cover opacity-60"

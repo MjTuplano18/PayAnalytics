@@ -129,6 +129,36 @@ class UploadRepository:
         await self.session.commit()
         return True
 
+    async def create_transaction(
+        self, session_id: str, user_id: str,
+        bank: str, account: str, payment_amount: float,
+        touchpoint: str | None = None, payment_date: str | None = None,
+        environment: str | None = None,
+    ) -> PaymentRecord | None:
+        """Add a single payment record to an existing session. Returns the new record or None."""
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return None
+        record = PaymentRecord(
+            session_id=session_id,
+            bank=bank,
+            account=account,
+            payment_amount=payment_amount,
+            touchpoint=touchpoint,
+            payment_date=payment_date,
+            environment=environment,
+        )
+        self.session.add(record)
+        await self._update_session_totals(session_id)
+        await self.session.commit()
+        await self.session.refresh(record)
+        return record
+
     async def update_transaction(
         self, record_id: str, session_id: str, user_id: str,
         bank: str, account: str, payment_amount: float,

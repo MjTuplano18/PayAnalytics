@@ -57,7 +57,6 @@ export function TopBar() {
       { name: "Dashboard", path: "/dashboard" },
       { name: "Transactions", path: "/transactions" },
       { name: "Accounts", path: "/customers" },
-      { name: "Customers", path: "/customers" },
       { name: "Reports", path: "/reports" },
       { name: "Upload Data", path: "/upload" },
     ];

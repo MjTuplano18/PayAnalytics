@@ -265,6 +265,14 @@ export function deleteUpload(token: string, sessionId: string) {
   return apiFetch<void>(`/api/v1/uploads/${sessionId}`, { method: "DELETE", token });
 }
 
+export function createTransaction(token: string, sessionId: string, record: PaymentRecordIn) {
+  return apiFetch<PaymentRecordOut>(`/api/v1/uploads/${sessionId}/transactions`, {
+    method: "POST",
+    token,
+    body: JSON.stringify(record),
+  });
+}
+
 export function deleteTransaction(token: string, sessionId: string, recordId: string) {
   return apiFetch<void>(`/api/v1/uploads/${sessionId}/transactions/${recordId}`, { method: "DELETE", token });
 }

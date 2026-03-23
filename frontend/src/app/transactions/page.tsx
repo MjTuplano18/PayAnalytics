@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
-import { getTransactions, getDashboardSummary, deleteTransaction, deleteTransactionsByDateRange, getUpload, deleteUpload, type PaymentRecordOut } from "@/lib/api";
+import { getTransactions, getDashboardSummary, deleteTransaction, deleteTransactionsByDateRange, getUpload, deleteUpload, createTransaction, type PaymentRecordOut } from "@/lib/api";
 import { useDashboard, useTransactions, queryKeys } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -330,13 +330,36 @@ export default function TransactionsPage() {
     }
   }, [token, sessionId, setData, recalcParsedData]);
 
-  const handleAddTransaction = () => {
-    if (!data) return;
+  const handleAddTransaction = async () => {
     const amount = parseFloat(addForm.paymentAmount);
     if (!addForm.bank || !addForm.paymentDate || isNaN(amount) || amount < 0 || !addForm.account || !addForm.touchpoint) {
       toast.error("Please fill in all fields with valid values. Amount cannot be negative.");
       return;
     }
+
+    if (usingApi && token && sessionId) {
+      try {
+        await createTransaction(token, sessionId, {
+          bank: addForm.bank.toUpperCase(),
+          account: addForm.account,
+          payment_amount: amount,
+          touchpoint: addForm.touchpoint.toUpperCase(),
+          payment_date: addForm.paymentDate,
+          environment: addForm.environment || undefined,
+        });
+        queryClient.invalidateQueries({ queryKey: ["transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        await refreshSessionData();
+        setAddForm({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
+        setShowAddForm(false);
+        toast.success("Transaction added.");
+      } catch {
+        toast.error("Failed to add transaction.");
+      }
+      return;
+    }
+
+    if (!data) return;
     const newRecord: PaymentRecord = {
       bank: addForm.bank.toUpperCase(),
       paymentDate: addForm.paymentDate,

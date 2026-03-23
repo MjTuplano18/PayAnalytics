@@ -39,6 +39,11 @@ export default function DashboardPage() {
   const [bankTopN, setBankTopN] = useState<number | "all">(20);
   const [envBankTopN, setEnvBankTopN] = useState<number | "all">(20);
 
+  // Bank Analytics table pagination
+  const [bankPage, setBankPage] = useState(1);
+  const [envBankPage, setEnvBankPage] = useState(1);
+  const bankRowsPerPage = 15;
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -615,7 +620,11 @@ export default function DashboardPage() {
               <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">100.0%</td>
               <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(envBankAnalytics.totalPayments)}</td>
             </tr>
-            {envBankAnalytics.bankAnalytics.map((b) => (
+            {(() => {
+              const allRows = envBankAnalytics.bankAnalytics;
+              const totalPages = Math.max(1, Math.ceil(allRows.length / bankRowsPerPage));
+              const paged = allRows.slice((envBankPage - 1) * bankRowsPerPage, envBankPage * bankRowsPerPage);
+              return paged.map((b) => (
               <tr key={b.bank} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200">
                 <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{b.bank}</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.accountCount)}</td>
@@ -624,9 +633,37 @@ export default function DashboardPage() {
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{b.percentage.toFixed(1)}%</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.paymentCount)}</td>
               </tr>
-            ))}
+              ));
+            })()}
           </tbody>
         </table>
+        {/* Env Bank Analytics Pagination */}
+        {(() => {
+          const totalRows = envBankAnalytics.bankAnalytics.length;
+          const totalPages = Math.max(1, Math.ceil(totalRows / bankRowsPerPage));
+          if (totalPages <= 1) return null;
+          const pages: number[] = [];
+          let start = Math.max(1, envBankPage - 2);
+          let end = Math.min(totalPages, start + 4);
+          start = Math.max(1, end - 4);
+          for (let i = start; i <= end; i++) pages.push(i);
+          return (
+            <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Showing {fmt((envBankPage - 1) * bankRowsPerPage + 1)}&ndash;{fmt(Math.min(envBankPage * bankRowsPerPage, totalRows))} of {fmt(totalRows)} banks
+              </p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setEnvBankPage(1)} disabled={envBankPage === 1} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">First</button>
+                <button onClick={() => setEnvBankPage((p) => Math.max(1, p - 1))} disabled={envBankPage === 1} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Prev</button>
+                {pages.map((pg) => (
+                  <button key={pg} onClick={() => setEnvBankPage(pg)} className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${pg === envBankPage ? "bg-[#4a55d1] text-white border-[#4a55d1] shadow-sm" : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2]"}`}>{pg}</button>
+                ))}
+                <button onClick={() => setEnvBankPage((p) => Math.min(totalPages, p + 1))} disabled={envBankPage === totalPages} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Next</button>
+                <button onClick={() => setEnvBankPage(totalPages)} disabled={envBankPage === totalPages} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Last</button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
       )}
       </>
@@ -875,7 +912,11 @@ export default function DashboardPage() {
                 {fmt(fa.totalPayments)}
               </td>
             </tr>
-            {fa.bankAnalytics.map((b) => (
+            {(() => {
+              const allRows = fa.bankAnalytics;
+              const totalPages = Math.max(1, Math.ceil(allRows.length / bankRowsPerPage));
+              const paged = allRows.slice((bankPage - 1) * bankRowsPerPage, bankPage * bankRowsPerPage);
+              return paged.map((b) => (
               <tr
                 key={b.bank}
                 className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200"
@@ -899,9 +940,37 @@ export default function DashboardPage() {
                   {fmt(b.paymentCount)}
                 </td>
               </tr>
-            ))}
+              ));
+            })()}
           </tbody>
         </table>
+        {/* Bank Analytics Pagination */}
+        {(() => {
+          const totalRows = fa.bankAnalytics.length;
+          const totalPages = Math.max(1, Math.ceil(totalRows / bankRowsPerPage));
+          if (totalPages <= 1) return null;
+          const pages: number[] = [];
+          let start = Math.max(1, bankPage - 2);
+          let end = Math.min(totalPages, start + 4);
+          start = Math.max(1, end - 4);
+          for (let i = start; i <= end; i++) pages.push(i);
+          return (
+            <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Showing {fmt((bankPage - 1) * bankRowsPerPage + 1)}&ndash;{fmt(Math.min(bankPage * bankRowsPerPage, totalRows))} of {fmt(totalRows)} banks
+              </p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setBankPage(1)} disabled={bankPage === 1} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">First</button>
+                <button onClick={() => setBankPage((p) => Math.max(1, p - 1))} disabled={bankPage === 1} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Prev</button>
+                {pages.map((pg) => (
+                  <button key={pg} onClick={() => setBankPage(pg)} className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${pg === bankPage ? "bg-[#4a55d1] text-white border-[#4a55d1] shadow-sm" : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2]"}`}>{pg}</button>
+                ))}
+                <button onClick={() => setBankPage((p) => Math.min(totalPages, p + 1))} disabled={bankPage === totalPages} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Next</button>
+                <button onClick={() => setBankPage(totalPages)} disabled={bankPage === totalPages} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Last</button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
       )}
       </>

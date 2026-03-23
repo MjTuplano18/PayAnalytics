@@ -100,7 +100,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
         </div>
         {/* Sidebar skeleton */}
-        <div className="relative z-10 hidden lg:flex h-screen w-64 flex-col border-r bg-[rgba(7,13,18,0.85)] border-white/10 p-6 gap-6 backdrop-blur-xl">
+        <div className="relative z-10 hidden md:flex h-screen w-64 flex-col border-r bg-[rgba(7,13,18,0.85)] border-white/10 p-6 gap-6 backdrop-blur-xl">
           <Skeleton className="h-8 w-36 bg-white/10" />
           <div className="space-y-3 mt-4">
             {Array.from({ length: 6 }).map((_, i) => (
