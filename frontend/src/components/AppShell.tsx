@@ -12,7 +12,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { MainContent } from "@/components/MainContent";
 import { Toaster } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getUpload } from "@/lib/api";
+import { getUpload, listUploads } from "@/lib/api";
 import { ParsedData } from "@/types/data";
 import { useUploadEvents } from "@/lib/useUploadEvents";
 
@@ -21,60 +21,64 @@ function SessionRestorer() {
   const { token } = useAuth();
   const { sessionId, setSessionId, data, setData, setFileName } = useData();
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoPickedRef = useRef(false);
 
+  // Helper: build ParsedData from upload detail records
+  const hydrateFromDetail = (detail: { records: { bank: string; payment_date: string | null; payment_amount: number; account: string; touchpoint: string | null; environment?: string }[]; file_name: string; id: string }) => {
+    const payments = detail.records.map((r) => ({
+      bank: r.bank,
+      paymentDate: r.payment_date ?? "",
+      paymentAmount: r.payment_amount,
+      account: r.account,
+      touchpoint: r.touchpoint ?? "",
+      environment: r.environment,
+    }));
+
+    const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
+    const tpMap = new Map<string, { count: number; totalAmount: number }>();
+    let totalAmount = 0;
+    const allAccounts = new Set<string>();
+
+    for (const p of payments) {
+      totalAmount += p.paymentAmount;
+      allAccounts.add(p.account);
+      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
+      const b = bankMap.get(p.bank)!;
+      b.totalAmount += p.paymentAmount; b.paymentCount++; b.accounts.add(p.account);
+      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
+      const t = tpMap.get(p.touchpoint)!;
+      t.count++; t.totalAmount += p.paymentAmount;
+    }
+
+    const bankAnalytics = Array.from(bankMap.entries())
+      .map(([bank, d]) => ({ bank, accountCount: d.accounts.size, totalAmount: d.totalAmount, debtorSum: 0, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount }))
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+
+    const touchpointAnalytics = Array.from(tpMap.entries())
+      .map(([tp, d]) => ({ touchpoint: tp, count: d.count, totalAmount: d.totalAmount, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    return { payments, bankAnalytics, touchpointAnalytics, totalAccounts: allAccounts.size, totalAmount, totalPayments: payments.length, raw: [] } as ParsedData;
+  };
+
+  // Restore existing sessionId
   useEffect(() => {
-    if (!sessionId || !token || data) return; // nothing to do
+    if (!sessionId || !token || data) return;
 
     let cancelled = false;
 
     const restore = (attempt: number) => {
       getUpload(token, sessionId).then((detail) => {
         if (cancelled) return;
-        const payments = detail.records.map((r) => ({
-          bank: r.bank,
-          paymentDate: r.payment_date ?? "",
-          paymentAmount: r.payment_amount,
-          account: r.account,
-          touchpoint: r.touchpoint ?? "",
-          environment: r.environment,
-        }));
-
-        const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
-        const tpMap = new Map<string, { count: number; totalAmount: number }>();
-        let totalAmount = 0;
-        const allAccounts = new Set<string>();
-
-        for (const p of payments) {
-          totalAmount += p.paymentAmount;
-          allAccounts.add(p.account);
-          if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
-          const b = bankMap.get(p.bank)!;
-          b.totalAmount += p.paymentAmount; b.paymentCount++; b.accounts.add(p.account);
-          if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
-          const t = tpMap.get(p.touchpoint)!;
-          t.count++; t.totalAmount += p.paymentAmount;
-        }
-
-        const bankAnalytics = Array.from(bankMap.entries())
-          .map(([bank, d]) => ({ bank, accountCount: d.accounts.size, totalAmount: d.totalAmount, debtorSum: 0, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount }))
-          .sort((a, b) => b.totalAmount - a.totalAmount);
-
-        const touchpointAnalytics = Array.from(tpMap.entries())
-          .map(([tp, d]) => ({ touchpoint: tp, count: d.count, totalAmount: d.totalAmount, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0 }))
-          .sort((a, b) => b.count - a.count);
-
-        const parsed: ParsedData = { payments, bankAnalytics, touchpointAnalytics, totalAccounts: allAccounts.size, totalAmount, totalPayments: payments.length, raw: [] };
-        setData(parsed);
+        setData(hydrateFromDetail(detail));
         setFileName(detail.file_name);
       }).catch((err: unknown) => {
         if (cancelled) return;
-        // Only clear sessionId on 404 (session actually deleted on server)
         const is404 = err instanceof Error && err.message.includes("404");
         if (is404) {
           setSessionId(null);
           return;
         }
-        // Retry up to 3 times with increasing delay for transient errors (401 during token refresh, network issues)
         if (attempt < 3) {
           retryRef.current = setTimeout(() => restore(attempt + 1), 1500 * (attempt + 1));
         }
@@ -87,6 +91,26 @@ function SessionRestorer() {
       cancelled = true;
       if (retryRef.current) clearTimeout(retryRef.current);
     };
+  }, [sessionId, token, data]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-pick the most recent upload if no sessionId is set
+  useEffect(() => {
+    if (sessionId || !token || data || autoPickedRef.current) return;
+    autoPickedRef.current = true;
+
+    listUploads(token).then((sessions) => {
+      if (sessions.length === 0) return;
+      // Sort by uploaded_at descending, pick the most recent
+      const sorted = [...sessions].sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
+      const latest = sorted[0];
+      return getUpload(token, latest.id).then((detail) => {
+        setData(hydrateFromDetail(detail));
+        setFileName(detail.file_name);
+        setSessionId(detail.id);
+      });
+    }).catch(() => {
+      // Silently fail — user can upload manually
+    });
   }, [sessionId, token, data]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
