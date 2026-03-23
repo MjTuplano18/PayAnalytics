@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
-import { getTransactions, getDashboardSummary, deleteTransaction, deleteTransactionsByDateRange, getUpload, deleteUpload, createTransaction, type PaymentRecordOut } from "@/lib/api";
+import { getTransactions, getDashboardSummary, deleteTransaction, deleteTransactionsByDateRange, getUpload, deleteUpload, createTransaction, updateTransaction, type PaymentRecordOut } from "@/lib/api";
 import { useDashboard, useTransactions, queryKeys } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -253,7 +253,8 @@ export default function TransactionsPage() {
   // ── CRUD helpers (in-memory mode only) ──
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "" });
+  const [editingDisplayIndex, setEditingDisplayIndex] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
   const [addForm, setAddForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -349,7 +350,6 @@ export default function TransactionsPage() {
         });
         queryClient.invalidateQueries({ queryKey: ["transactions"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-        await refreshSessionData();
         setAddForm({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
         setShowAddForm(false);
         toast.success("Transaction added.");
@@ -375,27 +375,54 @@ export default function TransactionsPage() {
     toast.success("Transaction added.");
   };
 
-  const handleStartEdit = (globalIdx: number, displayRow?: { bank: string; paymentDate: string; paymentAmount: number; account: string; touchpoint: string }) => {
+  const handleStartEdit = (globalIdx: number, displayIdx: number, displayRow?: { bank: string; paymentDate: string; paymentAmount: number; account: string; touchpoint: string; environment?: string }) => {
     if (!data && !displayRow) return;
     const p = displayRow ?? (globalIdx >= 0 ? data?.payments[globalIdx] : undefined);
     if (!p) return;
     setEditingIndex(globalIdx);
+    setEditingDisplayIndex(displayIdx);
     setEditForm({
       bank: p.bank,
       paymentDate: p.paymentDate,
       paymentAmount: String(p.paymentAmount),
       account: p.account,
       touchpoint: p.touchpoint,
+      environment: ('environment' in p ? (p as { environment?: string }).environment : undefined) || "",
     });
   };
 
-  const handleSaveEdit = () => {
-    if (!data || editingIndex === null) return;
+  const handleSaveEdit = async () => {
+    if (editingIndex === null) return;
     const amount = parseFloat(editForm.paymentAmount);
     if (!editForm.bank || !editForm.paymentDate || isNaN(amount) || amount < 0 || !editForm.account || !editForm.touchpoint) {
       toast.error("Please fill in all fields with valid values. Amount cannot be negative.");
       return;
     }
+
+    if (usingApi && token && sessionId && apiRows) {
+      const row = editingDisplayIndex !== null ? apiRows[editingDisplayIndex] : null;
+      if (!row) { toast.error("Could not find record to update."); return; }
+      try {
+        await updateTransaction(token, sessionId, row.id, {
+          bank: editForm.bank.toUpperCase(),
+          account: editForm.account,
+          payment_amount: amount,
+          touchpoint: editForm.touchpoint.toUpperCase(),
+          payment_date: editForm.paymentDate,
+          environment: editForm.environment || undefined,
+        });
+        queryClient.invalidateQueries({ queryKey: ["transactions"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        setEditingIndex(null);
+        setEditingDisplayIndex(null);
+        toast.success("Transaction updated.");
+      } catch {
+        toast.error("Failed to update transaction.");
+      }
+      return;
+    }
+
+    if (!data) return;
     const newPayments = [...data.payments];
     newPayments[editingIndex] = {
       bank: editForm.bank.toUpperCase(),
@@ -403,17 +430,18 @@ export default function TransactionsPage() {
       paymentAmount: amount,
       account: editForm.account,
       touchpoint: editForm.touchpoint.toUpperCase(),
+      environment: editForm.environment || undefined,
     };
     setData(recalcParsedData(newPayments));
     setEditingIndex(null);
+    setEditingDisplayIndex(null);
     toast.success("Transaction updated.");
   };
 
-  const handleCancelEdit = () => setEditingIndex(null);
+  const handleCancelEdit = () => { setEditingIndex(null); setEditingDisplayIndex(null); };
 
-  const handleDelete = async (globalIdx: number) => {
+  const handleDelete = async (globalIdx: number, displayIdx: number) => {
     if (usingApi && token && sessionId && apiRows) {
-      const displayIdx = globalIdx - ((currentPage - 1) * rowsPerPage);
       const row = apiRows[displayIdx];
       if (!row) return;
       try {
@@ -757,7 +785,7 @@ export default function TransactionsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Environment
                 </th>
-                {data && (
+                {(data || usingApi) && (
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">
                     Actions
                   </th>
@@ -766,8 +794,8 @@ export default function TransactionsPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {displayRows.map((p, i) => {
-                const globalIdx = data ? getGlobalIndex(i) : -1;
-                const isEditing = editingIndex === globalIdx && globalIdx !== -1;
+                const globalIdx = data ? getGlobalIndex(i) : (currentPage - 1) * rowsPerPage + i;
+                const isEditing = editingIndex === globalIdx;
                 return (
                 <tr
                   key={`${currentPage}-${i}`}
@@ -804,9 +832,22 @@ export default function TransactionsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    {p.environment || "—"}
+                    {isEditing ? (
+                      <select
+                        value={editForm.environment}
+                        onChange={(e) => setEditForm({ ...editForm, environment: e.target.value })}
+                        className="h-7 text-xs rounded-md border bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-2"
+                      >
+                        <option value="">Select environment...</option>
+                        {displayEnvironments.map((env) => (
+                          <option key={env} value={env}>{env}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      p.environment || "—"
+                    )}
                   </td>
-                  {data && (
+                  {(data || usingApi) && (
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       {isEditing ? (
                         <div className="flex items-center justify-center gap-1">
@@ -816,12 +857,12 @@ export default function TransactionsPage() {
                           <button onClick={handleCancelEdit} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500" title="Cancel">
                             <X className="w-4 h-4" />
                           </button>
-                          <button onClick={() => { handleDelete(globalIdx); setEditingIndex(null); }} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400" title="Delete">
+                          <button onClick={() => { handleDelete(globalIdx, i); setEditingIndex(null); setEditingDisplayIndex(null); }} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400" title="Delete">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => handleStartEdit(globalIdx, p)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
+                        <button onClick={() => handleStartEdit(globalIdx, i, p)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                       )}
