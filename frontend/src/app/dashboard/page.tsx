@@ -35,6 +35,11 @@ export default function DashboardPage() {
   const [envDropdownOpen, setEnvDropdownOpen] = useState(false);
   const envDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Bank filter state (environments tab)
+  const [selectedBanks, setSelectedBanks] = useState<Set<string>>(new Set());
+  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
+  const bankDropdownRef = useRef<HTMLDivElement>(null);
+
   // Top-N bank chart limit
   const [bankTopN, setBankTopN] = useState<number | "all">(20);
   const [envBankTopN, setEnvBankTopN] = useState<number | "all">(20);
@@ -52,6 +57,9 @@ export default function DashboardPage() {
       }
       if (envDropdownRef.current && !envDropdownRef.current.contains(e.target as Node)) {
         setEnvDropdownOpen(false);
+      }
+      if (bankDropdownRef.current && !bankDropdownRef.current.contains(e.target as Node)) {
+        setBankDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -176,6 +184,24 @@ export default function DashboardPage() {
     setSelectedTouchpoints(new Set());
   };
 
+  // Bank filter data (for environments tab)
+  const allBanks = useMemo(() => {
+    if (apiSummary) return apiSummary.banks.map((b) => b.bank).sort();
+    if (!data) return [];
+    return [...new Set(data.payments.map((p) => p.bank))].sort();
+  }, [apiSummary, data]);
+
+  const toggleBank = (bank: string) => {
+    setSelectedBanks((prev) => {
+      const next = new Set(prev);
+      if (next.has(bank)) next.delete(bank);
+      else next.add(bank);
+      return next;
+    });
+  };
+
+  const clearBankFilter = () => setSelectedBanks(new Set());
+
   // Touchpoints available based on selected environments (cascading)
   const allTouchpoints = useMemo(() => {
     if (apiSummary) {
@@ -264,11 +290,17 @@ export default function DashboardPage() {
     { label: "Top Touchpoint", value: tpTopTouchpoint, icon: BarChart3, iconBg: "bg-[#4048c0]" },
   ];
 
-  // ── Environments tab data (bank-only, filtered by environment) ──
+  // ── Environments tab data (bank-only, filtered by environment and bank) ──
   const envFilteredPayments = useMemo(() => {
-    if (selectedEnvironments.size === 0) return payments;
-    return payments.filter((p) => selectedEnvironments.has(p.environment || "Unknown"));
-  }, [payments, selectedEnvironments]);
+    let filtered = payments;
+    if (selectedEnvironments.size > 0) {
+      filtered = filtered.filter((p) => selectedEnvironments.has(p.environment || "Unknown"));
+    }
+    if (selectedBanks.size > 0) {
+      filtered = filtered.filter((p) => selectedBanks.has(p.bank));
+    }
+    return filtered;
+  }, [payments, selectedEnvironments, selectedBanks]);
 
   const envBankAnalytics = useMemo(() => {
     const src = envFilteredPayments;
@@ -356,6 +388,49 @@ export default function DashboardPage() {
                         {selectedEnvironments.has(env) && <Check className="h-3 w-3 text-white" />}
                       </span>
                       {env}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {/* Bank filter (only on environments tab) */}
+          {activeTab === "environments" && (
+            <div ref={bankDropdownRef} className="relative">
+              <button
+                onClick={() => setBankDropdownOpen((v) => !v)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
+              >
+                <Landmark className="h-4 w-4" />
+                {selectedBanks.size === 0
+                  ? "All Banks"
+                  : `${selectedBanks.size} bank${selectedBanks.size !== 1 ? "s" : ""}`}
+                <ChevronDown className={`h-4 w-4 transition-transform ${bankDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
+              {bankDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1 z-50 w-64 max-h-72 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+                  {selectedBanks.size > 0 && (
+                    <button
+                      onClick={clearBankFilter}
+                      className="w-full px-3 py-2 text-left text-xs text-[#5B66E2] dark:text-[#8B96F2] hover:bg-muted/50 dark:hover:bg-muted border-b border-gray-200 dark:border-gray-700"
+                    >
+                      Clear selection
+                    </button>
+                  )}
+                  {allBanks.map((bank) => (
+                    <button
+                      key={bank}
+                      onClick={() => toggleBank(bank)}
+                      className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
+                    >
+                      <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${
+                        selectedBanks.has(bank)
+                          ? "bg-[#5B66E2] border-[#5B66E2]"
+                          : "border-gray-300 dark:border-gray-600"
+                      }`}>
+                        {selectedBanks.has(bank) && <Check className="h-3 w-3 text-white" />}
+                      </span>
+                      {bank}
                     </button>
                   ))}
                 </div>
@@ -768,7 +843,7 @@ export default function DashboardPage() {
         {/* Pie chart */}
         <Card className="p-4 bg-card border-border">
           <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
-            By Touchpoint
+            Transaction per Touchpoints
           </h3>
           {apiLoading ? (
             <Skeleton className="h-[280px] w-full rounded-xl" />
