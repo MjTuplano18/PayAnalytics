@@ -13,7 +13,8 @@
 7. How People Use It
 8. Security & Safety
 9. Future Plans
-10. Conclusion
+10. How to Launch via Vercel and Render
+11. Conclusion
 
 ---
 
@@ -1069,7 +1070,15 @@ Hacker sees: password    Hacker sees: gibberish ✓
 
 ---
 
-## 10. CONCLUSION
+## 10. HOW TO LAUNCH VIA VERCEL AND RENDER
+**Step by Step process:**
+- Open and run Backend via Render: https://dashboard.render.com/web/srv-d6rqbashg0os73epvv6g
+- Open and run Frontend via Vercel: https://vercel.com/cmcsxs-projects/pay-analytics-updated
+- View launched website via: https://pay-analytics-updated.vercel.app/
+
+---
+
+## 11. CONCLUSION
 
 ### What You Need to Know
 
