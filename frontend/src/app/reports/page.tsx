@@ -6,6 +6,8 @@ import {
   FileSpreadsheet,
   BarChart3,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +31,8 @@ export default function ReportsPage() {
   const { token } = useAuth();
   const [exporting, setExporting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [bankPage, setBankPage] = useState(1);
+  const bankRowsPerPage = 15;
 
   const reportData = useMemo(() => {
     if (!data) return [];
@@ -183,7 +187,9 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {data.bankAnalytics.map((b) => (
+                {data.bankAnalytics
+                  .slice((bankPage - 1) * bankRowsPerPage, bankPage * bankRowsPerPage)
+                  .map((b) => (
                   <tr key={b.bank} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{b.bank}</td>
                     <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.paymentCount)}</td>
@@ -193,6 +199,31 @@ export default function ReportsPage() {
                 ))}
               </tbody>
             </table>
+            {data.bankAnalytics.length > bankRowsPerPage && (
+              <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Page {bankPage} of {Math.ceil(data.bankAnalytics.length / bankRowsPerPage)}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={bankPage <= 1}
+                    onClick={() => setBankPage((p) => p - 1)}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={bankPage >= Math.ceil(data.bankAnalytics.length / bankRowsPerPage)}
+                    onClick={() => setBankPage((p) => p + 1)}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

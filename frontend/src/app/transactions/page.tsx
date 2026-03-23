@@ -37,6 +37,8 @@ export default function TransactionsPage() {
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const rowsPerPage = 25;
+  const [reportBankPage, setReportBankPage] = useState(1);
+  const reportBankRowsPerPage = 15;
 
   // Debounce search: wait 400 ms after the user stops typing before firing API call
   useEffect(() => {
@@ -1010,7 +1012,9 @@ export default function TransactionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {data.bankAnalytics.map((b) => (
+                {data.bankAnalytics
+                  .slice((reportBankPage - 1) * reportBankRowsPerPage, reportBankPage * reportBankRowsPerPage)
+                  .map((b) => (
                   <tr key={b.bank} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{b.bank}</td>
                     <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.paymentCount)}</td>
@@ -1020,6 +1024,46 @@ export default function TransactionsPage() {
                 ))}
               </tbody>
             </table>
+            {data.bankAnalytics.length > reportBankRowsPerPage && (() => {
+              const totalBankPages = Math.ceil(data.bankAnalytics.length / reportBankRowsPerPage);
+              return (
+                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Page {reportBankPage} of {totalBankPages}
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setReportBankPage(1)}
+                      disabled={reportBankPage <= 1}
+                      className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      First
+                    </button>
+                    <button
+                      onClick={() => setReportBankPage((p) => Math.max(1, p - 1))}
+                      disabled={reportBankPage <= 1}
+                      className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Prev
+                    </button>
+                    <button
+                      onClick={() => setReportBankPage((p) => Math.min(totalBankPages, p + 1))}
+                      disabled={reportBankPage >= totalBankPages}
+                      className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                    <button
+                      onClick={() => setReportBankPage(totalBankPages)}
+                      disabled={reportBankPage >= totalBankPages}
+                      className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Last
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>

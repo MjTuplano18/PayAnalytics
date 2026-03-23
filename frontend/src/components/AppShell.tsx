@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -20,51 +20,73 @@ import { useUploadEvents } from "@/lib/useUploadEvents";
 function SessionRestorer() {
   const { token } = useAuth();
   const { sessionId, setSessionId, data, setData, setFileName } = useData();
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!sessionId || !token || data) return; // nothing to do
 
-    getUpload(token, sessionId).then((detail) => {
-      const payments = detail.records.map((r) => ({
-        bank: r.bank,
-        paymentDate: r.payment_date ?? "",
-        paymentAmount: r.payment_amount,
-        account: r.account,
-        touchpoint: r.touchpoint ?? "",
-        environment: r.environment,
-      }));
+    let cancelled = false;
 
-      const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
-      const tpMap = new Map<string, { count: number; totalAmount: number }>();
-      let totalAmount = 0;
-      const allAccounts = new Set<string>();
+    const restore = (attempt: number) => {
+      getUpload(token, sessionId).then((detail) => {
+        if (cancelled) return;
+        const payments = detail.records.map((r) => ({
+          bank: r.bank,
+          paymentDate: r.payment_date ?? "",
+          paymentAmount: r.payment_amount,
+          account: r.account,
+          touchpoint: r.touchpoint ?? "",
+          environment: r.environment,
+        }));
 
-      for (const p of payments) {
-        totalAmount += p.paymentAmount;
-        allAccounts.add(p.account);
-        if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
-        const b = bankMap.get(p.bank)!;
-        b.totalAmount += p.paymentAmount; b.paymentCount++; b.accounts.add(p.account);
-        if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
-        const t = tpMap.get(p.touchpoint)!;
-        t.count++; t.totalAmount += p.paymentAmount;
-      }
+        const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
+        const tpMap = new Map<string, { count: number; totalAmount: number }>();
+        let totalAmount = 0;
+        const allAccounts = new Set<string>();
 
-      const bankAnalytics = Array.from(bankMap.entries())
-        .map(([bank, d]) => ({ bank, accountCount: d.accounts.size, totalAmount: d.totalAmount, debtorSum: 0, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount }))
-        .sort((a, b) => b.totalAmount - a.totalAmount);
+        for (const p of payments) {
+          totalAmount += p.paymentAmount;
+          allAccounts.add(p.account);
+          if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
+          const b = bankMap.get(p.bank)!;
+          b.totalAmount += p.paymentAmount; b.paymentCount++; b.accounts.add(p.account);
+          if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
+          const t = tpMap.get(p.touchpoint)!;
+          t.count++; t.totalAmount += p.paymentAmount;
+        }
 
-      const touchpointAnalytics = Array.from(tpMap.entries())
-        .map(([tp, d]) => ({ touchpoint: tp, count: d.count, totalAmount: d.totalAmount, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0 }))
-        .sort((a, b) => b.count - a.count);
+        const bankAnalytics = Array.from(bankMap.entries())
+          .map(([bank, d]) => ({ bank, accountCount: d.accounts.size, totalAmount: d.totalAmount, debtorSum: 0, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount }))
+          .sort((a, b) => b.totalAmount - a.totalAmount);
 
-      const parsed: ParsedData = { payments, bankAnalytics, touchpointAnalytics, totalAccounts: allAccounts.size, totalAmount, totalPayments: payments.length, raw: [] };
-      setData(parsed);
-      setFileName(detail.file_name);
-    }).catch(() => {
-      // Session no longer valid — clear the stale id
-      setSessionId(null);
-    });
+        const touchpointAnalytics = Array.from(tpMap.entries())
+          .map(([tp, d]) => ({ touchpoint: tp, count: d.count, totalAmount: d.totalAmount, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0 }))
+          .sort((a, b) => b.count - a.count);
+
+        const parsed: ParsedData = { payments, bankAnalytics, touchpointAnalytics, totalAccounts: allAccounts.size, totalAmount, totalPayments: payments.length, raw: [] };
+        setData(parsed);
+        setFileName(detail.file_name);
+      }).catch((err: unknown) => {
+        if (cancelled) return;
+        // Only clear sessionId on 404 (session actually deleted on server)
+        const is404 = err instanceof Error && err.message.includes("404");
+        if (is404) {
+          setSessionId(null);
+          return;
+        }
+        // Retry up to 3 times with increasing delay for transient errors (401 during token refresh, network issues)
+        if (attempt < 3) {
+          retryRef.current = setTimeout(() => restore(attempt + 1), 1500 * (attempt + 1));
+        }
+      });
+    };
+
+    restore(0);
+
+    return () => {
+      cancelled = true;
+      if (retryRef.current) clearTimeout(retryRef.current);
+    };
   }, [sessionId, token, data]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;

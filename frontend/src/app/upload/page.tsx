@@ -39,7 +39,7 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const { setData, setRawData, setFileName, sessionId, setSessionId } = useData();
+  const { data, setData, rawData, setRawData, fileName, setFileName, sessionId, setSessionId } = useData();
   const { token } = useAuth();
   const queryClient = useQueryClient();
 
@@ -66,6 +66,27 @@ export default function UploadPage() {
   const [allDates, setAllDates] = useState(true);
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+
+  // Current data removal state
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const handleRemoveCurrentData = async () => {
+    setRemoving(true);
+    try {
+      // Only clear front-end state — keep the upload session in the backend/history
+      setData(null);
+      setRawData([]);
+      setFileName("");
+      setSessionId(null);
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      toast.success("Current data removed");
+    } finally {
+      setRemoving(false);
+      setConfirmRemove(false);
+    }
+  };
 
   // Extract unique sorted dates from pending data
   const availableDates = useMemo(() => {
@@ -535,6 +556,59 @@ export default function UploadPage() {
               className="hidden"
             />
           </Card>
+
+          {/* Current Data Info Box */}
+          {(data || sessionId) && (
+            <div className="p-6 rounded-lg bg-card border border-border animate-fade-in-up" style={{ animationDelay: '0.17s' }}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <FileSpreadsheet className="w-5 h-5 text-[#5B66E2] flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-gray-900 dark:text-white font-semibold mb-1">
+                      Current Data
+                    </h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {fileName || "Uploaded data"} &middot; {fmt(data?.totalPayments ?? 0)} records &middot; ₱{fmt(data?.totalAmount ?? 0)}
+                    </p>
+                    {data && (
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                        {data.bankAnalytics.length} bank{data.bankAnalytics.length !== 1 ? "s" : ""} &middot; {data.touchpointAnalytics.length} touchpoint{data.touchpointAnalytics.length !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {confirmRemove ? (
+                    <>
+                      <span className="text-sm text-red-600 dark:text-red-400 mr-1">Remove all data?</span>
+                      <Button
+                        onClick={handleRemoveCurrentData}
+                        disabled={removing}
+                        className="h-9 px-4 text-sm bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        {removing ? "Removing..." : "Yes, Remove"}
+                      </Button>
+                      <Button
+                        onClick={() => setConfirmRemove(false)}
+                        disabled={removing}
+                        className="h-9 px-4 text-sm bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-gray-100"
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={() => setConfirmRemove(true)}
+                      className="flex items-center gap-2 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-500 hover:text-red-600 dark:hover:text-red-400 border border-gray-200 dark:border-gray-600 hover:border-red-300 dark:hover:border-red-600 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Remove Current Data
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Merge file list (shown when multiple files queued) */}
           {mergeFiles.length > 0 && (
