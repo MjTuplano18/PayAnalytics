@@ -15,12 +15,14 @@ import { exportToCSV, exportToExcel } from "@/utils/exportUtils";
 import { useData } from "@/context/DataContext";
 import type { ParsedData, PaymentRecord } from "@/types/data";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
+import { useQueryClient } from "@tanstack/react-query";
 
 const ROWS_PER_PAGE = 25;
 
 export default function Page() {
   const { data, setData, rawData, setRawData, fileName, sessionId } = useData();
   const { token } = useAuth();
+  const queryClient = useQueryClient();
   const [rows, setRows] = useState<SheetRow[]>([]);
   // SheetRow type and default empty row
   type SheetRow = PaymentRecord & { id?: string | null };
@@ -252,6 +254,10 @@ export default function Page() {
               } catch {
                 // best-effort audit, ignore errors
               }
+              queryClient.invalidateQueries({ queryKey: ["transactions"] });
+              queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+              queryClient.invalidateQueries({ queryKey: ["uploads"] });
+              queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
             } catch {
               // ignore
             }
@@ -276,6 +282,10 @@ export default function Page() {
               snapshot_data: snapshot,
             }).catch(() => {});
           }
+          queryClient.invalidateQueries({ queryKey: ["transactions"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["uploads"] });
+          queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
         }
       } catch {}
 
@@ -378,6 +388,10 @@ export default function Page() {
               setRows((prev) => prev.filter((_, idx) => !selectedRows.has(idx)));
               clearSelection();
               toast.success("Selected rows deleted.");
+              queryClient.invalidateQueries({ queryKey: ["transactions"] });
+              queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+              queryClient.invalidateQueries({ queryKey: ["uploads"] });
+              queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
               return;
             }
 
@@ -385,6 +399,10 @@ export default function Page() {
             setRows((prev) => prev.filter((_, idx) => !selectedRows.has(idx)));
             clearSelection();
             toast.success("Selected rows deleted.");
+            queryClient.invalidateQueries({ queryKey: ["transactions"] });
+            queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+            queryClient.invalidateQueries({ queryKey: ["uploads"] });
+            queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
             try {
               if (token) {
                 createAuditLog(token, {
@@ -448,6 +466,10 @@ export default function Page() {
             });
           } catch {}
           toast.success("Row added and persisted.");
+          queryClient.invalidateQueries({ queryKey: ["transactions"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["uploads"] });
+          queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
         } catch {
           toast.success("Row added (local).");
           try {
@@ -461,6 +483,10 @@ export default function Page() {
               }).catch(() => {});
             }
           } catch {}
+          queryClient.invalidateQueries({ queryKey: ["transactions"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["uploads"] });
+          queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
         }
       })();
     } else {
@@ -476,6 +502,10 @@ export default function Page() {
           }).catch(() => {});
         }
       } catch {}
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["uploads"] });
+      queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
     }
   };
 
