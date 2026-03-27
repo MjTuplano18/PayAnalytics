@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { Download, Search, Plus, Pencil, Trash2, ChevronDown, X, Check, AlertTriangle, FileSpreadsheet, BarChart3 } from "lucide-react";
+import { Download, Search, Plus, Pencil, Trash2, ChevronDown, X, Check, AlertTriangle, FileSpreadsheet } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { useDashboard, useTransactions, queryKeys } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { exportToExcel, exportToCSV } from "@/utils/exportUtils";
-import type { PaymentRecord, ParsedData, DataRow } from "@/types/data";
+import type { PaymentRecord, ParsedData } from "@/types/data";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
@@ -26,7 +26,6 @@ export default function TransactionsPage() {
   const { data, setData, rawData, sessionId, setSessionId, globalSearchQuery, setGlobalSearchQuery } = useData();
   const { token } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"transactions" | "reports">("transactions");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -38,8 +37,6 @@ export default function TransactionsPage() {
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const rowsPerPage = 25;
-  const [reportBankPage, setReportBankPage] = useState(1);
-  const reportBankRowsPerPage = 15;
 
   // Debounce search: wait 400 ms after the user stops typing before firing API call
   useEffect(() => {
@@ -267,10 +264,6 @@ export default function TransactionsPage() {
   const [massDeleteTo, setMassDeleteTo] = useState("");
   const [massDeleteConfirmStep, setMassDeleteConfirmStep] = useState(false);
   const [massDeleting, setMassDeleting] = useState(false);
-
-  // Reports tab state
-  const [reportExporting, setReportExporting] = useState(false);
-  const [reportExportOpen, setReportExportOpen] = useState(false);
 
   const recalcParsedData = useCallback((payments: PaymentRecord[]): ParsedData => {
     const bankMap = new Map<string, { count: Set<string>; amount: number; paymentCount: number }>();
@@ -536,65 +529,6 @@ export default function TransactionsPage() {
     setMassDeleting(false);
   };
 
-  // ── Reports tab helpers ──
-  const reportData = useMemo(() => {
-    if (!data) return [];
-    return data.payments.map((p) => ({
-      Bank: p.bank,
-      "Payment Date": p.paymentDate,
-      "Payment Amount": p.paymentAmount,
-      Account: p.account,
-      Touchpoint: p.touchpoint,
-    }));
-  }, [data]);
-
-  const fetchAllForExport = async () => {
-    if (!token || !sessionId) return reportData;
-    const first = await getTransactions(token, sessionId, { page: 1, page_size: 1 });
-    if (first.total === 0) return [];
-    const all = await getTransactions(token, sessionId, { page: 1, page_size: first.total });
-    return all.items.map((r) => ({
-      Bank: r.bank,
-      "Payment Date": r.payment_date ?? "",
-      "Payment Amount": r.payment_amount,
-      Account: r.account,
-      Touchpoint: r.touchpoint ?? "",
-    }));
-  };
-
-  const handleReportExport = async (format: "excel" | "csv") => {
-    setReportExporting(true);
-    try {
-      let exportData: DataRow[];
-      if (sessionId && token) {
-        toast.info("Fetching all records from server...");
-        exportData = await fetchAllForExport();
-      } else {
-        exportData = reportData.length > 0 ? reportData : rawData;
-      }
-      if (exportData.length === 0) {
-        toast.error("No data to export");
-        return;
-      }
-      const fileName = `payanalytics_report_${new Date().toISOString().split("T")[0]}`;
-      if (format === "excel") {
-        await exportToExcel(exportData, fileName);
-        toast.success(`Exported ${fmt(exportData.length)} records to Excel`);
-      } else {
-        exportToCSV(exportData, fileName);
-        toast.success(`Exported ${fmt(exportData.length)} records to CSV`);
-      }
-    } catch {
-      toast.error("Export failed");
-    } finally {
-      setReportExporting(false);
-    }
-  };
-
-  const reportTotalRecords = sessionId ? (data?.totalPayments ?? 0) : reportData.length;
-  const reportTotalAmount = data?.totalAmount ?? 0;
-  const reportBankCount = data?.bankAnalytics.length ?? 0;
-
   // Map display row index back to global index in data.payments
   const getGlobalIndex = (rowIdx: number): number => {
     if (!data) return -1;
@@ -627,24 +561,6 @@ export default function TransactionsPage() {
 
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
-      {/* Tabs */}
-      <div className="flex gap-0 border-b border-gray-200 dark:border-gray-700 mb-6">
-        {(["transactions", "reports"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-5 py-3 text-sm font-medium transition-colors -mb-px ${
-              activeTab === tab
-                ? "border-b-2 border-[#5B66E2] text-[#5B66E2] bg-[#5B66E2]/5"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}
-          >
-            {tab === "transactions" ? "Transactions" : "Reports"}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === "transactions" ? (
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
           <div>
@@ -892,137 +808,6 @@ export default function TransactionsPage() {
           </div>
         </div>
       </div>
-      ) : (
-      /* ── Reports Tab ── */
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
-              Reports
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Generate and export payment reports
-            </p>
-          </div>
-          <Popover open={reportExportOpen} onOpenChange={setReportExportOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                disabled={reportExporting}
-                className="bg-[#4a55d1] hover:bg-[#4048c0] text-white gap-2"
-              >
-                <Download className="w-4 h-4" />
-                {reportExporting ? "Exporting..." : "Export"}
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-48 p-1">
-              <button
-                onClick={() => { setReportExportOpen(false); handleReportExport("excel"); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                Export as XLSX
-              </button>
-              <button
-                onClick={() => { setReportExportOpen(false); handleReportExport("csv"); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
-              >
-                <Download className="w-4 h-4" />
-                Export as CSV
-              </button>
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Summary stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 animate-fade-in-up">
-          <div className="p-5 rounded-lg bg-card border border-border">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Records</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmt(reportTotalRecords)}</p>
-          </div>
-          <div className="p-5 rounded-lg bg-card border border-border">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Amount</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">₱{fmt(reportTotalAmount)}</p>
-          </div>
-          <div className="p-5 rounded-lg bg-card border border-border">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Banks</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmt(reportBankCount)}</p>
-          </div>
-        </div>
-
-        {/* Bank breakdown table */}
-        {data && data.bankAnalytics.length > 0 && (
-          <div className="rounded-lg border bg-card border-border overflow-x-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-[#5B66E2]" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Bank Summary</h3>
-            </div>
-            <table className="w-full min-w-[500px]">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bank</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Payments</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Amount</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">% of Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {data.bankAnalytics
-                  .slice((reportBankPage - 1) * reportBankRowsPerPage, reportBankPage * reportBankRowsPerPage)
-                  .map((b) => (
-                  <tr key={b.bank} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{b.bank}</td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.paymentCount)}</td>
-                    <td className="px-4 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400">₱{fmt(b.totalAmount)}</td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{b.percentage.toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {data.bankAnalytics.length > reportBankRowsPerPage && (() => {
-              const totalBankPages = Math.ceil(data.bankAnalytics.length / reportBankRowsPerPage);
-              return (
-                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    Page {reportBankPage} of {totalBankPages}
-                  </span>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setReportBankPage(1)}
-                      disabled={reportBankPage <= 1}
-                      className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      First
-                    </button>
-                    <button
-                      onClick={() => setReportBankPage((p) => Math.max(1, p - 1))}
-                      disabled={reportBankPage <= 1}
-                      className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Prev
-                    </button>
-                    <button
-                      onClick={() => setReportBankPage((p) => Math.min(totalBankPages, p + 1))}
-                      disabled={reportBankPage >= totalBankPages}
-                      className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Next
-                    </button>
-                    <button
-                      onClick={() => setReportBankPage(totalBankPages)}
-                      disabled={reportBankPage >= totalBankPages}
-                      className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Last
-                    </button>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-      </div>
-      )}
 
     </div>
   );

@@ -11,6 +11,8 @@ import {
   Table,
   Settings,
   LogOut,
+  BarChart3,
+  BookOpen,
 } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { useAuth } from "@/context/AuthContext";
@@ -19,6 +21,7 @@ const menuItems = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/transactions", icon: FileText, label: "Transactions" },
   { path: "/customers", icon: UserCheck, label: "Accounts" },
+  { path: "/reports", icon: BarChart3, label: "Reports" },
   { path: "/sheets", icon: Table, label: "Sheets" },
   { path: "/upload", icon: Upload, label: "Upload Data" },
 ];
