@@ -9,6 +9,8 @@ import { useAuth } from "@/context/AuthContext";
 import { DynamicChart } from "@/components/DynamicChart";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
 import { PeriodComparison } from "@/components/PeriodComparison";
+import { ComparisonMode } from "@/components/ComparisonMode";
+import { SegmentationTools, loadSegments, saveSegments, applySegment, type Segment } from "@/components/SegmentationTools";
 import { type DashboardSummary } from "@/lib/api";
 import { useDashboard } from "@/lib/queries";
 
@@ -49,6 +51,10 @@ export default function DashboardPage() {
   const [envBankPage, setEnvBankPage] = useState(1);
   const bankRowsPerPage = 15;
 
+  // Segmentation state
+  const [segments, setSegments] = useState<Segment[]>(() => loadSegments());
+  const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -68,8 +74,14 @@ export default function DashboardPage() {
 
   const payments = useMemo(() => {
     if (!data) return [];
-    return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
-  }, [data, dateRange, customRange]);
+    const dateFiltered = filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
+    // Apply active segment filter if set
+    if (activeSegmentId) {
+      const seg = segments.find((s) => s.id === activeSegmentId);
+      if (seg) return applySegment(dateFiltered, seg);
+    }
+    return dateFiltered;
+  }, [data, dateRange, customRange, activeSegmentId, segments]);
 
   // Monthly trend from in-memory data (API doesn't aggregate by month yet)
   const monthlyTrend = useMemo(() => {
@@ -925,6 +937,22 @@ export default function DashboardPage() {
                 );
               })}
         </div>
+      </div>
+
+      {/* Comparison + Segments */}
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 mb-6">
+        <ComparisonMode
+          payments={payments}
+          bankAnalytics={fa.bankAnalytics}
+          touchpointAnalytics={fa.touchpointAnalytics}
+        />
+        <SegmentationTools
+          payments={payments}
+          segments={segments}
+          onSegmentsChange={setSegments}
+          activeSegmentId={activeSegmentId}
+          onActiveSegmentChange={setActiveSegmentId}
+        />
       </div>
 
       {/* Row 3: Bank Analytics Table (full width) */}
