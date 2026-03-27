@@ -371,16 +371,6 @@ export default function Page() {
         setRows((prev) => prev.filter((_, idx) => !selectedRows.has(idx)));
         clearSelection();
         toast.success("Selected rows deleted.");
-        try {
-          await createAuditLog(token, {
-            action: "record_bulk_delete",
-            file_name: fileName || "uploaded",
-            session_id: sessionId,
-            record_count: deletedCount,
-            details: `Deleted ${deletedCount} rows from sheet`,
-            snapshot_data: JSON.stringify({ session_id: sessionId, deleted: deletedRows }),
-          });
-        } catch {}
         return;
       }
 
