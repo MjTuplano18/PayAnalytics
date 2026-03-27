@@ -59,6 +59,7 @@ export function TopBar() {
       { name: "Accounts", path: "/customers" },
       { name: "Reports", path: "/reports" },
       { name: "Upload Data", path: "/upload" },
+      { name: "Sheets", path: "/sheets" },
     ];
 
     pageMatches.forEach((page) => {

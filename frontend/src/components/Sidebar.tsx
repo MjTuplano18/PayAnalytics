@@ -8,6 +8,7 @@ import {
   FileText,
   UserCheck,
   Upload,
+  Table,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -18,6 +19,7 @@ const menuItems = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/transactions", icon: FileText, label: "Transactions" },
   { path: "/customers", icon: UserCheck, label: "Accounts" },
+  { path: "/sheets", icon: Table, label: "Sheets" },
   { path: "/upload", icon: Upload, label: "Upload Data" },
 ];
 

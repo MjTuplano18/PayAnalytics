@@ -10,6 +10,8 @@ from app.models.audit_log import AuditLog
 class AuditLogRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        import logging
+        self.logger = logging.getLogger(__name__)
 
     async def log_action(
         self,
@@ -33,7 +35,39 @@ class AuditLogRepository:
             snapshot_data=snapshot_data,
         )
         self.session.add(entry)
+        try:
+            # Log for observability during debugging
+            self.logger.info("Created audit entry: user=%s action=%s file=%s session=%s", user_id, action, file_name, session_id)
+        except Exception:
+            pass
         await self.session.flush()
+        # Enforce per-user retention cap: keep only the most recent 15 entries per user
+        try:
+            # Count how many entries this user currently has
+            total_result = await self.session.execute(
+                select(func.count()).select_from(AuditLog).where(AuditLog.user_id == user_id)
+            )
+            total = int(total_result.scalar_one() or 0)
+            # keep only the most recent N entries per user
+            keep = 10
+            if total > keep:
+                # delete the oldest (total - keep) entries for this user
+                n_to_delete = total - keep
+                # select the ids of the oldest rows
+                ids_result = await self.session.execute(
+                    select(AuditLog.id)
+                    .where(AuditLog.user_id == user_id)
+                    .order_by(AuditLog.created_at.asc())
+                    .limit(n_to_delete)
+                )
+                ids_to_delete = [row[0] for row in ids_result.all()]
+                if ids_to_delete:
+                    await self.session.execute(delete(AuditLog).where(AuditLog.id.in_(ids_to_delete)))
+                    await self.session.flush()
+        except Exception:
+            # Pruning should never block the main action — swallow errors and proceed
+            pass
+
         return entry
 
     async def get_entry(self, entry_id: str) -> AuditLog | None:

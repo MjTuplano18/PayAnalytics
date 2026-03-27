@@ -101,6 +101,8 @@ export default function TouchpointsDashboardPage() {
   const uniqueTouchpoints = filteredAnalytics.length;
   const topTouchpoint = filteredAnalytics[0]?.touchpoint ?? "—";
 
+  
+
   const noData = filteredAnalytics.length === 0 && !apiLoading;
 
   const metricCards = [

@@ -111,3 +111,17 @@ class UnifiedAuditLogEntry(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class BulkDeleteRequest(BaseModel):
+    ids: list[str]
+
+
+class AuditLogCreate(BaseModel):
+    action: str
+    file_name: str
+    session_id: str | None = None
+    record_count: int = 0
+    total_amount: float = 0.0
+    details: str | None = None
+    snapshot_data: str | None = None

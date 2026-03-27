@@ -28,6 +28,7 @@ interface DynamicChartProps {
   xAxisKey: string;
   height?: number;
   title?: string;
+  
 }
 
 /** Brand palette — 12 slots for multi-series / pie charts */
@@ -225,7 +226,7 @@ export function DynamicChart({
             <Legend />
             <Line
               type="monotone"
-              dataKey={dataKey}
+                dataKey={dataKey}
               stroke={BRAND}
               strokeWidth={2}
               dot={{ fill: BRAND, r: 4 }}
@@ -269,6 +270,7 @@ export function DynamicChart({
             />
           </AreaChart>
         );
+      
       case "pie": {
         const isNarrow = containerWidth < 380;
         return (

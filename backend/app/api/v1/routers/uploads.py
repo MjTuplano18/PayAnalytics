@@ -13,6 +13,7 @@ from app.repositories.audit_log_repository import AuditLogRepository
 from app.repositories.upload_repository import UploadRepository
 from app.schemas.upload import (
     AuditLogEntry,
+    BulkDeleteRequest,
     DashboardSummary,
     PaginatedTransactions,
     PaymentRecordIn,
@@ -21,6 +22,7 @@ from app.schemas.upload import (
     UploadSessionCreate,
     UploadSessionDetail,
     UploadSessionOut,
+    AuditLogCreate,
 )
 
 router = APIRouter(prefix="/uploads", tags=["Uploads"])
@@ -256,6 +258,32 @@ async def create_transaction(
     )
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
+    # Log creation of a single record
+    audit_repo = AuditLogRepository(db)
+    session_obj = await repo.get_session(session_id, current_user.id)
+    # compact snapshot of the created record
+    snapshot = json.dumps({
+        "session_id": session_id,
+        "record": {
+            "id": getattr(record, "id", None),
+            "bank": record.bank,
+            "account": record.account,
+            "touchpoint": record.touchpoint,
+            "payment_date": record.payment_date,
+            "payment_amount": record.payment_amount,
+            "environment": record.environment,
+        },
+    })
+
+    await audit_repo.log_action(
+        user_id=current_user.id,
+        action="record_create",
+        file_name=session_obj.file_name if session_obj else "unknown",
+        session_id=session_id,
+        record_count=1,
+        details=f"Created record {getattr(record, 'id', 'unknown')}",
+        snapshot_data=snapshot,
+    )
     return PaymentRecordOut.model_validate(record)
 
 
@@ -269,6 +297,22 @@ async def update_transaction(
 ) -> PaymentRecordOut:
     """Update a single transaction record."""
     repo = UploadRepository(db)
+    # Capture existing record snapshot (compact) before update
+    session_obj = await repo.get_session(session_id, current_user.id)
+    before_rec = None
+    if session_obj and getattr(session_obj, "records", None):
+        before = next((r for r in session_obj.records if r.id == record_id), None)
+        if before:
+            before_rec = {
+                "id": before.id,
+                "bank": before.bank,
+                "account": before.account,
+                "touchpoint": before.touchpoint,
+                "payment_date": before.payment_date,
+                "payment_amount": before.payment_amount,
+                "environment": before.environment,
+            }
+
     updated = await repo.update_transaction(
         record_id=record_id,
         session_id=session_id,
@@ -282,7 +326,87 @@ async def update_transaction(
     )
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found.")
+    # Log update of a single record
+    audit_repo = AuditLogRepository(db)
+    # compact snapshot containing before and after
+    after_rec = {
+        "id": getattr(updated, "id", None),
+        "bank": updated.bank,
+        "account": updated.account,
+        "touchpoint": updated.touchpoint,
+        "payment_date": updated.payment_date,
+        "payment_amount": updated.payment_amount,
+        "environment": updated.environment,
+    }
+    snapshot = json.dumps({"session_id": session_id, "before": before_rec, "after": after_rec})
+    session_obj = await repo.get_session(session_id, current_user.id)
+    await audit_repo.log_action(
+        user_id=current_user.id,
+        action="record_update",
+        file_name=session_obj.file_name if session_obj else "unknown",
+        session_id=session_id,
+        record_count=1,
+        details=f"Updated record {record_id}",
+        snapshot_data=snapshot,
+    )
     return PaymentRecordOut.model_validate(updated)
+
+
+@router.post("/{session_id}/transactions/bulk-delete", status_code=status.HTTP_200_OK)
+async def bulk_delete_transactions(
+    session_id: str,
+    payload: BulkDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Delete multiple transaction records by ID in a single operation."""
+    if not payload.ids:
+        return {"deleted": 0}
+    repo = UploadRepository(db)
+    audit_repo = AuditLogRepository(db)
+
+    # Get session info for audit log
+    session_obj = await repo.get_session(session_id, current_user.id)
+    if not session_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+
+    # Build snapshot of records that will be deleted
+    ids_set = set(payload.ids)
+    matching_records = [r for r in session_obj.records if r.id in ids_set]
+    snapshot = None
+    if matching_records:
+        snapshot = json.dumps({
+            "session_id": session_id,
+            "records": [
+                {
+                    "id": r.id,
+                    "bank": r.bank,
+                    "account": r.account,
+                    "touchpoint": r.touchpoint,
+                    "payment_date": r.payment_date,
+                    "payment_amount": r.payment_amount,
+                    "environment": r.environment,
+                }
+                for r in matching_records
+            ],
+        })
+
+    count = await repo.delete_transactions_bulk(
+        session_id=session_id, user_id=current_user.id, record_ids=payload.ids
+    )
+
+    if count > 0:
+        await audit_repo.log_action(
+            user_id=current_user.id,
+            action="record_bulk_delete",
+            file_name=session_obj.file_name,
+            session_id=session_id,
+            record_count=count,
+            details=f"Bulk deleted {count} records by ID",
+            snapshot_data=snapshot,
+        )
+
+    return {"deleted": count}
 
 
 @router.delete("/{session_id}/transactions/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -389,6 +513,27 @@ async def delete_transactions_by_date_range(
         )
 
     return {"deleted": count}
+
+
+@router.post("/audit", status_code=status.HTTP_201_CREATED)
+async def create_audit_entry(
+    payload: AuditLogCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Create a custom audit log entry for the current user."""
+    audit_repo = AuditLogRepository(db)
+    await audit_repo.log_action(
+        user_id=current_user.id,
+        action=payload.action,
+        file_name=payload.file_name,
+        session_id=payload.session_id,
+        record_count=payload.record_count,
+        total_amount=payload.total_amount,
+        details=payload.details,
+        snapshot_data=payload.snapshot_data,
+    )
+    return {"detail": "logged"}
 
 
 @router.get("/admin/audit-log", response_model=list[AuditLogEntry])

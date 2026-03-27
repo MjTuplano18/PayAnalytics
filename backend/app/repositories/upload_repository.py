@@ -1,3 +1,4 @@
+import logging
 from sqlalchemy import delete as sql_delete, func, select, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -9,6 +10,7 @@ from app.schemas.upload import PaymentRecordIn
 class UploadRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self.logger = logging.getLogger(__name__)
 
     async def create_session(
         self,
@@ -123,6 +125,11 @@ class UploadRepository:
         record = result.scalar_one_or_none()
         if not record:
             return False
+        # Log deletion intent for observability
+        try:
+            self.logger.info("Deleting PaymentRecord id=%s session=%s user=%s", record_id, session_id, user_id)
+        except Exception:
+            pass
         await self.session.delete(record)
         # Update session totals
         await self._update_session_totals(session_id)
@@ -192,6 +199,34 @@ class UploadRepository:
         await self._update_session_totals(session_id)
         await self.session.commit()
         return record
+
+    async def delete_transactions_bulk(
+        self, session_id: str, user_id: str, record_ids: list[str]
+    ) -> int:
+        """Delete multiple payment records by ID in a single operation. Returns count deleted."""
+        if not record_ids:
+            return 0
+        # Verify session ownership
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return 0
+        # Bulk delete in a single statement
+        result = await self.session.execute(
+            sql_delete(PaymentRecord).where(
+                PaymentRecord.session_id == session_id,
+                PaymentRecord.id.in_(record_ids),
+            )
+        )
+        count = result.rowcount
+        if count > 0:
+            await self._update_session_totals(session_id)
+            await self.session.commit()
+        return count
 
     async def delete_transactions_by_date_range(
         self, session_id: str, user_id: str, date_from: str, date_to: str

@@ -71,17 +71,18 @@ export function DateFilter({ value, onChange, customRange }: DateFilterProps) {
 
   return (
     <div className="flex items-center gap-2">
-      <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400 hidden sm:block" />
-
-      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger asChild>
           <div>
             <Select value={value} onValueChange={handleSelectChange}>
-              <SelectTrigger className="h-8 w-auto min-w-[140px] gap-1.5 rounded-full border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 focus:ring-[#5B66E2] data-[state=open]:ring-[#5B66E2]">
-                <SelectValue>
-                  {displayLabel ?? options.find((o) => o.value === value)?.label}
-                </SelectValue>
-              </SelectTrigger>
+                <SelectTrigger className="h-8 w-auto min-w-[140px] gap-1.5 rounded-full border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 focus:ring-[#5B66E2] data-[state=open]:ring-[#5B66E2]">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <SelectValue>
+                      {displayLabel ?? options.find((o) => o.value === value)?.label}
+                    </SelectValue>
+                  </div>
+                </SelectTrigger>
               <SelectContent>
                 {options.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value} className="text-xs">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { Download, Search, Plus, Pencil, Trash2, ChevronDown, X, Check, AlertTriangle, FileSpreadsheet, BarChart3 } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
@@ -692,6 +693,14 @@ export default function TransactionsPage() {
           </div>
         )}
 
+        <div className="mb-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/8 px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+          Transactions is view-only now. For create, edit, and delete actions, use
+          <Link href="/sheets" className="ml-1 font-semibold text-[#4a55d1] hover:underline">
+            Sheets
+          </Link>
+          .
+        </div>
+
 
 
         {/* Filters */}
@@ -787,89 +796,35 @@ export default function TransactionsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Environment
                 </th>
-                {(data || usingApi) && (
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">
-                    Actions
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {displayRows.map((p, i) => {
-                const globalIdx = data ? getGlobalIndex(i) : (currentPage - 1) * rowsPerPage + i;
-                const isEditing = editingIndex === globalIdx;
                 return (
                 <tr
                   key={`${currentPage}-${i}`}
                   className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200"
                 >
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                    {isEditing ? <Input value={editForm.bank} onChange={(e) => setEditForm({ ...editForm, bank: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" /> : p.bank}
+                    {p.bank}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    {isEditing ? <Input type="date" value={editForm.paymentDate} onChange={(e) => setEditForm({ ...editForm, paymentDate: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" /> : p.paymentDate}
+                    {p.paymentDate}
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-medium text-green-600 dark:text-green-400 whitespace-nowrap">
-                    {isEditing ? <Input type="number" step="0.01" value={editForm.paymentAmount} onChange={(e) => setEditForm({ ...editForm, paymentAmount: e.target.value })} className="h-7 text-xs text-right bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" /> : `₱${fmt(p.paymentAmount)}`}
+                    {`₱${fmt(p.paymentAmount)}`}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                    {isEditing ? <Input value={editForm.account} onChange={(e) => setEditForm({ ...editForm, account: e.target.value })} className="h-7 text-xs bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600" /> : p.account}
+                    {p.account}
                   </td>
                   <td className="px-4 py-3 text-sm whitespace-nowrap">
-                    {isEditing ? (
-                      <select
-                        value={editForm.touchpoint}
-                        onChange={(e) => setEditForm({ ...editForm, touchpoint: e.target.value })}
-                        className="h-7 text-xs rounded-md border bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-2"
-                      >
-                        <option value="">Select touchpoint...</option>
-                        {displayTouchpoints.map((tp) => (
-                          <option key={tp} value={tp}>{tp}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#5B66E2]/10 text-[#5B66E2] dark:bg-[#5B66E2]/20 dark:text-[#8B96F2]">
-                        {p.touchpoint}
-                      </span>
-                    )}
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#5B66E2]/10 text-[#5B66E2] dark:bg-[#5B66E2]/20 dark:text-[#8B96F2]">
+                      {p.touchpoint}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    {isEditing ? (
-                      <select
-                        value={editForm.environment}
-                        onChange={(e) => setEditForm({ ...editForm, environment: e.target.value })}
-                        className="h-7 text-xs rounded-md border bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-2"
-                      >
-                        <option value="">Select environment...</option>
-                        {displayEnvironments.map((env) => (
-                          <option key={env} value={env}>{env}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      p.environment || "—"
-                    )}
+                    {p.environment || "—"}
                   </td>
-                  {(data || usingApi) && (
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
-                      {isEditing ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={handleSaveEdit} className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400" title="Save">
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button onClick={handleCancelEdit} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500" title="Cancel">
-                            <X className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => { handleDelete(globalIdx, i); setEditingIndex(null); setEditingDisplayIndex(null); }} className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 dark:text-red-400" title="Delete">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => handleStartEdit(globalIdx, i, p)} className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400" title="Edit">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  )}
                 </tr>
                 );
               })}
@@ -1069,172 +1024,6 @@ export default function TransactionsPage() {
       </div>
       )}
 
-      {/* Floating Action Buttons */}
-      {data && activeTab === "transactions" && (
-        <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 flex flex-col items-center gap-3">
-          <button
-            onClick={() => setShowMassDelete(true)}
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center"
-            title="Mass Delete"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center"
-            title="Add Transaction"
-          >
-            <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-        </div>
-      )}
-
-      {/* Add Transaction Popup */}
-      {showAddForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px]" onClick={() => setShowAddForm(false)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">New Transaction</h3>
-              <button onClick={() => setShowAddForm(false)} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label className="text-sm text-gray-700 dark:text-gray-300">Bank</Label>
-                <Input value={addForm.bank} onChange={(e) => setAddForm({ ...addForm, bank: e.target.value })} placeholder="e.g. ENBD" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm text-gray-700 dark:text-gray-300">Payment Date</Label>
-                <Input type="date" value={addForm.paymentDate} onChange={(e) => setAddForm({ ...addForm, paymentDate: e.target.value })} placeholder="YYYY-MM-DD" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 uppercase placeholder:normal-case" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm text-gray-700 dark:text-gray-300">Amount</Label>
-                <Input type="number" step="0.01" min="0" value={addForm.paymentAmount} onChange={(e) => setAddForm({ ...addForm, paymentAmount: e.target.value })} placeholder="0.00" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm text-gray-700 dark:text-gray-300">Account</Label>
-                <Input value={addForm.account} onChange={(e) => setAddForm({ ...addForm, account: e.target.value })} placeholder="e.g. 1234567" className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm text-gray-700 dark:text-gray-300">Touchpoint</Label>
-                <select
-                  value={addForm.touchpoint}
-                  onChange={(e) => setAddForm({ ...addForm, touchpoint: e.target.value })}
-                  className="w-full h-10 rounded-md border bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-3 text-sm"
-                >
-                  <option value="">Select touchpoint...</option>
-                  {displayTouchpoints.map((tp) => (
-                    <option key={tp} value={tp}>{tp}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm text-gray-700 dark:text-gray-300">Environment</Label>
-                <select
-                  value={addForm.environment}
-                  onChange={(e) => setAddForm({ ...addForm, environment: e.target.value })}
-                  className="w-full h-10 rounded-md border bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 px-3 text-sm"
-                >
-                  <option value="">Select environment...</option>
-                  {displayEnvironments.map((env) => (
-                    <option key={env} value={env}>{env}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <Button onClick={handleAddTransaction} className="flex-1 bg-[#4a55d1] hover:bg-[#4048c0] text-white">Add Transaction</Button>
-              <Button variant="outline" onClick={() => setShowAddForm(false)} className="flex-1">Cancel</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mass Delete Modal */}
-      {showMassDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px]" onClick={closeMassDelete}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-                  <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Mass Delete</h3>
-              </div>
-              <button onClick={closeMassDelete} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {!massDeleteConfirmStep ? (
-              <>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                  Select a date range to delete all matching transactions.
-                </p>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-sm text-gray-700 dark:text-gray-300">From</Label>
-                    <Input
-                      type="date"
-                      value={massDeleteFrom}
-                      onChange={(e) => setMassDeleteFrom(e.target.value)}
-                      className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-sm text-gray-700 dark:text-gray-300">To</Label>
-                    <Input
-                      type="date"
-                      value={massDeleteTo}
-                      onChange={(e) => setMassDeleteTo(e.target.value)}
-                      className="bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-                </div>
-
-                {massDeleteFrom && massDeleteTo && (
-                  <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {massDeleteCount > 0
-                      ? <><span className="text-red-500">{fmt(massDeleteCount)}</span> transaction{massDeleteCount !== 1 ? "s" : ""} will be deleted.</>
-                      : "No transactions found in this range."}
-                  </p>
-                )}
-
-                <div className="flex gap-3 mt-5">
-                  <Button
-                    onClick={() => setMassDeleteConfirmStep(true)}
-                    disabled={!massDeleteFrom || !massDeleteTo || massDeleteCount === 0}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-40"
-                  >
-                    Delete
-                  </Button>
-                  <Button variant="outline" onClick={closeMassDelete} className="flex-1">Cancel</Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 mb-4">
-                  <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                  <p className="text-sm text-red-700 dark:text-red-300">
-                    Are you sure? This will permanently delete <strong>{fmt(massDeleteCount)}</strong> transaction{massDeleteCount !== 1 ? "s" : ""} from {massDeleteFrom} to {massDeleteTo}. This action cannot be undone.
-                  </p>
-                </div>
-                <div className="flex gap-3">
-                  <Button
-                    onClick={handleMassDelete}
-                    disabled={massDeleting}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
-                  >
-                    {massDeleting ? "Deleting…" : "Yes, Delete"}
-                  </Button>
-                  <Button variant="outline" onClick={() => setMassDeleteConfirmStep(false)} disabled={massDeleting} className="flex-1">Go Back</Button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

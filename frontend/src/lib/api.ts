@@ -10,7 +10,9 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const { token, headers, ...rest } = options;
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -18,6 +20,9 @@ export async function apiFetch<T>(
     },
     ...rest,
   });
+  } catch (err) {
+    throw new Error(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
@@ -285,7 +290,33 @@ export function deleteTransaction(token: string, sessionId: string, recordId: st
   return apiFetch<void>(`/api/v1/uploads/${sessionId}/transactions/${recordId}`, { method: "DELETE", token });
 }
 
+export function bulkDeleteTransactions(token: string, sessionId: string, ids: string[]) {
+  return apiFetch<{ deleted: number }>(`/api/v1/uploads/${sessionId}/transactions/bulk-delete`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export function deleteTransactionsByDateRange(token: string, sessionId: string, dateFrom: string, dateTo: string) {
   const qs = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
   return apiFetch<{ deleted: number }>(`/api/v1/uploads/${sessionId}/transactions?${qs}`, { method: "DELETE", token });
+}
+
+export interface AuditLogCreate {
+  action: string;
+  file_name: string;
+  session_id?: string | null;
+  record_count?: number;
+  total_amount?: number;
+  details?: string | null;
+  snapshot_data?: string | null;
+}
+
+export function createAuditLog(token: string, payload: AuditLogCreate) {
+  return apiFetch<{ detail: string }>("/api/v1/uploads/audit", {
+    method: "POST",
+    token,
+    body: JSON.stringify(payload),
+  });
 }

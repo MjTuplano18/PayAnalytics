@@ -137,6 +137,7 @@ PayAnalytics is a web application for analyzing payment transaction data. You ca
 
 ### Starting the Server (Backend)
 
+
 ```bash
 cd backend
 python -m venv venv
@@ -145,6 +146,12 @@ pip install -r requirements.txt
 alembic upgrade head               # Set up the database
 python create_admin.py             # Create an admin account
 python -m uvicorn main:app --reload --port 8000
+```
+
+Or, from the project root:
+
+```bash
+python -m uvicorn backend.main:app --reload --port 8000
 ```
 
 ### Starting the Website (Frontend)
