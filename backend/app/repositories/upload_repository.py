@@ -225,7 +225,7 @@ class UploadRepository:
         count = result.rowcount
         if count > 0:
             await self._update_session_totals(session_id)
-            await self.session.commit()
+            await self.session.flush()
         return count
 
     async def delete_transactions_by_date_range(

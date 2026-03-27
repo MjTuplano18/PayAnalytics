@@ -9,13 +9,11 @@ import {
   listUsers,
   createUser,
   changePassword,
-  undoAuditEntry,
   type UserResponse,
   type UnifiedAuditLogEntry,
 } from "@/lib/api";
 import { useUnifiedAuditLog } from "@/lib/queries";
-import { useQueryClient } from "@tanstack/react-query";
-import { Eye, EyeOff, Plus, Shield, Lock, ClipboardList, Undo2, Users } from "lucide-react";
+import { Eye, EyeOff, Plus, Shield, Lock, ClipboardList, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -428,26 +426,12 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   file_delete: { label: "Delete File", color: "bg-red-500/10 text-red-400" },
   record_delete: { label: "Delete Record", color: "bg-orange-500/10 text-orange-400" },
   record_bulk_delete: { label: "Bulk Delete", color: "bg-red-500/10 text-red-400" },
+  record_create: { label: "Create Record", color: "bg-blue-500/10 text-blue-400" },
+  record_update: { label: "Edit Record", color: "bg-yellow-500/10 text-yellow-400" },
 };
 
 function UnifiedAuditLogSection({ token }: { token: string | null }) {
   const { data: entries = [], isLoading: loading } = useUnifiedAuditLog(token);
-  const queryClient = useQueryClient();
-  const [undoing, setUndoing] = useState<string | null>(null);
-
-  const handleUndo = async (entryId: string) => {
-    if (!token) return;
-    setUndoing(entryId);
-    try {
-      const res = await undoAuditEntry(token, entryId);
-      toast.success(res.detail);
-      queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
-    } catch {
-      toast.error("Failed to undo action");
-    } finally {
-      setUndoing(null);
-    }
-  };
 
   return (
     <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
@@ -456,7 +440,7 @@ function UnifiedAuditLogSection({ token }: { token: string | null }) {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Audit Log</h2>
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        Your recent file activity (uploads, deletions, record changes — up to 10).
+        Your recent file activity (uploads, deletions, record changes).
       </p>
 
       {loading ? (
@@ -469,7 +453,7 @@ function UnifiedAuditLogSection({ token }: { token: string | null }) {
         <p className="text-sm text-gray-500 dark:text-gray-400">No activity recorded yet.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700">
                 <th className="pb-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Action</th>
@@ -477,23 +461,17 @@ function UnifiedAuditLogSection({ token }: { token: string | null }) {
                 <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Records</th>
                 <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
                 <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">When</th>
-                <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {entries.map((e) => {
                 const actionInfo = ACTION_LABELS[e.action] ?? { label: e.action, color: "bg-gray-500/10 text-gray-400" };
                 return (
-                  <tr key={e.id} className={`hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors ${e.is_undone ? "opacity-50" : ""}`}>
+                  <tr key={e.id} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors">
                     <td className="py-2.5">
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${actionInfo.color}`}>
                         {actionInfo.label}
                       </span>
-                      {e.is_undone && (
-                        <span className="ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-gray-500/10 text-gray-400">
-                          Undone
-                        </span>
-                      )}
                     </td>
                     <td className="py-2.5 text-gray-700 dark:text-gray-300 max-w-[180px] truncate" title={e.file_name}>
                       {e.file_name}
@@ -503,19 +481,6 @@ function UnifiedAuditLogSection({ token }: { token: string | null }) {
                       {e.total_amount > 0 ? `₱${fmt(e.total_amount)}` : "—"}
                     </td>
                     <td className="py-2.5 text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">{fmtDate(e.created_at)}</td>
-                    <td className="py-2.5 text-right">
-                      {e.can_undo && !e.is_undone ? (
-                        <button
-                          onClick={() => handleUndo(e.id)}
-                          disabled={undoing === e.id}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-500/10 disabled:opacity-50 transition-colors"
-                          title="Undo this action"
-                        >
-                          <Undo2 className="h-3.5 w-3.5" />
-                          {undoing === e.id ? "Undoing\u2026" : "Undo"}
-                        </button>
-                      ) : null}
-                    </td>
                   </tr>
                 );
               })}

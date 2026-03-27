@@ -14,8 +14,8 @@ from app.repositories.audit_log_repository import AuditLogRepository
 
 logger = logging.getLogger(__name__)
 
-AUDIT_LOG_CLEANUP_INTERVAL = 20 * 60  # 20 minutes in seconds
-AUDIT_LOG_MAX_AGE_MINUTES = 20
+AUDIT_LOG_CLEANUP_INTERVAL = 24 * 60 * 60  # 24 hours in seconds
+AUDIT_LOG_MAX_AGE_MINUTES = 24 * 60  # 24 hours
 
 
 async def _audit_log_cleanup_loop() -> None:

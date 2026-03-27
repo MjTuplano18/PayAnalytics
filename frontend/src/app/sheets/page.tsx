@@ -348,49 +348,59 @@ export default function Page() {
       return;
     }
     const deletedCount = selectedRows.size;
-    // capture deleted rows for a compact snapshot
-    const deletedIndices = Array.from(selectedRows).sort((a, b) => a - b);
-    const deletedRows = deletedIndices.map((idx) => rows[idx]).map((r) => ({ bank: r.bank, account: r.account, paymentDate: r.paymentDate, paymentAmount: r.paymentAmount, touchpoint: r.touchpoint, environment: r.environment, id: r.id }));
 
-    // If session is persisted, attempt to delete on backend using bulk endpoint
-    (async () => {
-      if (token && sessionId) {
-        const ids = deletedRows.map((r) => r.id).filter(Boolean) as string[];
-        if (ids.length > 0) {
-          try {
-            const result = await bulkDeleteTransactions(token, sessionId!, ids);
-            if (result.deleted < ids.length) {
-              toast.error(`${ids.length - result.deleted} record deletions failed on the server.`);
+    toast(`Delete ${deletedCount} row${deletedCount > 1 ? "s" : ""}?`, {
+      description: "This action cannot be undone.",
+      position: "bottom-right",
+      action: {
+        label: "Delete",
+        onClick: () => {
+          // capture deleted rows for a compact snapshot
+          const deletedIndices = Array.from(selectedRows).sort((a, b) => a - b);
+          const deletedRows = deletedIndices.map((idx) => rows[idx]).map((r) => ({ bank: r.bank, account: r.account, paymentDate: r.paymentDate, paymentAmount: r.paymentAmount, touchpoint: r.touchpoint, environment: r.environment, id: r.id }));
+
+          // If session is persisted, attempt to delete on backend using bulk endpoint
+          (async () => {
+            if (token && sessionId) {
+              const ids = deletedRows.map((r) => r.id).filter(Boolean) as string[];
+              if (ids.length > 0) {
+                try {
+                  const result = await bulkDeleteTransactions(token, sessionId!, ids);
+                  if (result.deleted < ids.length) {
+                    toast.error(`${ids.length - result.deleted} record deletions failed on the server.`);
+                  }
+                } catch (err) {
+                  toast.error("Bulk delete failed on server: " + (err instanceof Error ? err.message : String(err)));
+                }
+              }
+
+              // Remove rows locally instead of refetching all data
+              setRows((prev) => prev.filter((_, idx) => !selectedRows.has(idx)));
+              clearSelection();
+              toast.success("Selected rows deleted.");
+              return;
             }
-          } catch (err) {
-            toast.error("Bulk delete failed on server: " + (err instanceof Error ? err.message : String(err)));
-          }
-        }
 
-        // Remove rows locally instead of refetching all data
-        setRows((prev) => prev.filter((_, idx) => !selectedRows.has(idx)));
-        clearSelection();
-        toast.success("Selected rows deleted.");
-        return;
-      }
-
-      // Fallback: local-only delete and audit log
-      setRows((prev) => prev.filter((_, idx) => !selectedRows.has(idx)));
-      clearSelection();
-      toast.success("Selected rows deleted.");
-      try {
-        if (token) {
-          createAuditLog(token, {
-            action: "record_bulk_delete",
-            file_name: fileName || "local",
-            session_id: sessionId ?? null,
-            record_count: deletedCount,
-            details: `Deleted ${deletedCount} rows from sheet`,
-            snapshot_data: JSON.stringify({ session_id: sessionId ?? null, deleted: deletedRows }),
-          }).catch(() => {});
-        }
-      } catch {}
-    })();
+            // Fallback: local-only delete and audit log
+            setRows((prev) => prev.filter((_, idx) => !selectedRows.has(idx)));
+            clearSelection();
+            toast.success("Selected rows deleted.");
+            try {
+              if (token) {
+                createAuditLog(token, {
+                  action: "record_bulk_delete",
+                  file_name: fileName || "local",
+                  session_id: sessionId ?? null,
+                  record_count: deletedCount,
+                  details: `Deleted ${deletedCount} rows from sheet`,
+                  snapshot_data: JSON.stringify({ session_id: sessionId ?? null, deleted: deletedRows }),
+                }).catch(() => {});
+              }
+            } catch {}
+          })();
+        },
+      },
+    });
   };
 
   const addRow = () => {
