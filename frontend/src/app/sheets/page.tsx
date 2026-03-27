@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { createAuditLog, getUpload, createTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions } from "@/lib/api";
 // Utility to get unique values from an array
@@ -50,12 +50,55 @@ export default function Page() {
   }
 
   // Extract unique options for filters
-  const touchpointOptions = useMemo(() => getUnique(rows.map((r) => r.touchpoint).filter(Boolean)), [rows]);
-  const environmentOptions = useMemo(() => getUnique(rows.map((r) => r.environment).filter(Boolean)), [rows]);
-  const bankOptions = useMemo(() => getUnique(rows.map((r) => r.bank).filter(Boolean)), [rows]);
+  const touchpointOptions = useMemo(() => getUnique(rows.map((r) => r.touchpoint).filter((v): v is string => Boolean(v))), [rows]);
+  const environmentOptions = useMemo(() => getUnique(rows.map((r) => r.environment).filter((v): v is string => Boolean(v))), [rows]);
+  const bankOptions = useMemo(() => getUnique(rows.map((r) => r.bank).filter((v): v is string => Boolean(v))), [rows]);
+
+  const recalcParsedData = useCallback((payments: PaymentRecord[]): ParsedData => {
+    const bankMap = new Map<string, { count: Set<string>; amount: number; paymentCount: number }>();
+    const tpMap = new Map<string, { count: number; amount: number }>();
+    const accountSet = new Set<string>();
+    let totalAmount = 0;
+    for (const p of payments) {
+      totalAmount += p.paymentAmount;
+      accountSet.add(p.account);
+      const bk = bankMap.get(p.bank) ?? { count: new Set<string>(), amount: 0, paymentCount: 0 };
+      bk.count.add(p.account);
+      bk.amount += p.paymentAmount;
+      bk.paymentCount += 1;
+      bankMap.set(p.bank, bk);
+      const tp = tpMap.get(p.touchpoint) ?? { count: 0, amount: 0 };
+      tp.count += 1;
+      tp.amount += p.paymentAmount;
+      tpMap.set(p.touchpoint, tp);
+    }
+    const bankAnalytics = Array.from(bankMap.entries()).map(([bank, v]) => ({
+      bank,
+      accountCount: v.count.size,
+      totalAmount: v.amount,
+      debtorSum: 0,
+      percentage: totalAmount > 0 ? (v.amount / totalAmount) * 100 : 0,
+      paymentCount: v.paymentCount,
+    }));
+    const touchpointAnalytics = Array.from(tpMap.entries()).map(([touchpoint, v]) => ({
+      touchpoint,
+      count: v.count,
+      totalAmount: v.amount,
+      percentage: totalAmount > 0 ? (v.amount / totalAmount) * 100 : 0,
+    }));
+    return {
+      payments,
+      bankAnalytics,
+      touchpointAnalytics,
+      totalAccounts: accountSet.size,
+      totalAmount,
+      totalPayments: payments.length,
+      raw: payments.map((p) => ({ Bank: p.bank, "Payment Date": p.paymentDate, "Payment Amount": p.paymentAmount, Account: p.account, Touchpoint: p.touchpoint })),
+    };
+  }, []);
 
   // Column order for the spreadsheet view
-  const columnOrder = [
+  const columnOrder: { key: keyof SheetRow; label: string; inputType?: string }[] = [
     { key: "bank", label: "Bank" },
     { key: "paymentDate", label: "Payment Date" },
     { key: "paymentAmount", label: "Payment Amount", inputType: "number" },
@@ -142,10 +185,9 @@ export default function Page() {
         if (!dateFilteredSet.has(row)) return false;
 
         // multi-select filters
-        if (selectedEnvironments.size > 0 && !selectedEnvironments.has(row.environment)) return false;
         if (selectedEnvironments.size > 0 && !selectedEnvironments.has(row.environment ?? "")) return false;
         if (selectedBanks.size > 0 && !selectedBanks.has(row.bank)) return false;
-        if (selectedTouchpoints.size > 0 && !selectedTouchpoints.has(row.touchpoint)) return false;
+        if (selectedTouchpoints.size > 0 && !selectedTouchpoints.has(row.touchpoint ?? "")) return false;
 
         return true;
       });
@@ -474,8 +516,8 @@ export default function Page() {
       paymentDate: r.paymentDate,
       paymentAmount: Number.isFinite(r.paymentAmount) ? r.paymentAmount : 0,
       account: r.account.trim(),
-      touchpoint: r.touchpoint.trim(),
-      environment: r.environment.trim(),
+      touchpoint: (r.touchpoint ?? "").trim(),
+      environment: (r.environment ?? "").trim(),
     }));
 
     const parsed = recalcParsedData(payments);
@@ -497,8 +539,8 @@ export default function Page() {
             environment: r.environment ?? "",
           }));
           setRows(records);
-          setData(recalcParsedData(records.map((r) => ({ bank: r.bank, paymentDate: r.paymentDate, paymentAmount: r.paymentAmount, account: r.account, touchpoint: r.touchpoint, environment: r.environment }))));
-          setRawData(records.map((r) => ({ Bank: r.bank, "Payment Date": r.paymentDate, "Payment Amount": r.paymentAmount, Account: r.account, Touchpoint: r.touchpoint, Environment: r.environment })));
+          setData(recalcParsedData(records.map((r) => ({ bank: r.bank, paymentDate: r.paymentDate, paymentAmount: r.paymentAmount, account: r.account, touchpoint: r.touchpoint, environment: r.environment ?? "" }))));
+          setRawData(records.map((r) => ({ Bank: r.bank, "Payment Date": r.paymentDate, "Payment Amount": r.paymentAmount, Account: r.account, Touchpoint: r.touchpoint, Environment: r.environment ?? "" })));
           toast.success("Sheet saved and persisted.");
         } catch {
           toast.success("Sheet saved locally.");
@@ -582,7 +624,7 @@ export default function Page() {
                       toast.error("Export failed");
                     }
                   })() : (async () => {
-                    const rowsData = rows.map((r) => ({ Bank: r.bank, "Payment Date": r.paymentDate, "Payment Amount": r.paymentAmount, Account: r.account, Touchpoint: r.touchpoint, Environment: r.environment }));
+                    const rowsData = rows.map((r) => ({ Bank: r.bank, "Payment Date": r.paymentDate, "Payment Amount": r.paymentAmount, Account: r.account, Touchpoint: r.touchpoint ?? "", Environment: r.environment ?? "" }));
                     await exportToExcel(rowsData, `sheet_export_${new Date().toISOString().split("T")[0]}`);
                     toast.success(`Exported ${rowsData.length} records to Excel`);
                   })();
@@ -603,7 +645,7 @@ export default function Page() {
                       toast.error("Export failed");
                     }
                   } else {
-                    const rowsData = rows.map((r) => ({ Bank: r.bank, "Payment Date": r.paymentDate, "Payment Amount": r.paymentAmount, Account: r.account, Touchpoint: r.touchpoint, Environment: r.environment }));
+                    const rowsData = rows.map((r) => ({ Bank: r.bank, "Payment Date": r.paymentDate, "Payment Amount": r.paymentAmount, Account: r.account, Touchpoint: r.touchpoint ?? "", Environment: r.environment ?? "" }));
                     exportToCSV(rowsData, `sheet_export_${new Date().toISOString().split("T")[0]}`);
                     toast.success(`Exported ${rowsData.length} records to CSV`);
                   }
