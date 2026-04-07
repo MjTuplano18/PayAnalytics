@@ -139,10 +139,18 @@ export function ReportBuilder({
   const [sections, setSections] = useState<ReportSection[]>([]);
   const [reportName, setReportName] = useState("Untitled Report");
   const [isPreview, setIsPreview] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+
+  // Listen for afterprint to restore chart heights
+  useEffect(() => {
+    const onAfterPrint = () => setIsPrinting(false);
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => window.removeEventListener("afterprint", onAfterPrint);
+  }, []);
 
   useEffect(() => {
     setTemplates(loadTemplates());
@@ -264,7 +272,8 @@ export function ReportBuilder({
             type="text"
             value={reportName}
             onChange={(e) => setReportName(e.target.value)}
-            className="text-lg font-semibold bg-transparent border-b border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-[#5B66E2] outline-none text-gray-900 dark:text-white px-1"
+            placeholder="Enter report name…"
+            className="text-lg font-semibold bg-transparent border border-dashed border-gray-300 dark:border-gray-600 hover:border-[#5B66E2] focus:border-[#5B66E2] focus:border-solid outline-none text-gray-900 dark:text-white px-2 py-1 rounded-md transition-colors"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -318,6 +327,13 @@ export function ReportBuilder({
 
       {/* Report Canvas */}
       <div id="report-canvas" className="space-y-4 print:space-y-6">
+        {/* Print-only header: bold title + date */}
+        <div className="report-print-header hidden print:block mb-4">
+          <h1>{reportName}</h1>
+          <p className="report-print-date">
+            {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+          </p>
+        </div>
         {sections.map((section, idx) => (
           <div
             key={section.id}
@@ -401,21 +417,13 @@ export function ReportBuilder({
               </div>
             )}
 
-            {!isPreview && editingSectionId === section.id && section.type === "text" && (
-              <div className="px-4 py-2 bg-muted border-b border-gray-200 dark:border-gray-700 print:hidden">
-                <textarea
-                  value={section.config.content || ""}
-                  onChange={(e) => updateSection(section.id, { config: { ...section.config, content: e.target.value } })}
-                  className="w-full h-20 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-y"
-                  placeholder="Enter text content..."
-                />
-              </div>
-            )}
+            {/* Text editor is now inline in the content area below */}
 
             {/* Section Content */}
             <div className="p-4">
+              {/* Screen preview title */}
               {isPreview && section.title && section.type !== "divider" && (
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">{section.title}</h3>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3 print:hidden">{section.title}</h3>
               )}
 
               {section.type === "kpi_cards" && (
@@ -439,7 +447,7 @@ export function ReportBuilder({
                   type={section.config.chartType || "bar"}
                   dataKey={section.config.dataKey || "totalAmount"}
                   xAxisKey={section.config.xAxisKey || "bank"}
-                  height={300}
+                  height={400}
                 />
               )}
 
@@ -472,7 +480,19 @@ export function ReportBuilder({
 
               {section.type === "text" && (
                 <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{section.config.content}</p>
+                  {isPreview ? (
+                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{section.config.content}</p>
+                  ) : (
+                    <div
+                      contentEditable
+                      suppressContentEditableWarning
+                      onBlur={(e) => updateSection(section.id, { config: { ...section.config, content: e.currentTarget.textContent || "" } })}
+                      className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap min-h-[2rem] outline-none cursor-text border-b border-dashed border-gray-300 dark:border-gray-600 focus:border-[#5B66E2] transition-colors print:border-none"
+                      data-placeholder="Enter your text here..."
+                    >
+                      {section.config.content || "Enter your text here..."}
+                    </div>
+                  )}
                 </div>
               )}
 

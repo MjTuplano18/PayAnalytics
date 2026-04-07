@@ -183,7 +183,7 @@ export function SegmentationTools({ payments, segments, onSegmentsChange, active
   // Removed: no longer hide the entire component when data is empty
 
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden flex flex-col max-h-[260px]">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -197,7 +197,7 @@ export function SegmentationTools({ payments, segments, onSegmentsChange, active
       </div>
 
       {/* Segment list */}
-      <div className="divide-y divide-gray-100 dark:divide-gray-700">
+      <div className="divide-y divide-gray-100 dark:divide-gray-700 flex-1 overflow-y-auto min-h-0">
         {segments.map((seg) => {
           const isEditing = editing === seg.id && draft;
           const count = matchCounts[seg.id] ?? 0;

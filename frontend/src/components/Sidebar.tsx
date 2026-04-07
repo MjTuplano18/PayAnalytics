@@ -39,44 +39,11 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile bottom navigation bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t bg-white dark:bg-[rgba(7,13,18,0.95)] border-gray-200 dark:border-white/10 backdrop-blur-xl px-2 py-2 safe-bottom">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.path);
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={`flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors ${
-                active
-                  ? "text-[#5B66E2]"
-                  : "text-gray-500 dark:text-[#939393]"
-              }`}
-            >
-              <Icon className={`h-5 w-5 ${active ? "text-[#5B66E2]" : ""}`} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-        <Link
-          href="/settings"
-          className={`flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors ${
-            isActive("/settings")
-              ? "text-[#5B66E2]"
-              : "text-gray-500 dark:text-[#939393]"
-          }`}
-        >
-          <Settings className={`h-5 w-5 ${isActive("/settings") ? "text-[#5B66E2]" : ""}`} />
-          <span>Settings</span>
-        </Link>
-      </nav>
-
-      {/* Desktop sidebar — hidden on mobile */}
+      {/* Desktop sidebar */}
       <aside
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`fixed left-0 top-16 z-50 hidden md:flex h-[calc(100vh-4rem)] flex-col border-r bg-white dark:bg-[rgba(7,13,18,0.85)] border-gray-200 dark:border-white/10 backdrop-blur-xl transition-[width] duration-200 ease-out translate-x-0 ${
+        className={`fixed left-0 top-16 z-50 flex h-[calc(100vh-4rem)] flex-col border-r bg-white dark:bg-[rgba(7,13,18,0.85)] border-gray-200 dark:border-white/10 backdrop-blur-xl transition-[width] duration-200 ease-out translate-x-0 ${
           collapsed ? "w-20" : "w-64"
         }`}
       >

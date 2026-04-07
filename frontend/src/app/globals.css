@@ -219,3 +219,188 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(107, 114, 128, 0.5);
 }
+
+/* ── Print styles ─────────────────────────────────────────────────────────── */
+
+@media print {
+  /* Page margins */
+  @page {
+    margin: 1.5cm 1.5cm 2cm 1.5cm;
+    size: A4 portrait;
+  }
+
+  /* Hide sidebar, topbar, nav, and background decorations */
+  aside,
+  header,
+  nav,
+  .fixed.inset-0 {
+    display: none !important;
+  }
+
+  /* Print-friendly base styles */
+  html {
+    font-size: 16px !important;
+  }
+
+  body {
+    background: white !important;
+    color: #1a1a1a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Reset layout to full page width */
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  .relative.z-10 {
+    position: static !important;
+  }
+
+  /* ── Report print header ──────────────────────────────────────── */
+  .report-print-header {
+    display: block !important;
+    margin-bottom: 1.5rem;
+  }
+  .report-print-header h1 {
+    font-size: 22px !important;
+    font-weight: 800 !important;
+    color: #111 !important;
+    margin: 0 0 2px 0 !important;
+    line-height: 1.2 !important;
+  }
+  .report-print-header .report-print-date {
+    font-size: 12px !important;
+    color: #5B66E2 !important;
+    font-style: italic !important;
+    margin: 0 !important;
+  }
+
+  /* ── Report sections ──────────────────────────────────────────── */
+  #report-canvas > div {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Section titles in print */
+  #report-canvas .print-section-title {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #374151 !important;
+    background: #f3f4f6 !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 4px !important;
+    padding: 4px 10px !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* ── Tables ───────────────────────────────────────────────────── */
+  #report-canvas table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 10px !important;
+    break-inside: avoid;
+  }
+  #report-canvas thead {
+    background: #f9fafb !important;
+  }
+  #report-canvas th {
+    padding: 6px 10px !important;
+    text-align: left !important;
+    font-weight: 600 !important;
+    font-size: 9px !important;
+    text-transform: uppercase !important;
+    color: #6b7280 !important;
+    border-bottom: 2px solid #e5e7eb !important;
+  }
+  #report-canvas td {
+    padding: 5px 10px !important;
+    border-bottom: 1px solid #f0f0f0 !important;
+    color: #374151 !important;
+  }
+  #report-canvas .text-green-600,
+  #report-canvas .dark\:text-green-400 {
+    color: #059669 !important;
+  }
+
+  /* ── KPI cards ────────────────────────────────────────────────── */
+  #report-canvas .grid {
+    gap: 8px !important;
+  }
+  #report-canvas .grid > div {
+    border: 1px solid #e5e7eb !important;
+    border-radius: 6px !important;
+    padding: 10px !important;
+    background: #fafafa !important;
+  }
+
+  /* ── Charts ───────────────────────────────────────────────────── */
+  /* Chart containers: scale uniformly and prevent page splits */
+  .recharts-responsive-container,
+  .recharts-wrapper {
+    break-inside: avoid;
+    overflow: visible !important;
+  }
+  #report-canvas .recharts-responsive-container {
+    transform: scale(0.7) !important;
+    transform-origin: top left !important;
+    margin-bottom: -120px !important;
+  }
+  #report-canvas > div:has(.recharts-responsive-container) {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    overflow: visible !important;
+  }
+
+  /* ── Text blocks ──────────────────────────────────────────────── */
+  #report-canvas .prose p,
+  #report-canvas .whitespace-pre-wrap {
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+    color: #374151 !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+  }
+
+  /* ── General text overflow prevention ─────────────────────────── */
+  p, span, h1, h2, h3, h4, h5, h6, td, th, li {
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    max-width: 100% !important;
+  }
+
+  /* Tighten outer padding */
+  .px-4, .sm\:px-8 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .py-8 {
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+
+  /* Section spacing */
+  #report-canvas {
+    gap: 1rem !important;
+  }
+  #report-canvas > div + div {
+    margin-top: 0.75rem !important;
+  }
+
+  /* Page break avoidance for cards & charts */
+  [data-slot="card"],
+  table,
+  .recharts-responsive-container {
+    break-inside: avoid;
+  }
+}

@@ -940,7 +940,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Comparison + Segments */}
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 mb-6 items-start">
         <ComparisonMode
           payments={payments}
           bankAnalytics={fa.bankAnalytics}

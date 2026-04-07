@@ -32,7 +32,7 @@ function fmt(n: number): string {
 }
 
 export default function ReportsPage() {
-  const { data, rawData, sessionId } = useData();
+  const { data, rawData, sessionId, fileName } = useData();
   const { token } = useAuth();
   const [exporting, setExporting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -153,8 +153,17 @@ export default function ReportsPage() {
 
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
+      {/* Print-only header with filename — only for Export tab (Builder has its own) */}
+      {activeTab === "export" && (
+        <div className="hidden print:block mb-4 border-b border-gray-300 pb-3">
+          <h1 className="text-lg font-bold text-black">PayAnalytics — Financial Report</h1>
+          {fileName && <p className="text-sm text-gray-600 mt-1">{fileName}</p>}
+          <p className="text-xs text-gray-400 mt-0.5">{new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+        </div>
+      )}
+
       <div className="mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+        <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
           <div>
             <h1 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
               Reports
@@ -234,7 +243,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Tabs – same style as dashboard */}
-        <div className="flex gap-0 border-b border-gray-200 dark:border-gray-700 mb-6">
+        <div className="print:hidden flex gap-0 border-b border-gray-200 dark:border-gray-700 mb-6">
           {(["export", "builder"] as const).map((tab) => (
             <button
               key={tab}
@@ -308,7 +317,7 @@ export default function ReportsPage() {
               </tbody>
             </table>
             {data.bankAnalytics.length > bankRowsPerPage && (
-              <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="print:hidden flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   Page {bankPage} of {Math.ceil(data.bankAnalytics.length / bankRowsPerPage)}
                 </span>
