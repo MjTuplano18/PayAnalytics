@@ -99,6 +99,25 @@ export default function Page() {
     };
   }, []);
 
+  // Ref to prevent data→rows→data infinite loop when syncing edits
+  const skipNextDataEffect = useRef(false);
+
+  // Sync local rows back to data context so changes survive navigation
+  const syncToContext = useCallback((updatedRows: SheetRow[]) => {
+    const payments: PaymentRecord[] = updatedRows.map((r) => ({
+      bank: r.bank,
+      paymentDate: r.paymentDate,
+      paymentAmount: Number.isFinite(r.paymentAmount) ? r.paymentAmount : 0,
+      account: r.account,
+      touchpoint: r.touchpoint ?? "",
+      environment: r.environment ?? "",
+    }));
+    const parsed = recalcParsedData(payments);
+    skipNextDataEffect.current = true;
+    setData(parsed);
+    setRawData(parsed.raw);
+  }, [recalcParsedData, setData, setRawData]);
+
   // Column order for the spreadsheet view
   const columnOrder: { key: keyof SheetRow; label: string; inputType?: string }[] = [
     { key: "bank", label: "Bank" },
@@ -110,6 +129,10 @@ export default function Page() {
   ];
 
   useEffect(() => {
+    if (skipNextDataEffect.current) {
+      skipNextDataEffect.current = false;
+      return;
+    }
     if (!data?.payments) {
       setRows([]);
       return;
@@ -207,90 +230,84 @@ export default function Page() {
   }, [filteredRows, page]);
 
   const updateCell = (rowIndex: number, key: keyof SheetRow, value: string) => {
-    setRows((prev) => {
-      const next = [...prev];
-      const row = { ...next[rowIndex] };
-      const oldVal = String(row[key] ?? "");
-      const before = {
-        account: row.account,
-        bank: row.bank,
-        touchpoint: row.touchpoint,
-        paymentDate: row.paymentDate,
-        paymentAmount: row.paymentAmount,
-        environment: row.environment,
-      };
-      if (key === "paymentAmount") {
-        row.paymentAmount = Number.isFinite(Number(value)) ? Number(value) : 0;
-      } else {
-        row[key] = value;
-      }
-      next[rowIndex] = row;
+    const next = [...rows];
+    const row = { ...next[rowIndex] };
+    const oldVal = String(row[key] ?? "");
+    const before = {
+      account: row.account,
+      bank: row.bank,
+      touchpoint: row.touchpoint,
+      paymentDate: row.paymentDate,
+      paymentAmount: row.paymentAmount,
+      environment: row.environment,
+    };
+    if (key === "paymentAmount") {
+      row.paymentAmount = Number.isFinite(Number(value)) ? Number(value) : 0;
+    } else {
+      row[key] = value;
+    }
+    next[rowIndex] = row;
+    setRows(next);
+    syncToContext(next);
 
-      // Persist update to backend when possible
-      try {
-        const id = row.id;
-        if (token && sessionId && id) {
-          // perform update and also send an explicit audit entry
-          (async () => {
-            try {
-              const updated = await updateTransaction(token, sessionId, id, {
-                bank: row.bank,
-                account: row.account,
-                touchpoint: row.touchpoint || undefined,
-                payment_date: row.paymentDate || undefined,
-                payment_amount: row.paymentAmount || 0,
-                environment: row.environment || undefined,
-              });
-              try {
-                const snapshot = JSON.stringify({ session_id: sessionId, before, after: { bank: updated.bank, account: updated.account, touchpoint: updated.touchpoint, payment_date: updated.payment_date, payment_amount: updated.payment_amount, environment: updated.environment } });
-                await createAuditLog(token, {
-                  action: "record_update",
-                  file_name: fileName || "uploaded",
-                  session_id: sessionId,
-                  record_count: 1,
-                  details: `Updated record ${id}`,
-                  snapshot_data: snapshot,
-                });
-              } catch {
-                // best-effort audit, ignore errors
-              }
-              queryClient.invalidateQueries({ queryKey: ["transactions"] });
-              queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-              queryClient.invalidateQueries({ queryKey: ["uploads"] });
-              queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
-            } catch {
-              // ignore
-            }
-          })();
-        } else {
-          // Best-effort audit log for cell update (compact snapshot) when not persisted
-          if (token) {
-            const snapshot = JSON.stringify({
-              session_id: sessionId ?? null,
-              row_index: rowIndex,
-              account: before.account,
-              column: String(key),
-              old: oldVal,
-              new: value,
-            });
-            createAuditLog(token, {
+    // Persist update to backend when possible
+    const id = row.id;
+    if (token && sessionId && id) {
+      (async () => {
+        try {
+          const updated = await updateTransaction(token, sessionId, id, {
+            bank: row.bank,
+            account: row.account,
+            touchpoint: row.touchpoint || undefined,
+            payment_date: row.paymentDate || undefined,
+            payment_amount: row.paymentAmount || 0,
+            environment: row.environment || undefined,
+          });
+          try {
+            const snapshot = JSON.stringify({ session_id: sessionId, before, after: { bank: updated.bank, account: updated.account, touchpoint: updated.touchpoint, payment_date: updated.payment_date, payment_amount: updated.payment_amount, environment: updated.environment } });
+            await createAuditLog(token, {
               action: "record_update",
-              file_name: fileName || "local",
-              session_id: sessionId ?? null,
+              file_name: fileName || "uploaded",
+              session_id: sessionId,
               record_count: 1,
-              details: `Row ${rowIndex} updated column ${String(key)}`,
+              details: `Updated record ${id}`,
               snapshot_data: snapshot,
-            }).catch(() => {});
+            });
+          } catch {
+            // best-effort audit, ignore errors
           }
           queryClient.invalidateQueries({ queryKey: ["transactions"] });
           queryClient.invalidateQueries({ queryKey: ["dashboard"] });
           queryClient.invalidateQueries({ queryKey: ["uploads"] });
           queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
+        } catch {
+          // ignore
         }
-      } catch {}
-
-      return next;
-    });
+      })();
+    } else {
+      if (token) {
+        const snapshot = JSON.stringify({
+          session_id: sessionId ?? null,
+          row_index: rowIndex,
+          account: before.account,
+          column: String(key),
+          old: oldVal,
+          new: value,
+        });
+        createAuditLog(token, {
+          action: "record_update",
+          file_name: fileName || "local",
+          session_id: sessionId ?? null,
+          record_count: 1,
+          details: `Row ${rowIndex} updated column ${String(key)}`,
+          snapshot_data: snapshot,
+        }).catch(() => {});
+      }
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["uploads"] });
+      queryClient.invalidateQueries({ queryKey: ["unified-audit-log"] });
+    }
   };
 
   // Dropdown helpers
@@ -384,8 +401,10 @@ export default function Page() {
                 }
               }
 
-              // Remove rows locally instead of refetching all data
-              setRows((prev) => prev.filter((_, idx) => !selectedRows.has(idx)));
+              // Remove rows locally and sync to context
+              const newRows = rows.filter((_, idx) => !selectedRows.has(idx));
+              setRows(newRows);
+              syncToContext(newRows);
               clearSelection();
               toast.success("Selected rows deleted.");
               queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -395,8 +414,10 @@ export default function Page() {
               return;
             }
 
-            // Fallback: local-only delete and audit log
-            setRows((prev) => prev.filter((_, idx) => !selectedRows.has(idx)));
+            // Fallback: local-only delete and sync to context
+            const newRows = rows.filter((_, idx) => !selectedRows.has(idx));
+            setRows(newRows);
+            syncToContext(newRows);
             clearSelection();
             toast.success("Selected rows deleted.");
             queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -424,7 +445,9 @@ export default function Page() {
   const addRow = () => {
     // Insert optimistically at the top of the rows array so it appears on the current page
     const tempRow: SheetRow = { ...emptyRow, id: null };
-    setRows((prev) => [tempRow, ...prev]);
+    const newRows = [tempRow, ...rows];
+    setRows(newRows);
+    syncToContext(newRows);
 
     if (token && sessionId) {
       // persist in background and update the row with the server-assigned id
@@ -551,6 +574,7 @@ export default function Page() {
     }));
 
     const parsed = recalcParsedData(payments);
+    skipNextDataEffect.current = true;
     setData(parsed);
     setRawData(parsed.raw);
 
@@ -569,6 +593,7 @@ export default function Page() {
             environment: r.environment ?? "",
           }));
           setRows(records);
+          skipNextDataEffect.current = true;
           setData(recalcParsedData(records.map((r) => ({ bank: r.bank, paymentDate: r.paymentDate, paymentAmount: r.paymentAmount, account: r.account, touchpoint: r.touchpoint, environment: r.environment ?? "" }))));
           setRawData(records.map((r) => ({ Bank: r.bank, "Payment Date": r.paymentDate, "Payment Amount": r.paymentAmount, Account: r.account, Touchpoint: r.touchpoint, Environment: r.environment ?? "" })));
           toast.success("Sheet saved and persisted.");

@@ -24,14 +24,14 @@ interface MetricRow {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtCurrency(n: number): string {
-  if (Math.abs(n) >= 1_000_000_000) return `₱${(n / 1_000_000_000).toFixed(1)}B`;
-  if (Math.abs(n) >= 1_000_000) return `₱${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000) return `₱${(n / 1_000).toFixed(1)}K`;
-  return `₱${Math.round(n).toLocaleString()}`;
+  if (Math.abs(n) >= 1_000_000_000) return `₱${(n / 1_000_000_000).toFixed(2)}B`;
+  if (Math.abs(n) >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(n) >= 1_000) return `₱${(n / 1_000).toFixed(2)}K`;
+  return `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmt(n: number): string {
-  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatVal(n: number, format: "currency" | "number"): string {
@@ -210,7 +210,7 @@ export function ComparisonMode({ payments, bankAnalytics, touchpointAnalytics }:
                     ) : (
                       <span className={`flex items-center justify-end gap-1 text-xs font-medium ${isUp ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>
                         {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                        {isUp ? "+" : ""}{pct.toFixed(1)}%
+                        {isUp ? "+" : ""}{pct.toFixed(2)}%
                       </span>
                     )}
                   </td>

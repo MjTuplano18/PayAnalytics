@@ -27,13 +27,13 @@ function computeMetrics(records: PaymentRecord[]): PeriodMetrics {
 }
 
 function fmt(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return `₱${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000) return `₱${(n / 1_000).toFixed(1)}K`;
-  return `₱${Math.round(n).toLocaleString()}`;
+  if (Math.abs(n) >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(n) >= 1_000) return `₱${(n / 1_000).toFixed(2)}K`;
+  return `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmtPlain(n: number): string {
-  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function ChangeIndicator({ current, previous }: { current: number; previous: number; isAmount?: boolean }) {
@@ -69,7 +69,7 @@ function ChangeIndicator({ current, previous }: { current: number; previous: num
     >
       {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
       {isPositive ? "+" : ""}
-      {change.toFixed(1)}%
+      {change.toFixed(2)}%
     </span>
   );
 }

@@ -16,7 +16,11 @@ import { useDashboard } from "@/lib/queries";
 
 /** Format number with commas */
 function fmt(n: number): string {
-  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtInt(n: number): string {
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 export default function DashboardPage() {
@@ -54,6 +58,8 @@ export default function DashboardPage() {
   // Segmentation state
   const [segments, setSegments] = useState<Segment[]>(() => loadSegments());
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
+  const [segmentsOpen, setSegmentsOpen] = useState(false);
+  const segmentsRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -66,6 +72,9 @@ export default function DashboardPage() {
       }
       if (bankDropdownRef.current && !bankDropdownRef.current.contains(e.target as Node)) {
         setBankDropdownOpen(false);
+      }
+      if (segmentsRef.current && !segmentsRef.current.contains(e.target as Node)) {
+        setSegmentsOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -289,17 +298,21 @@ export default function DashboardPage() {
     return touchpointAnalytics.filter((t) => selectedTouchpoints.has(t.touchpoint));
   }, [touchpointAnalytics, selectedTouchpoints]);
 
-  const tpTotalTransactions = filteredTpAnalytics.reduce((s, t) => s + t.count, 0);
-  const tpTotalAmount = filteredTpAnalytics.reduce((s, t) => s + t.totalAmount, 0);
+  const tpTotalTransactions = (apiSummary && !isFiltered && selectedEnvironments.size === 0 && selectedTouchpoints.size === 0)
+    ? apiSummary.total_payments
+    : filteredTpAnalytics.reduce((s, t) => s + t.count, 0);
+  const tpTotalAmount = (apiSummary && !isFiltered && selectedEnvironments.size === 0 && selectedTouchpoints.size === 0)
+    ? apiSummary.total_amount
+    : filteredTpAnalytics.reduce((s, t) => s + t.totalAmount, 0);
   const tpUniqueTouchpoints = filteredTpAnalytics.length;
   const tpTopTouchpoint = filteredTpAnalytics[0]?.touchpoint ?? "—";
   const tpNoData = filteredTpAnalytics.length === 0 && !apiLoading;
 
   const tpMetricCards = [
-    { label: "Total Transactions", value: fmt(tpTotalTransactions), icon: Hash, iconBg: "bg-[#5B66E2]" },
-    { label: "Total Amount", value: `₱${fmt(tpTotalAmount)}`, icon: DollarSign, iconBg: "bg-[#4a55d1]" },
-    { label: "Unique Touchpoints", value: fmt(tpUniqueTouchpoints), icon: Waypoints, iconBg: "bg-[#5B66E2]" },
-    { label: "Top Touchpoint", value: tpTopTouchpoint, icon: BarChart3, iconBg: "bg-[#4048c0]" },
+    { label: "Total Transactions", value: fmtInt(tpTotalTransactions), icon: Hash, iconBg: "bg-[#5B66E2]", info: "Total number of transactions" },
+    { label: "Total Amount", value: `₱${fmt(tpTotalAmount)}`, icon: DollarSign, iconBg: "bg-[#4a55d1]", info: "Sum of all payment amounts" },
+    { label: "Unique Touchpoints", value: fmtInt(tpUniqueTouchpoints), icon: Waypoints, iconBg: "bg-[#5B66E2]", info: "Distinct touchpoint channels" },
+    { label: "Top Touchpoint", value: tpTopTouchpoint, icon: BarChart3, iconBg: "bg-[#4048c0]", info: "Highest transaction volume" },
   ];
 
   // ── Environments tab data (bank-only, filtered by environment and bank) ──
@@ -339,17 +352,17 @@ export default function DashboardPage() {
   const envNoData = envFilteredPayments.length === 0 && !apiLoading;
 
   const envMetricCards = [
-    { label: "Total Payment Amount", value: `₱${fmt(envBankAnalytics.totalAmount)}`, icon: DollarSign, iconBg: "bg-[#5B66E2]" },
-    { label: "Count of Accounts", value: fmt(envBankAnalytics.totalAccounts), icon: Users, iconBg: "bg-[#4a55d1]" },
-    { label: "Total Transactions", value: fmt(envBankAnalytics.totalPayments), icon: FileText, iconBg: "bg-[#5B66E2]" },
-    { label: "Banks / Portfolios", value: fmt(envBankAnalytics.bankAnalytics.length), icon: Landmark, iconBg: "bg-[#4048c0]" },
+    { label: "Total Payment Amount", value: `₱${fmt(envBankAnalytics.totalAmount)}`, icon: DollarSign, iconBg: "bg-[#5B66E2]", info: "Sum of all payment amounts" },
+    { label: "Count of Accounts", value: fmtInt(envBankAnalytics.totalAccounts), icon: Users, iconBg: "bg-[#4a55d1]", info: "Unique accounts in dataset" },
+    { label: "Total Transactions", value: fmtInt(envBankAnalytics.totalPayments), icon: FileText, iconBg: "bg-[#5B66E2]", info: "Total number of payments" },
+    { label: "Banks / Portfolios", value: fmtInt(envBankAnalytics.bankAnalytics.length), icon: Landmark, iconBg: "bg-[#4048c0]", info: "Distinct banks or portfolios" },
   ];
 
   const metricCards = [
     { label: "Total Payment Amount", value: `₱${fmt(fa.totalAmount)}`, icon: DollarSign, iconBg: "bg-[#5B66E2]", info: "Sum of all payment amounts" },
-    { label: "Count of Accounts", value: fmt(fa.totalAccounts), icon: Users, iconBg: "bg-[#4a55d1]", info: "Unique accounts in dataset" },
-    { label: "Total Transactions", value: fmt(fa.totalPayments), icon: FileText, iconBg: "bg-[#5B66E2]", info: "Total number of payments" },
-    { label: "Banks / Portfolios", value: fmt(fa.bankAnalytics.length), icon: Landmark, iconBg: "bg-[#4048c0]", info: "Distinct banks or portfolios" },
+    { label: "Count of Accounts", value: fmtInt(fa.totalAccounts), icon: Users, iconBg: "bg-[#4a55d1]", info: "Unique accounts in dataset" },
+    { label: "Total Transactions", value: fmtInt(fa.totalPayments), icon: FileText, iconBg: "bg-[#5B66E2]", info: "Total number of payments" },
+    { label: "Banks / Portfolios", value: fmtInt(fa.bankAnalytics.length), icon: Landmark, iconBg: "bg-[#4048c0]", info: "Distinct banks or portfolios" },
   ];
 
   return (
@@ -492,6 +505,33 @@ export default function DashboardPage() {
               )}
             </div>
           )}
+          {/* Segments expandable button (overview tab only) */}
+          {activeTab === "overview" && (
+            <div ref={segmentsRef} className="relative">
+              <button
+                onClick={() => setSegmentsOpen((v) => !v)}
+                className={`flex items-center gap-2 h-9 min-w-[140px] px-4 rounded-full border text-xs font-medium transition-colors ${
+                  segmentsOpen || activeSegmentId
+                    ? "border-[#5B66E2] bg-[#5B66E2]/10 text-[#5B66E2] dark:text-[#8B96F2]"
+                    : "border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:border-[#5B66E2]"
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                Segments
+              </button>
+              {segmentsOpen && (
+                <div className="absolute right-0 top-full mt-2 z-50 w-[420px] shadow-xl rounded-xl overflow-hidden">
+                  <SegmentationTools
+                    payments={payments}
+                    segments={segments}
+                    onSegmentsChange={setSegments}
+                    activeSegmentId={activeSegmentId}
+                    onActiveSegmentChange={setActiveSegmentId}
+                  />
+                </div>
+              )}
+            </div>
+          )}
           <DateFilter
             value={dateRange}
             onChange={(r, c) => { setDateRange(r); setCustomRange(c); }}
@@ -524,12 +564,12 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
         {apiLoading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-6 bg-card border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-9 w-9 rounded-lg" />
+              <Card key={i} className="flex-1 overflow-hidden bg-card border-border gap-0">
+                <div className="h-1 bg-[#5B66E2]" />
+                <div className="p-4">
+                  <Skeleton className="h-4 w-24 mb-3" />
+                  <Skeleton className="h-8 w-full rounded-full" />
                 </div>
-                <Skeleton className="h-8 w-24 mt-2" />
               </Card>
             ))
           : envMetricCards.map((card) => {
@@ -537,18 +577,27 @@ export default function DashboardPage() {
               return (
                 <Card
                   key={card.label}
-                  className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                  className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {card.label}
-                    </span>
-                    <div className={`p-2 ${card.iconBg} rounded-lg`}>
-                      <Icon className="w-5 h-5 text-white" />
+                  <div className="h-1 bg-[#5B66E2]" />
+                  <div className="flex flex-col h-[calc(100%-4px)] px-5 pt-3 pb-4 gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        {card.label}:
+                      </span>
+                      <div className={`p-2 mt-1 mr-0.5 ${card.iconBg} rounded-lg`}>
+                        <Icon className="w-6 h-6 text-white" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {card.value}
+                    <div className="flex-1 flex items-center justify-center">
+                      <span className="inline-block px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-lg font-bold text-gray-900 dark:text-white">
+                        {card.value}
+                      </span>
+                    </div>
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex items-center justify-between">
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{card.info}</span>
+                      <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                    </div>
                   </div>
                 </Card>
               );
@@ -607,7 +656,7 @@ export default function DashboardPage() {
             Bank Distribution
           </h3>
           {apiLoading ? (
-            <Skeleton className="h-[350px] w-full rounded-xl" />
+            <Skeleton className="h-[380px] w-full rounded-xl" />
           ) : (
             <DynamicChart
               data={envBankAnalytics.bankAnalytics.slice(0, 8).map((a) => ({
@@ -617,7 +666,7 @@ export default function DashboardPage() {
               type="pie"
               dataKey="amount"
               xAxisKey="bank"
-              height={350}
+              height={380}
             />
           )}
         </Card>
@@ -659,7 +708,7 @@ export default function DashboardPage() {
               <div className="overflow-x-auto rounded-xl">
                 <div style={{ minWidth }}>
                   <DynamicChart
-                    data={shareData.map((a) => ({ bank: a.bank, percentage: Math.round(a.percentage * 10) / 10 }))}
+                    data={shareData.map((a) => ({ bank: a.bank, percentage: Math.round(a.percentage * 100) / 100 }))}
                     type="bar"
                     dataKey="percentage"
                     xAxisKey="bank"
@@ -717,7 +766,7 @@ export default function DashboardPage() {
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.accountCount)}</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">₱{fmt(b.totalAmount)}</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.debtorSum)}</td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{b.percentage.toFixed(1)}%</td>
+                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{b.percentage.toFixed(2)}%</td>
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.paymentCount)}</td>
               </tr>
               ));
@@ -825,7 +874,7 @@ export default function DashboardPage() {
                     className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
                   >
                     <div className="h-1 bg-[#5B66E2]" />
-                    <div className="flex flex-col h-[calc(100%-4px)] px-4 pt-1 pb-3">
+                    <div className="flex flex-col h-[calc(100%-4px)] px-5 pt-3 pb-4 gap-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                           {card.label}:
@@ -914,7 +963,7 @@ export default function DashboardPage() {
                     className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
                   >
                     <div className="h-1 bg-[#5B66E2]" />
-                    <div className="flex flex-col h-[calc(100%-4px)] px-4 pt-1 pb-3">
+                    <div className="flex flex-col h-[calc(100%-4px)] px-5 pt-3 pb-4 gap-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                           {card.label}:
@@ -939,19 +988,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Comparison + Segments */}
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 mb-6 items-start">
+      {/* Comparison (full width) */}
+      <div className="mb-6">
         <ComparisonMode
           payments={payments}
           bankAnalytics={fa.bankAnalytics}
           touchpointAnalytics={fa.touchpointAnalytics}
-        />
-        <SegmentationTools
-          payments={payments}
-          segments={segments}
-          onSegmentsChange={setSegments}
-          activeSegmentId={activeSegmentId}
-          onActiveSegmentChange={setActiveSegmentId}
         />
       </div>
 
@@ -1037,7 +1079,7 @@ export default function DashboardPage() {
                   {fmt(b.debtorSum)}
                 </td>
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                  {b.percentage.toFixed(1)}%
+                  {b.percentage.toFixed(2)}%
                 </td>
                 <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
                   {fmt(b.paymentCount)}
@@ -1084,12 +1126,12 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
         {apiLoading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-6 bg-card border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-9 w-9 rounded-lg" />
+              <Card key={i} className="flex-1 overflow-hidden bg-card border-border gap-0">
+                <div className="h-1 bg-[#5B66E2]" />
+                <div className="p-4">
+                  <Skeleton className="h-4 w-24 mb-3" />
+                  <Skeleton className="h-8 w-full rounded-full" />
                 </div>
-                <Skeleton className="h-8 w-24 mt-2" />
               </Card>
             ))
           : tpMetricCards.map((card) => {
@@ -1097,18 +1139,27 @@ export default function DashboardPage() {
               return (
                 <Card
                   key={card.label}
-                  className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                  className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {card.label}
-                    </span>
-                    <div className={`p-2 ${card.iconBg} rounded-lg`}>
-                      <Icon className="w-5 h-5 text-white" />
+                  <div className="h-1 bg-[#5B66E2]" />
+                  <div className="flex flex-col h-[calc(100%-4px)] px-5 pt-3 pb-4 gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        {card.label}:
+                      </span>
+                      <div className={`p-2 mt-1 mr-0.5 ${card.iconBg} rounded-lg`}>
+                        <Icon className="w-6 h-6 text-white" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">
-                    {card.value}
+                    <div className="flex-1 flex items-center justify-center">
+                      <span className="inline-block px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-lg font-bold text-gray-900 dark:text-white truncate">
+                        {card.value}
+                      </span>
+                    </div>
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex items-center justify-between">
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{card.info}</span>
+                      <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                    </div>
                   </div>
                 </Card>
               );
@@ -1195,7 +1246,7 @@ export default function DashboardPage() {
             <DynamicChart
               data={filteredTpAnalytics.map((t) => ({
                 touchpoint: t.touchpoint,
-                percentage: Math.round(t.percentage * 10) / 10,
+                percentage: Math.round(t.percentage * 100) / 100,
               }))}
               type="bar"
               dataKey="percentage"
@@ -1261,7 +1312,7 @@ export default function DashboardPage() {
                     ₱{fmt(t.totalAmount)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                    {t.percentage.toFixed(1)}%
+                    {t.percentage.toFixed(2)}%
                   </td>
                 </tr>
               ))}

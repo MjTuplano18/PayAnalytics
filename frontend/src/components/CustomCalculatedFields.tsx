@@ -88,12 +88,12 @@ function groupRecords(payments: PaymentRecord[], groupBy: GroupByKey): Map<strin
 
 function fmt(n: number): string {
   if (Math.abs(n) >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
-  if (Math.abs(n) >= 1_000) return `₱${(n / 1_000).toFixed(1)}K`;
-  return `₱${Math.round(n).toLocaleString()}`;
+  if (Math.abs(n) >= 1_000) return `₱${(n / 1_000).toFixed(2)}K`;
+  return `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmtPlain(n: number): string {
-  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 interface CustomCalculatedFieldsProps {

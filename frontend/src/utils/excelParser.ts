@@ -33,15 +33,21 @@ function findColumn(
   });
 }
 
-/** Convert Excel date values to a readable date string */
+/** Convert Excel date values to a readable date string (YYYY-MM-DD, local timezone) */
 function formatDate(value: unknown): string {
   if (value instanceof Date) {
-    return value.toISOString().split("T")[0];
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
   if (typeof value === "number" && value > 30000 && value < 100000) {
     // Excel serial date fallback
     const date = new Date((value - 25569) * 86400 * 1000);
-    return date.toISOString().split("T")[0];
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(date.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
   return String(value || "");
 }

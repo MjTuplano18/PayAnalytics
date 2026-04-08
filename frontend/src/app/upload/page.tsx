@@ -16,7 +16,7 @@ import { useUploads } from "@/lib/queries";
 import { ParsedData, PaymentRecord } from "@/types/data";
 
 function fmt(n: number): string {
-  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtAmount(n: number): string {
@@ -58,6 +58,18 @@ export default function UploadPage() {
     duplicatesRemoved: number;
     filesProcessed: number;
   } | null>(null);
+
+  // Merge date picker popup state
+  interface MergeFileEntry {
+    fileName: string;
+    parsed: ParsedData;
+    allDates: boolean;
+    dateFrom: string;
+    dateTo: string;
+    availableDates: string[];
+  }
+  const [showMergeDatePicker, setShowMergeDatePicker] = useState(false);
+  const [mergeFileEntries, setMergeFileEntries] = useState<MergeFileEntry[]>([]);
 
   // Date filter popup state
   const [pendingParsed, setPendingParsed] = useState<ParsedData | null>(null);
@@ -419,10 +431,78 @@ export default function UploadPage() {
     setError(null);
     setMergeResult(null);
     try {
-      const allPayments: ParsedData["payments"] = [];
+      const entries: MergeFileEntry[] = [];
       for (const file of mergeFiles) {
         const parsed = await parseExcelFile(file);
-        allPayments.push(...parsed.payments);
+        const dates = [...new Set(parsed.payments.map((p) => p.paymentDate).filter(Boolean))].sort();
+        entries.push({
+          fileName: file.name,
+          parsed,
+          allDates: true,
+          dateFrom: "",
+          dateTo: "",
+          availableDates: dates,
+        });
+      }
+      setMergeFileEntries(entries);
+      setShowMergeDatePicker(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to parse files";
+      setError(message);
+      toast.error("Merge failed");
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  // Compute per-file filtered record count
+  const mergeFilteredCounts = useMemo(() => {
+    return mergeFileEntries.map((entry) => {
+      if (entry.allDates) return entry.parsed.payments.length;
+      return entry.parsed.payments.filter((p) => {
+        if (!p.paymentDate) return false;
+        if (entry.dateFrom && p.paymentDate < entry.dateFrom) return false;
+        if (entry.dateTo && p.paymentDate > entry.dateTo) return false;
+        return true;
+      }).length;
+    });
+  }, [mergeFileEntries]);
+
+  const mergeTotalFilteredCount = mergeFilteredCounts.reduce((s, c) => s + c, 0);
+
+  // Compute overall unique dates and total records across all merge files
+  const mergeOverallStats = useMemo(() => {
+    const allDates = new Set<string>();
+    let totalRecords = 0;
+    for (const entry of mergeFileEntries) {
+      totalRecords += entry.parsed.payments.length;
+      for (const d of entry.availableDates) allDates.add(d);
+    }
+    const sorted = [...allDates].sort();
+    return { totalRecords, uniqueDates: sorted.length, minDate: sorted[0] ?? "", maxDate: sorted[sorted.length - 1] ?? "" };
+  }, [mergeFileEntries]);
+
+  const updateMergeEntry = (idx: number, updates: Partial<MergeFileEntry>) => {
+    setMergeFileEntries((prev) => prev.map((e, i) => i === idx ? { ...e, ...updates } : e));
+  };
+
+  const handleMergeDateConfirm = async () => {
+    setShowMergeDatePicker(false);
+    setMerging(true);
+    setError(null);
+    try {
+      const allPayments: ParsedData["payments"] = [];
+      for (const entry of mergeFileEntries) {
+        let payments = entry.parsed.payments;
+        if (!entry.allDates) {
+          payments = payments.filter((p) => {
+            if (!p.paymentDate) return false;
+            if (entry.dateFrom && p.paymentDate < entry.dateFrom) return false;
+            if (entry.dateTo && p.paymentDate > entry.dateTo) return false;
+            return true;
+          });
+        }
+        allPayments.push(...payments);
       }
 
       // Deduplicate by account + date + amount
@@ -433,6 +513,13 @@ export default function UploadPage() {
         seen.add(key);
         return true;
       });
+
+      if (unique.length === 0) {
+        toast.error("No records found for the selected date ranges.");
+        setMerging(false);
+        setShowMergeDatePicker(true);
+        return;
+      }
 
       const duplicatesRemoved = allPayments.length - unique.length;
 
@@ -486,19 +573,39 @@ export default function UploadPage() {
         raw: [],
       };
 
+      const mergedFileName = mergeFileEntries.map((e) => e.fileName).join(" + ");
       setData(mergedData);
       setRawData([]);
-      setFileName(mergeFiles.map((f) => f.name).join(" + "));
-      setSessionId(null);
+      setFileName(mergedFileName);
+
+      // Save to backend
+      if (token) {
+        try {
+          const records = unique.map((p) => ({
+            bank: p.bank,
+            account: p.account,
+            touchpoint: p.touchpoint,
+            payment_date: p.paymentDate,
+            payment_amount: p.paymentAmount,
+            environment: p.environment,
+          }));
+          const saved = await saveUpload(token, { file_name: mergedFileName, records });
+          setSessionId(saved.id);
+          await queryClient.invalidateQueries({ queryKey: ["uploads"] });
+        } catch (backendErr) {
+          setSessionId(null);
+          const msg = backendErr instanceof Error ? backendErr.message : "Unknown error";
+          toast.warning(`Merged locally — server sync failed: ${msg}`);
+        }
+      }
 
       setMergeResult({
         totalRecords: unique.length,
         duplicatesRemoved,
-        filesProcessed: mergeFiles.length,
+        filesProcessed: mergeFileEntries.length,
       });
 
-      toast.success(`Merged ${mergeFiles.length} files — ${fmt(unique.length)} records (${fmt(duplicatesRemoved)} duplicates removed)`);
-
+      toast.success(`Merged ${mergeFileEntries.length} files — ${fmt(unique.length)} records (${fmt(duplicatesRemoved)} duplicates removed)`);
       setTimeout(() => router.push("/dashboard"), 2000);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to merge files";
@@ -507,6 +614,11 @@ export default function UploadPage() {
     } finally {
       setMerging(false);
     }
+  };
+
+  const handleMergeDateCancel = () => {
+    setShowMergeDatePicker(false);
+    setMergeFileEntries([]);
   };
 
   return (
@@ -558,7 +670,7 @@ export default function UploadPage() {
           </Card>
 
           {/* Current Data Info Box */}
-          {(data || sessionId) && (
+          {(data && data.totalPayments > 0) && (
             <div className="p-6 rounded-lg bg-card border border-border animate-fade-in-up" style={{ animationDelay: '0.17s' }}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-3">
@@ -943,6 +1055,164 @@ export default function UploadPage() {
               >
                 Import {!allDates && filteredRecordCount > 0 ? `(${fmt(filteredRecordCount)} records)` : ""}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Merge Date Selection Popup */}
+      {showMergeDatePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-lg mx-4 rounded-2xl bg-card border border-border shadow-2xl animate-fade-in-up overflow-hidden">
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4 border-b border-border">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-[#5B66E2]/10 dark:bg-[#5B66E2]/20 flex items-center justify-center">
+                  <CalendarDays className="w-5 h-5 text-[#5B66E2]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Select Import Dates
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Choose which dates to include from each file
+                  </p>
+                </div>
+              </div>
+              {/* Overall stats bar */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                <span>{mergeFileEntries.length} files</span>
+                <span>&middot;</span>
+                <span>{fmt(mergeOverallStats.totalRecords)} total records</span>
+                <span>&middot;</span>
+                <span>{mergeOverallStats.uniqueDates} unique dates</span>
+                {mergeOverallStats.minDate && (
+                  <>
+                    <span>&middot;</span>
+                    <span>{mergeOverallStats.minDate} to {mergeOverallStats.maxDate}</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Per-file sections */}
+            <div className="px-6 py-4 max-h-[50vh] overflow-y-auto space-y-4">
+              {mergeFileEntries.map((entry, idx) => (
+                <div key={idx} className="rounded-xl border border-border bg-gray-50 dark:bg-gray-800/50 p-4">
+                  {/* File header */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <FileSpreadsheet className="w-4 h-4 text-[#5B66E2] flex-shrink-0" />
+                    <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{entry.fileName}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
+                      {fmt(entry.parsed.payments.length)} records &middot; {entry.availableDates.length} dates
+                    </span>
+                  </div>
+                  {entry.availableDates.length > 0 && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-3 -mt-1">
+                      {entry.availableDates[0]} to {entry.availableDates[entry.availableDates.length - 1]}
+                    </p>
+                  )}
+
+                  {/* All Dates toggle */}
+                  <label className="flex items-center gap-2.5 mb-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={entry.allDates}
+                      onChange={(e) => {
+                        updateMergeEntry(idx, {
+                          allDates: e.target.checked,
+                          ...(e.target.checked ? { dateFrom: "", dateTo: "" } : {}),
+                        });
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-[#5B66E2] focus:ring-[#5B66E2] accent-[#5B66E2]"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-[#5B66E2] dark:group-hover:text-[#8B96F2] transition-colors">
+                      All Dates
+                    </span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">(import entire file)</span>
+                  </label>
+
+                  {/* Date range selectors */}
+                  <div className={`transition-all duration-200 ${entry.allDates ? "opacity-30 pointer-events-none max-h-0 overflow-hidden" : "opacity-100 max-h-40"}`}>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">From</label>
+                        <select
+                          value={entry.dateFrom}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const updates: Partial<MergeFileEntry> = { dateFrom: val };
+                            if (val) {
+                              updates.allDates = false;
+                              if (!entry.dateTo || entry.dateTo < val) updates.dateTo = val;
+                            }
+                            updateMergeEntry(idx, updates);
+                          }}
+                          className="w-full px-2.5 py-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#5B66E2]"
+                        >
+                          <option value="">Earliest</option>
+                          {entry.availableDates.map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">To</label>
+                        <select
+                          value={entry.dateTo}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const updates: Partial<MergeFileEntry> = { dateTo: val };
+                            if (val) {
+                              updates.allDates = false;
+                              if (!entry.dateFrom || entry.dateFrom > val) updates.dateFrom = val;
+                            }
+                            updateMergeEntry(idx, updates);
+                          }}
+                          className="w-full px-2.5 py-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#5B66E2]"
+                        >
+                          <option value="">Latest</option>
+                          {entry.availableDates.map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Per-file record count badge */}
+                  {!entry.allDates && (entry.dateFrom || entry.dateTo) && (
+                    <div className="mt-2 text-xs text-[#5B66E2] dark:text-[#8B96F2]">
+                      {fmt(mergeFilteredCounts[idx])} records selected
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-border bg-gray-50/50 dark:bg-gray-800/30">
+              {/* Total summary pill */}
+              <div className="mb-4 p-3 rounded-lg bg-[#5B66E2]/10 dark:bg-[#5B66E2]/20 border border-[#5B66E2]/20 dark:border-[#5B66E2]/30 flex items-center gap-2 text-sm text-[#5B66E2] dark:text-[#8B96F2]">
+                <Merge className="w-4 h-4 flex-shrink-0" />
+                <span className="font-medium">{fmt(mergeTotalFilteredCount)}</span> records will be merged
+                <span className="text-xs opacity-70">(duplicates removed automatically)</span>
+              </div>
+              <div className="flex items-center justify-end gap-3">
+                <Button
+                  onClick={handleMergeDateCancel}
+                  className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleMergeDateConfirm}
+                  disabled={mergeTotalFilteredCount === 0}
+                  className="bg-[#4a55d1] hover:bg-[#4048c0] text-white disabled:opacity-50"
+                >
+                  Merge &amp; Import
+                </Button>
+              </div>
             </div>
           </div>
         </div>

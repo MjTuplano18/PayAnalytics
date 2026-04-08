@@ -113,6 +113,14 @@ export function DateFilter({ value, onChange, customRange }: DateFilterProps) {
   );
 }
 
+/** Format a local Date as YYYY-MM-DD string (timezone-safe) */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /** Filter an array of records by a date field string (YYYY-MM-DD) */
 export function filterByDateRange<T>(
   items: T[],
@@ -123,42 +131,40 @@ export function filterByDateRange<T>(
   if (range === "all") return items;
 
   if (range === "custom" && custom) {
-    const start = new Date(custom.from);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(custom.to);
-    end.setHours(23, 59, 59, 999);
+    const startStr = toLocalDateStr(custom.from);
+    const endStr = toLocalDateStr(custom.to);
     return items.filter((item) => {
-      const d = new Date(getDate(item));
-      return !isNaN(d.getTime()) && d >= start && d <= end;
+      const d = getDate(item);
+      return d >= startStr && d <= endStr;
     });
   }
 
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayStr = toLocalDateStr(now);
 
-  let start: Date;
+  let startStr: string;
   switch (range) {
     case "today":
-      start = today;
+      startStr = todayStr;
       break;
     case "week": {
-      const day = today.getDay();
-      start = new Date(today);
-      start.setDate(today.getDate() - day);
+      const day = now.getDay();
+      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+      startStr = toLocalDateStr(weekStart);
       break;
     }
     case "month":
-      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      startStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
       break;
     case "year":
-      start = new Date(today.getFullYear(), 0, 1);
+      startStr = `${now.getFullYear()}-01-01`;
       break;
     default:
       return items;
   }
 
   return items.filter((item) => {
-    const d = new Date(getDate(item));
-    return !isNaN(d.getTime()) && d >= start;
+    const d = getDate(item);
+    return d >= startStr && d <= todayStr;
   });
 }

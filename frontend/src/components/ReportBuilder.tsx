@@ -106,14 +106,14 @@ function saveTemplates(templates: ReportTemplate[]): void {
 // ── Helper ───────────────────────────────────────────────────────────────────
 
 function fmtCurrency(n: number): string {
-  if (Math.abs(n) >= 1_000_000_000) return `₱${(n / 1_000_000_000).toFixed(1)}B`;
-  if (Math.abs(n) >= 1_000_000) return `₱${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1_000) return `₱${(n / 1_000).toFixed(1)}K`;
-  return `₱${Math.round(n).toLocaleString()}`;
+  if (Math.abs(n) >= 1_000_000_000) return `₱${(n / 1_000_000_000).toFixed(2)}B`;
+  if (Math.abs(n) >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
+  if (Math.abs(n) >= 1_000) return `₱${(n / 1_000).toFixed(2)}K`;
+  return `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmt(n: number): string {
-  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
@@ -470,7 +470,7 @@ export function ReportBuilder({
                           {(section.config.tableColumns || []).includes("Accounts") && (
                             <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{fmt(b.accountCount)}</td>
                           )}
-                          <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{b.percentage.toFixed(1)}%</td>
+                          <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{b.percentage.toFixed(2)}%</td>
                         </tr>
                       ))}
                     </tbody>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
-import { Waypoints, DollarSign, Hash, BarChart3, ChevronDown, Check } from "lucide-react";
+import { Waypoints, DollarSign, Hash, BarChart3, ChevronDown, Check, Info } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useData } from "@/context/DataContext";
@@ -11,7 +11,7 @@ import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/com
 import { useDashboard } from "@/lib/queries";
 
 function fmt(n: number): string {
-  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function TouchpointsDashboardPage() {
@@ -96,8 +96,12 @@ export default function TouchpointsDashboardPage() {
     return touchpointAnalytics.filter((t) => selectedTouchpoints.has(t.touchpoint));
   }, [touchpointAnalytics, selectedTouchpoints]);
 
-  const totalTransactions = filteredAnalytics.reduce((s, t) => s + t.count, 0);
-  const totalAmount = filteredAnalytics.reduce((s, t) => s + t.totalAmount, 0);
+  const totalTransactions = (apiSummary && !isFiltered && selectedTouchpoints.size === 0)
+    ? apiSummary.total_payments
+    : filteredAnalytics.reduce((s, t) => s + t.count, 0);
+  const totalAmount = (apiSummary && !isFiltered && selectedTouchpoints.size === 0)
+    ? apiSummary.total_amount
+    : filteredAnalytics.reduce((s, t) => s + t.totalAmount, 0);
   const uniqueTouchpoints = filteredAnalytics.length;
   const topTouchpoint = filteredAnalytics[0]?.touchpoint ?? "—";
 
@@ -106,10 +110,10 @@ export default function TouchpointsDashboardPage() {
   const noData = filteredAnalytics.length === 0 && !apiLoading;
 
   const metricCards = [
-    { label: "Total Transactions", value: fmt(totalTransactions), icon: Hash, iconBg: "bg-[#5B66E2]" },
-    { label: "Total Amount", value: `₱${fmt(totalAmount)}`, icon: DollarSign, iconBg: "bg-[#4a55d1]" },
-    { label: "Unique Touchpoints", value: fmt(uniqueTouchpoints), icon: Waypoints, iconBg: "bg-[#5B66E2]" },
-    { label: "Top Touchpoint", value: topTouchpoint, icon: BarChart3, iconBg: "bg-[#4048c0]" },
+    { label: "Total Transactions", value: fmt(totalTransactions), icon: Hash, iconBg: "bg-[#5B66E2]", info: "Total number of transactions" },
+    { label: "Total Amount", value: `₱${fmt(totalAmount)}`, icon: DollarSign, iconBg: "bg-[#4a55d1]", info: "Sum of all payment amounts" },
+    { label: "Unique Touchpoints", value: fmt(uniqueTouchpoints), icon: Waypoints, iconBg: "bg-[#5B66E2]", info: "Distinct touchpoint channels" },
+    { label: "Top Touchpoint", value: topTouchpoint, icon: BarChart3, iconBg: "bg-[#4048c0]", info: "Highest transaction volume" },
   ];
 
   return (
@@ -176,12 +180,12 @@ export default function TouchpointsDashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
         {apiLoading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-6 bg-card border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-9 w-9 rounded-lg" />
+              <Card key={i} className="flex-1 overflow-hidden bg-card border-border gap-0">
+                <div className="h-1 bg-[#5B66E2]" />
+                <div className="p-4">
+                  <Skeleton className="h-4 w-24 mb-3" />
+                  <Skeleton className="h-8 w-full rounded-full" />
                 </div>
-                <Skeleton className="h-8 w-24 mt-2" />
               </Card>
             ))
           : metricCards.map((card) => {
@@ -189,18 +193,27 @@ export default function TouchpointsDashboardPage() {
               return (
                 <Card
                   key={card.label}
-                  className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+                  className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {card.label}
-                    </span>
-                    <div className={`p-2 ${card.iconBg} rounded-lg`}>
-                      <Icon className="w-5 h-5 text-white" />
+                  <div className="h-1 bg-[#5B66E2]" />
+                  <div className="flex flex-col h-[calc(100%-4px)] px-5 pt-3 pb-4 gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        {card.label}:
+                      </span>
+                      <div className={`p-2 mt-1 mr-0.5 ${card.iconBg} rounded-lg`}>
+                        <Icon className="w-6 h-6 text-white" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">
-                    {card.value}
+                    <div className="flex-1 flex items-center justify-center">
+                      <span className="inline-block px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-lg font-bold text-gray-900 dark:text-white truncate">
+                        {card.value}
+                      </span>
+                    </div>
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex items-center justify-between">
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{card.info}</span>
+                      <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                    </div>
                   </div>
                 </Card>
               );
@@ -287,7 +300,7 @@ export default function TouchpointsDashboardPage() {
             <DynamicChart
               data={filteredAnalytics.map((t) => ({
                 touchpoint: t.touchpoint,
-                percentage: Math.round(t.percentage * 10) / 10,
+                percentage: Math.round(t.percentage * 100) / 100,
               }))}
               type="bar"
               dataKey="percentage"
@@ -350,7 +363,7 @@ export default function TouchpointsDashboardPage() {
                     ₱{fmt(t.totalAmount)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                    {t.percentage.toFixed(1)}%
+                    {t.percentage.toFixed(2)}%
                   </td>
                 </tr>
               ))}

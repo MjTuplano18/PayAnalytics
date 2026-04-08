@@ -10,8 +10,6 @@ interface DataContextType {
   setRawData: (data: DataRow[]) => void;
   fileName: string;
   setFileName: (name: string) => void;
-  globalSearchQuery: string;
-  setGlobalSearchQuery: (query: string) => void;
   /** The active upload session ID stored in the backend (null = in-memory only) */
   sessionId: string | null;
   setSessionId: (id: string | null) => void;
@@ -22,7 +20,6 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<ParsedData | null>(null);
   const [rawData, setRawData] = useState<DataRow[]>([]);
-  const [globalSearchQuery, setGlobalSearchQuery] = useState<string>("");
 
   // Initialise sessionId from localStorage so it survives page refresh
   const [sessionId, setSessionIdState] = useState<string | null>(() => {
@@ -66,7 +63,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   return (
     <DataContext.Provider
-      value={{ data, setData, rawData, setRawData, fileName, setFileName, globalSearchQuery, setGlobalSearchQuery, sessionId, setSessionId }}
+      value={{ data, setData, rawData, setRawData, fileName, setFileName, sessionId, setSessionId }}
     >
       {children}
     </DataContext.Provider>

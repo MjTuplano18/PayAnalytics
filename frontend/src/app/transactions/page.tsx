@@ -19,11 +19,11 @@ import { exportToExcel, exportToCSV } from "@/utils/exportUtils";
 import type { PaymentRecord, ParsedData } from "@/types/data";
 
 function fmt(n: number): string {
-  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function TransactionsPage() {
-  const { data, setData, rawData, sessionId, setSessionId, globalSearchQuery, setGlobalSearchQuery } = useData();
+  const { data, setData, rawData, sessionId, setSessionId } = useData();
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
@@ -105,14 +105,6 @@ export default function TransactionsPage() {
   }, [dashSummary, envFilter, bankFilter, apiEnvironmentMap]);
 
   const apiDates = dashSummary?.dates ?? [];
-
-  // Initialize search query from global context (e.g. nav bar search)
-  useEffect(() => {
-    if (globalSearchQuery) {
-      setSearchQuery(globalSearchQuery);
-      setGlobalSearchQuery("");
-    }
-  }, [globalSearchQuery, setGlobalSearchQuery]);
 
   // In-memory fallback (used when sessionId is null)
   const inMemoryEnvironments = useMemo(() => {

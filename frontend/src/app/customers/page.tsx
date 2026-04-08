@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Users, DollarSign, FileText } from "lucide-react";
+import { Users, DollarSign, FileText, Info } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { Card } from "@/components/ui/card";
 import { DynamicChart } from "@/components/DynamicChart";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
 
 function fmt(n: number): string {
-  return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function AccountsPage() {
@@ -84,18 +84,21 @@ export default function AccountsPage() {
       value: fmt(data.totalAccounts),
       icon: Users,
       iconBg: "bg-[#4a55d1]",
+      info: "Unique accounts in dataset",
     },
     {
       label: "Avg Payments / Account",
-      value: avgPayments.toFixed(1),
+      value: avgPayments.toFixed(2),
       icon: FileText,
       iconBg: "bg-[#5B66E2]",
+      info: "Average payment count per account",
     },
     {
       label: "Avg Amount / Account",
       value: `₱${fmt(Math.round(avgAmount))}`,
       icon: DollarSign,
       iconBg: "bg-[#5B66E2]",
+      info: "Average payment amount per account",
     },
   ];
 
@@ -126,18 +129,27 @@ export default function AccountsPage() {
           return (
             <Card
               key={m.label}
-              className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+              className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {m.label}
-                </span>
-                <div className={`p-2 ${m.iconBg} rounded-lg`}>
-                  <Icon className="w-5 h-5 text-white" />
+              <div className="h-1 bg-[#5B66E2]" />
+              <div className="flex flex-col h-[calc(100%-4px)] px-5 pt-3 pb-4 gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {m.label}:
+                  </span>
+                  <div className={`p-2 mt-1 mr-0.5 ${m.iconBg} rounded-lg`}>
+                    <Icon className="w-6 h-6 text-white" />
+                  </div>
                 </div>
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {m.value}
+                <div className="flex-1 flex items-center justify-center">
+                  <span className="inline-block px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-lg font-bold text-gray-900 dark:text-white">
+                    {m.value}
+                  </span>
+                </div>
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex items-center justify-between">
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{m.info}</span>
+                  <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                </div>
               </div>
             </Card>
           );

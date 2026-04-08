@@ -149,7 +149,7 @@ export async function exportToExcel(
         summarySheet.getCell(row, 3).value = b.totalAmount;
         summarySheet.getCell(row, 3).numFmt = "₱#,##0.00";
         summarySheet.getCell(row, 4).value = b.accountCount;
-        summarySheet.getCell(row, 5).value = `${b.percentage.toFixed(1)}%`;
+        summarySheet.getCell(row, 5).value = `${b.percentage.toFixed(2)}%`;
         row++;
       }
 
@@ -174,7 +174,7 @@ export async function exportToExcel(
           summarySheet.getCell(row, 2).value = t.count;
           summarySheet.getCell(row, 3).value = t.totalAmount;
           summarySheet.getCell(row, 3).numFmt = "₱#,##0.00";
-          summarySheet.getCell(row, 4).value = `${t.percentage.toFixed(1)}%`;
+          summarySheet.getCell(row, 4).value = `${t.percentage.toFixed(2)}%`;
           row++;
         }
       }
