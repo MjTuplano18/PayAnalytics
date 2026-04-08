@@ -285,16 +285,9 @@ export function DynamicChart({
         const RADIAN = Math.PI / 180;
 
         // Custom label renderer that places labels outside the pie along leader lines.
-        // A collision-avoidance pass shifts labels vertically so they don't overlap.
-        const renderOuterLabel = (props: {
-          cx: number;
-          cy: number;
-          midAngle: number;
-          outerRadius: number;
-          percent?: number;
-          index: number;
-        }) => {
-          const { cx, cy, midAngle, outerRadius: oR, percent = 0 } = props;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const renderOuterLabel = (props: any) => {
+          const { cx = 0, cy = 0, midAngle = 0, outerRadius: oR = 0, percent = 0 } = props;
           if (percent < 0.003) return null; // skip < 0.3%
           const radius = oR + 32;
           const x = cx + radius * Math.cos(-midAngle * RADIAN);
