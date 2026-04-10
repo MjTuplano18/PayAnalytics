@@ -70,23 +70,27 @@ export default function TouchpointsDashboardPage() {
       }));
     }
     if (payments.length === 0) return [];
-    const tpMap = new Map<string, { count: number; totalAmount: number }>();
-    let totalAmount = 0;
+    const tpMap = new Map<string, { count: number; totalAmountCents: number }>();
+    let totalAmountCents = 0;
     for (const p of payments) {
-      totalAmount += p.paymentAmount;
+      totalAmountCents += Math.round(p.paymentAmount * 100);
       const tp = p.touchpoint || "Unknown";
-      if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, totalAmount: 0 });
+      if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, totalAmountCents: 0 });
       const entry = tpMap.get(tp)!;
       entry.count++;
-      entry.totalAmount += p.paymentAmount;
+      entry.totalAmountCents += Math.round(p.paymentAmount * 100);
     }
+    const totalAmount = totalAmountCents / 100;
     return Array.from(tpMap.entries())
-      .map(([touchpoint, d]) => ({
-        touchpoint,
-        count: d.count,
-        totalAmount: d.totalAmount,
-        percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
-      }))
+      .map(([touchpoint, d]) => {
+        const tpAmount = d.totalAmountCents / 100;
+        return {
+          touchpoint,
+          count: d.count,
+          totalAmount: tpAmount,
+          percentage: totalAmount > 0 ? (tpAmount / totalAmount) * 100 : 0,
+        };
+      })
       .sort((a, b) => b.count - a.count);
   }, [apiSummary, payments, isFiltered]);
 

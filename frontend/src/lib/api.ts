@@ -189,13 +189,15 @@ export function getUpload(token: string, sessionId: string) {
 export function getTransactions(
   token: string,
   sessionId: string,
-  params: { bank?: string; touchpoint?: string; search?: string; payment_date?: string; environment?: string; page?: number; page_size?: number } = {}
+  params: { bank?: string; touchpoint?: string; search?: string; payment_date?: string; environment?: string; date_from?: string; date_to?: string; page?: number; page_size?: number } = {}
 ) {
   const qs = new URLSearchParams();
   if (params.bank) qs.set("bank", params.bank);
   if (params.touchpoint) qs.set("touchpoint", params.touchpoint);
   if (params.search) qs.set("search", params.search);
   if (params.payment_date) qs.set("payment_date", params.payment_date);
+  if (params.date_from) qs.set("date_from", params.date_from);
+  if (params.date_to) qs.set("date_to", params.date_to);
   if (params.environment) qs.set("environment", params.environment);
   if (params.page) qs.set("page", String(params.page));
   if (params.page_size) qs.set("page_size", String(params.page_size));

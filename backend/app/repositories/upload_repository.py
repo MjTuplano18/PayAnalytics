@@ -288,6 +288,8 @@ class UploadRepository:
         search: str | None = None,
         payment_date: str | None = None,
         environment: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
         page: int = 1,
         page_size: int = 25,
     ) -> tuple[int, float, list[PaymentRecord]]:
@@ -309,6 +311,10 @@ class UploadRepository:
             query = query.where(PaymentRecord.touchpoint == touchpoint)
         if payment_date:
             query = query.where(PaymentRecord.payment_date == payment_date)
+        if date_from:
+            query = query.where(PaymentRecord.payment_date >= date_from)
+        if date_to:
+            query = query.where(PaymentRecord.payment_date <= date_to)
         if environment:
             query = query.where(PaymentRecord.environment == environment)
         if search:

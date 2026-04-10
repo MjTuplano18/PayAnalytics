@@ -1,5 +1,13 @@
 import json
 import uuid
+from decimal import Decimal
+
+
+class _DecimalEncoder(json.JSONEncoder):
+    def default(self, o: object) -> object:
+        if isinstance(o, Decimal):
+            return float(o)
+        return super().default(o)
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -126,6 +134,8 @@ async def get_transactions(
     touchpoint: str | None = None,
     search: str | None = None,
     payment_date: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     environment: str | None = None,
     page: int = 1,
     page_size: int = 25,
@@ -146,6 +156,8 @@ async def get_transactions(
         touchpoint=touchpoint,
         search=search,
         payment_date=payment_date,
+        date_from=date_from,
+        date_to=date_to,
         environment=environment,
         page=page,
         page_size=page_size,
@@ -218,7 +230,7 @@ async def delete_upload(
         "user_id": session_obj.user_id,
         "file_name": session_obj.file_name,
         "records": records_snapshot,
-    })
+    }, cls=_DecimalEncoder)
 
     # Log the deletion before actually deleting
     await audit_repo.log_action(
@@ -273,7 +285,7 @@ async def create_transaction(
             "payment_amount": record.payment_amount,
             "environment": record.environment,
         },
-    })
+    }, cls=_DecimalEncoder)
 
     await audit_repo.log_action(
         user_id=current_user.id,
@@ -338,7 +350,7 @@ async def update_transaction(
         "payment_amount": updated.payment_amount,
         "environment": updated.environment,
     }
-    snapshot = json.dumps({"session_id": session_id, "before": before_rec, "after": after_rec})
+    snapshot = json.dumps({"session_id": session_id, "before": before_rec, "after": after_rec}, cls=_DecimalEncoder)
     session_obj = await repo.get_session(session_id, current_user.id)
     await audit_repo.log_action(
         user_id=current_user.id,
@@ -389,7 +401,7 @@ async def bulk_delete_transactions(
                 }
                 for r in matching_records
             ],
-        })
+        }, cls=_DecimalEncoder)
 
     count = await repo.delete_transactions_bulk(
         session_id=session_id, user_id=current_user.id, record_ids=payload.ids
@@ -439,7 +451,7 @@ async def delete_transaction(
                 "payment_amount": target_record.payment_amount,
                 "environment": target_record.environment,
             },
-        })
+        }, cls=_DecimalEncoder)
 
     deleted = await repo.delete_transaction(record_id=record_id, session_id=session_id, user_id=current_user.id)
     if not deleted:
@@ -495,7 +507,7 @@ async def delete_transactions_by_date_range(
                 }
                 for r in matching_records
             ],
-        })
+        }, cls=_DecimalEncoder)
 
     count = await repo.delete_transactions_by_date_range(
         session_id=session_id, user_id=current_user.id, date_from=date_from, date_to=date_to

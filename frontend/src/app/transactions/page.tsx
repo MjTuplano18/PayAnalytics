@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
+import { DateFilter, DateRange, CustomDateRange, filterByDateRange, dateRangeToBounds } from "@/components/DateFilter";
 import { getTransactions, getDashboardSummary, deleteTransaction, deleteTransactionsByDateRange, getUpload, deleteUpload, createTransaction, updateTransaction, type PaymentRecordOut } from "@/lib/api";
 import { useDashboard, useTransactions, queryKeys } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
@@ -52,11 +52,14 @@ export default function TransactionsPage() {
 
   // Backend-mode state using TanStack Query (cached, no redundant Neon fetches)
   const { data: dashSummary } = useDashboard(token, sessionId);
+  const dateBounds = dateRangeToBounds(dateRange, customRange);
   const apiFilters = {
     bank: bankFilter !== "all" ? bankFilter : undefined,
     touchpoint: tpFilter !== "all" ? tpFilter : undefined,
     payment_date: dateFilter !== "all" ? dateFilter : undefined,
     environment: envFilter !== "all" ? envFilter : undefined,
+    date_from: dateBounds.date_from,
+    date_to: dateBounds.date_to,
     search: debouncedSearch || undefined,
     page: currentPage,
     page_size: rowsPerPage,
@@ -156,7 +159,7 @@ export default function TransactionsPage() {
   }, [data, sessionId, bankFilter, tpFilter, dateFilter, envFilter, debouncedSearch, dateRange, customRange]);
 
   const inMemoryFilteredTotal = useMemo(
-    () => inMemoryFiltered.reduce((s, p) => s + p.paymentAmount, 0),
+    () => inMemoryFiltered.reduce((s, p) => s + Math.round(p.paymentAmount * 100), 0) / 100,
     [inMemoryFiltered]
   );
 

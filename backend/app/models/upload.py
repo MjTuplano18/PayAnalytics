@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -20,7 +20,7 @@ class UploadSession(Base):
     )
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     total_records: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    total_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    total_amount: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False, default=0.0)
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -50,7 +50,7 @@ class PaymentRecord(Base):
     account: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     touchpoint: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     payment_date: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
-    payment_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    payment_amount: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False, default=0.0)
     environment: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Relationship

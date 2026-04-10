@@ -137,34 +137,42 @@ export default function DashboardPage() {
       };
     }
     if (payments.length === 0) return null;
-    const bankMap = new Map<string, { accountCount: number; totalAmount: number; debtorSum: number; paymentCount: number; accounts: Set<string> }>();
-    const tpMap = new Map<string, { count: number; totalAmount: number }>();
-    let totalAmount = 0;
+    const bankMap = new Map<string, { accountCount: number; totalAmountCents: number; debtorSum: number; paymentCount: number; accounts: Set<string> }>();
+    const tpMap = new Map<string, { count: number; totalAmountCents: number }>();
+    let totalAmountCents = 0;
     const allAccounts = new Set<string>();
 
     for (const p of payments) {
-      totalAmount += p.paymentAmount;
+      totalAmountCents += Math.round(p.paymentAmount * 100);
       allAccounts.add(p.account);
 
-      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { accountCount: 0, totalAmount: 0, debtorSum: 0, paymentCount: 0, accounts: new Set() });
+      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { accountCount: 0, totalAmountCents: 0, debtorSum: 0, paymentCount: 0, accounts: new Set() });
       const bEntry = bankMap.get(p.bank)!;
-      bEntry.totalAmount += p.paymentAmount;
+      bEntry.totalAmountCents += Math.round(p.paymentAmount * 100);
       bEntry.debtorSum += parseInt(p.account) || 0;
       bEntry.paymentCount++;
       bEntry.accounts.add(p.account);
 
-      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
+      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmountCents: 0 });
       const tEntry = tpMap.get(p.touchpoint)!;
       tEntry.count++;
-      tEntry.totalAmount += p.paymentAmount;
+      tEntry.totalAmountCents += Math.round(p.paymentAmount * 100);
     }
 
+    const totalAmount = totalAmountCents / 100;
+
     const bankAnalytics = Array.from(bankMap.entries())
-      .map(([bank, d]) => ({ bank, accountCount: d.accounts.size, totalAmount: d.totalAmount, debtorSum: d.debtorSum, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount }))
+      .map(([bank, d]) => {
+        const bankAmount = d.totalAmountCents / 100;
+        return { bank, accountCount: d.accounts.size, totalAmount: bankAmount, debtorSum: d.debtorSum, percentage: totalAmount > 0 ? (bankAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount };
+      })
       .sort((a, b) => b.totalAmount - a.totalAmount);
 
     const touchpointAnalytics = Array.from(tpMap.entries())
-      .map(([touchpoint, d]) => ({ touchpoint, count: d.count, totalAmount: d.totalAmount, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0 }))
+      .map(([touchpoint, d]) => {
+        const tpAmount = d.totalAmountCents / 100;
+        return { touchpoint, count: d.count, totalAmount: tpAmount, percentage: totalAmount > 0 ? (tpAmount / totalAmount) * 100 : 0 };
+      })
       .sort((a, b) => b.count - a.count);
 
     return { bankAnalytics, touchpointAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: payments.length };

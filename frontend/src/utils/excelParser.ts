@@ -146,7 +146,7 @@ function categorizePaymentData(data: DataRow[]): ParsedData {
   const payments: PaymentRecord[] = data.map((row) => ({
     bank: bankCol ? String(row[bankCol] || "Unknown") : "Unknown",
     paymentDate: dateCol ? formatDate(row[dateCol]) : "",
-    paymentAmount: amountCol ? Number(row[amountCol]) || 0 : 0,
+    paymentAmount: amountCol ? Math.round((Number(row[amountCol]) || 0) * 100) / 100 : 0,
     account: accountCol ? String(row[accountCol] || "") : "",
     touchpoint: touchpointCol
       ? String(row[touchpointCol] || "NO TOUCHPOINT")
@@ -161,60 +161,68 @@ function computeAnalytics(
   payments: PaymentRecord[],
   raw: DataRow[]
 ): ParsedData {
-  const totalAmount = payments.reduce((s, p) => s + p.paymentAmount, 0);
+  // Use integer centavo accumulation to avoid floating-point drift
+  const totalCents = payments.reduce((s, p) => s + Math.round(p.paymentAmount * 100), 0);
+  const totalAmount = totalCents / 100;
   const uniqueAccounts = new Set(payments.map((p) => p.account));
 
   // Bank analytics
   const bankMap = new Map<
     string,
-    { accounts: Set<string>; amount: number; debtorIds: number; count: number }
+    { accounts: Set<string>; amountCents: number; debtorIds: number; count: number }
   >();
   for (const p of payments) {
     if (!bankMap.has(p.bank)) {
       bankMap.set(p.bank, {
         accounts: new Set(),
-        amount: 0,
+        amountCents: 0,
         debtorIds: 0,
         count: 0,
       });
     }
     const entry = bankMap.get(p.bank)!;
     entry.accounts.add(p.account);
-    entry.amount += p.paymentAmount;
+    entry.amountCents += Math.round(p.paymentAmount * 100);
     entry.debtorIds += Number(p.account) || 0;
     entry.count++;
   }
 
   const bankAnalytics: BankAnalytics[] = Array.from(bankMap.entries())
-    .map(([bank, d]) => ({
-      bank,
-      accountCount: d.accounts.size,
-      totalAmount: d.amount,
-      debtorSum: d.debtorIds,
-      percentage: totalAmount > 0 ? (d.amount / totalAmount) * 100 : 0,
-      paymentCount: d.count,
-    }))
+    .map(([bank, d]) => {
+      const bankAmount = d.amountCents / 100;
+      return {
+        bank,
+        accountCount: d.accounts.size,
+        totalAmount: bankAmount,
+        debtorSum: d.debtorIds,
+        percentage: totalAmount > 0 ? (bankAmount / totalAmount) * 100 : 0,
+        paymentCount: d.count,
+      };
+    })
     .sort((a, b) => b.totalAmount - a.totalAmount);
 
   // Touchpoint analytics
-  const tpMap = new Map<string, { count: number; amount: number }>();
+  const tpMap = new Map<string, { count: number; amountCents: number }>();
   for (const p of payments) {
     const tp = p.touchpoint || "NO TOUCHPOINT";
-    if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, amount: 0 });
+    if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, amountCents: 0 });
     const entry = tpMap.get(tp)!;
     entry.count++;
-    entry.amount += p.paymentAmount;
+    entry.amountCents += Math.round(p.paymentAmount * 100);
   }
 
   const touchpointAnalytics: TouchpointAnalytics[] = Array.from(
     tpMap.entries()
   )
-    .map(([touchpoint, d]) => ({
-      touchpoint,
-      count: d.count,
-      totalAmount: d.amount,
-      percentage: totalAmount > 0 ? (d.amount / totalAmount) * 100 : 0,
-    }))
+    .map(([touchpoint, d]) => {
+      const tpAmount = d.amountCents / 100;
+      return {
+        touchpoint,
+        count: d.count,
+        totalAmount: tpAmount,
+        percentage: totalAmount > 0 ? (tpAmount / totalAmount) * 100 : 0,
+      };
+    })
     .sort((a, b) => b.count - a.count);
 
   return {
