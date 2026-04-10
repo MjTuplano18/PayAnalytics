@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, AlertCircle, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, History, Merge, X, CalendarDays } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, History, Merge, X, CalendarDays, Info, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { parseExcelFile } from "@/utils/excelParser";
@@ -35,6 +36,9 @@ function fmtDate(iso: string): string {
 
 export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0); // 0-100
+  const [uploadPhase, setUploadPhase] = useState<"parsing" | "saving" | "done">("parsing");
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,6 +46,27 @@ export default function UploadPage() {
   const { data, setData, rawData, setRawData, fileName, setFileName, sessionId, setSessionId } = useData();
   const { token } = useAuth();
   const queryClient = useQueryClient();
+
+  // Smooth progress animation: gradually fill toward the next checkpoint
+  useEffect(() => {
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    if (!uploading || uploadPhase === "done") return;
+
+    const target = uploadPhase === "parsing" ? 48 : 95;
+    progressTimerRef.current = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= target) return prev;
+        // Slow down as we approach the target (logarithmic ease)
+        const remaining = target - prev;
+        const increment = Math.max(0.3, remaining * 0.04);
+        return Math.min(prev + increment, target);
+      });
+    }, 200);
+
+    return () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    };
+  }, [uploading, uploadPhase]);
 
   // Upload history state
   const [restoring, setRestoring] = useState<string | null>(null);
@@ -82,6 +107,9 @@ export default function UploadPage() {
   // Current data removal state
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
+
+  // Upload mode: "standard" (client-side parse + date filter) or "fast" (server-side streaming)
+  const [uploadMode, setUploadMode] = useState<"standard" | "fast">("standard");
 
   const handleRemoveCurrentData = async () => {
     setRemoving(true);
@@ -232,8 +260,12 @@ export default function UploadPage() {
     setShowDatePicker(false);
     setPendingParsed(null);
     setUploading(true);
+    setUploadProgress(5);
+    setUploadPhase("saving");
     try {
       await finalizeImport(finalData, pendingFileName);
+      setUploadProgress(100);
+      setUploadPhase("done");
     } catch {
       toast.error("Import failed");
     } finally {
@@ -251,6 +283,11 @@ export default function UploadPage() {
   };
 
   const handleFileUpload = async (file: File) => {
+    // Fast Upload: send file directly to server for streaming parse
+    if (uploadMode === "fast") {
+      return handleFastUpload(file);
+    }
+
     setUploading(true);
     setError(null);
     setUploadSuccess(false);
@@ -258,7 +295,7 @@ export default function UploadPage() {
     try {
       const parsedData = await parseExcelFile(file);
 
-      // Show date selection popup before importing
+      // Show date selection popup before importing (no progress bar yet)
       setPendingParsed(parsedData);
       setPendingFileName(file.name);
       setAllDates(true);
@@ -271,6 +308,52 @@ export default function UploadPage() {
         err instanceof Error
           ? err.message
           : "Failed to parse file. Please ensure it's a valid .xlsx or .xls file.";
+      setError(message);
+      toast.error("Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFastUpload = async (file: File) => {
+    if (!token) {
+      setError("You must be logged in to use Fast Upload.");
+      return;
+    }
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadPhase("parsing");
+    setError(null);
+    setUploadSuccess(false);
+
+    try {
+      // Parse client-side then save directly — skip setData/setRawData
+      // to avoid expensive React re-renders with large datasets.
+      // The dashboard will fetch data from the API via sessionId.
+      setUploadProgress(10);
+      const parsedData = await parseExcelFile(file);
+      setUploadProgress(50);
+      setUploadPhase("saving");
+      const records = parsedData.payments.map((p) => ({
+        bank: p.bank,
+        account: p.account,
+        touchpoint: p.touchpoint,
+        payment_date: p.paymentDate,
+        payment_amount: p.paymentAmount,
+        environment: p.environment,
+      }));
+      setUploadProgress(60);
+      const saved = await saveUpload(token, { file_name: file.name, records });
+      setUploadProgress(100);
+      setUploadPhase("done");
+      setSessionId(saved.id);
+      setFileName(file.name);
+      await queryClient.invalidateQueries({ queryKey: ["uploads"] });
+      toast.success(`Uploaded! ${saved.total_records.toLocaleString()} records saved.`);
+      setUploadSuccess(true);
+      router.push("/dashboard");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Upload failed";
       setError(message);
       toast.error("Upload failed");
     } finally {
@@ -291,7 +374,13 @@ export default function UploadPage() {
       setError("Please upload valid files (.xlsx, .xls, .csv)");
       return;
     }
-    if (files.length === 1) {
+    if (uploadMode === 'fast') {
+      if (files.length > 1) {
+        setError("Fast Upload supports one file at a time. Switch to Standard Upload to merge multiple files.");
+        return;
+      }
+      handleFileUpload(files[0]);
+    } else if (files.length === 1) {
       handleFileUpload(files[0]);
     } else {
       setMergeFiles((prev) => [...prev, ...files]);
@@ -306,7 +395,13 @@ export default function UploadPage() {
         f.name.endsWith(".csv") ||
         f.name.endsWith(".json")
     );
-    if (files.length === 1) {
+    if (uploadMode === 'fast') {
+      if (files.length > 1) {
+        setError("Fast Upload supports one file at a time. Switch to Standard Upload to merge multiple files.");
+        return;
+      }
+      if (files.length === 1) handleFileUpload(files[0]);
+    } else if (files.length === 1) {
       handleFileUpload(files[0]);
     } else if (files.length > 1) {
       setMergeFiles((prev) => [...prev, ...files]);
@@ -632,6 +727,51 @@ export default function UploadPage() {
         </p>
       </div>
 
+      {/* Upload Mode Toggle */}
+      <div className="max-w-4xl mx-auto mb-6 flex gap-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => setUploadMode('standard')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                uploadMode === 'standard'
+                  ? 'border-[#5B66E2] bg-[#5B66E2]/10 text-[#5B66E2]'
+                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <Upload className="w-4 h-4" />
+              Standard Upload
+              <Info className="w-3.5 h-3.5 opacity-50" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-[220px] text-center">
+            Preview your data and filter by date range before importing. Best for smaller files.
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => setUploadMode('fast')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                uploadMode === 'fast'
+                  ? 'border-[#5B66E2] bg-[#5B66E2]/10 text-[#5B66E2]'
+                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              Fast Upload
+              <Info className="w-3.5 h-3.5 opacity-50" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-[240px] text-center">
+            Import your data instantly — skips the date filter and preview steps. Best when you want speed. You can filter dates on the dashboard after.
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
       {/* Main content */}
       <div className="max-w-4xl mx-auto">
         <div className="space-y-6">
@@ -645,25 +785,41 @@ export default function UploadPage() {
           >
             <Upload className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600" />
             <h3 className="text-lg sm:text-xl font-semibold mb-2 text-gray-900 dark:text-white">
-              Drop one or more files here
+              {uploadMode === 'fast' ? 'Drop a file here' : 'Drop one or more files here'}
             </h3>
             <p className="mb-1 text-gray-500 dark:text-gray-400">
               Supports .xlsx, .xls, and .csv files
             </p>
             <p className="mb-4 text-sm text-gray-400 dark:text-gray-500">
-              Drop a single file to import, or multiple files to merge them into one dataset
+              {uploadMode === 'fast'
+                ? 'Skips preview and date filter — imports directly to your dashboard'
+                : 'Drop a single file to import, or multiple files to merge them into one dataset'}
             </p>
-            <Button
-              className="bg-[#4a55d1] hover:bg-[#4048c0] text-white"
-              disabled={uploading || merging}
-            >
-              {uploading ? "Processing..." : merging ? "Merging..." : "Browse Files"}
-            </Button>
+            {uploading && uploadProgress > 0 ? (
+              <div className="relative w-full h-11 rounded-lg overflow-hidden bg-[#4a55d1]/20 border border-[#4a55d1]/30">
+                <div
+                  className="absolute inset-y-0 left-0 bg-[#4a55d1] transition-all duration-700 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+                <span className="relative z-10 flex items-center justify-center h-full text-sm font-medium text-white">
+                  {uploadPhase === "parsing" && `Reading file... ${Math.round(uploadProgress)}%`}
+                  {uploadPhase === "saving" && `Uploading... ${Math.round(uploadProgress)}%`}
+                  {uploadPhase === "done" && "Done!"}
+                </span>
+              </div>
+            ) : (
+              <Button
+                className="bg-[#4a55d1] hover:bg-[#4048c0] text-white w-full"
+                disabled={merging}
+              >
+                {merging ? "Merging..." : "Browse Files"}
+              </Button>
+            )}
             <input
               ref={fileInputRef}
               type="file"
               accept=".xlsx,.xls,.csv,.json"
-              multiple
+              multiple={uploadMode !== 'fast'}
               onChange={handleFileSelect}
               className="hidden"
             />

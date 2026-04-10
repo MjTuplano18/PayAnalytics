@@ -36,6 +36,14 @@ export const queryKeys = {
   unifiedAuditLog: (token: string) => ["unified-audit-log", token] as const,
 };
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Don't retry queries that fail with a 404 (session deleted / doesn't exist) */
+function retryUnless404(failureCount: number, error: Error) {
+  if (error.message.includes("404") || error.message.includes("Not Found")) return false;
+  return failureCount < 2;
+}
+
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
 /** Fetch aggregated dashboard KPIs for a session — cached 5 minutes */
@@ -44,6 +52,7 @@ export function useDashboard(token: string | null, sessionId: string | null) {
     queryKey: queryKeys.dashboard(token!, sessionId!),
     queryFn: () => getDashboardSummary(token!, sessionId!),
     enabled: !!token && !!sessionId,
+    retry: retryUnless404,
   });
 }
 
@@ -68,6 +77,7 @@ export function useTransactions(
     queryFn: () => getTransactions(token!, sessionId!, filters),
     enabled: !!token && !!sessionId,
     placeholderData: keepPreviousData, // smooth page transitions
+    retry: retryUnless404,
   });
 }
 

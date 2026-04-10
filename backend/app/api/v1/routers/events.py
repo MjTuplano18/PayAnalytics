@@ -53,6 +53,23 @@ async def broadcast_new_upload(session_id: str, file_name: str) -> None:
         await q.put(payload)
 
 
+async def broadcast_upload_progress(
+    session_id: str, file_name: str, processed: int, total: int
+) -> None:
+    """Push upload progress to SSE clients (called during batch inserts)."""
+    payload = json.dumps(
+        {
+            "type": "upload_progress",
+            "session_id": session_id,
+            "file_name": file_name,
+            "processed": processed,
+            "total": total,
+        }
+    )
+    for q in list(_subscribers):
+        await q.put(payload)
+
+
 @router.get("/stream")
 async def event_stream(
     _current_user: User = Depends(get_current_user),

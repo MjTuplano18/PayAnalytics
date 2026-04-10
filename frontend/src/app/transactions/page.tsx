@@ -64,7 +64,14 @@ export default function TransactionsPage() {
     page: currentPage,
     page_size: rowsPerPage,
   };
-  const { data: txPage, isFetching: apiLoading } = useTransactions(token, sessionId, apiFilters);
+  const { data: txPage, isFetching: apiLoading, error: txError } = useTransactions(token, sessionId, apiFilters);
+
+  // Auto-clear stale session on 404
+  useEffect(() => {
+    if (txError && (txError.message.includes("404") || txError.message.includes("Not Found"))) {
+      setSessionId(null);
+    }
+  }, [txError, setSessionId]);
 
   const apiRows = txPage?.items ?? null;
   const apiTotal = txPage?.total ?? 0;

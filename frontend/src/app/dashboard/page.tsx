@@ -24,12 +24,19 @@ function fmtInt(n: number): string {
 }
 
 export default function DashboardPage() {
-  const { data, sessionId } = useData();
+  const { data, sessionId, setSessionId } = useData();
   const { token, user } = useAuth();
   const [activeTab, setActiveTab] = useState<"overview" | "touchpoints" | "environments">("overview");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
-  const { data: apiSummary, isLoading: apiLoading } = useDashboard(token, sessionId);
+  const { data: apiSummary, isLoading: apiLoading, error: dashError } = useDashboard(token, sessionId);
+
+  // Auto-clear stale session on 404
+  useEffect(() => {
+    if (dashError && (dashError.message.includes("404") || dashError.message.includes("Not Found"))) {
+      setSessionId(null);
+    }
+  }, [dashError, setSessionId]);
 
   // Touchpoints tab state
   const [selectedTouchpoints, setSelectedTouchpoints] = useState<Set<string>>(new Set());
@@ -518,10 +525,10 @@ export default function DashboardPage() {
             <div ref={segmentsRef} className="relative">
               <button
                 onClick={() => setSegmentsOpen((v) => !v)}
-                className={`flex items-center gap-2 h-9 min-w-[140px] px-4 rounded-full border text-xs font-medium transition-colors ${
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                   segmentsOpen || activeSegmentId
                     ? "border-[#5B66E2] bg-[#5B66E2]/10 text-[#5B66E2] dark:text-[#8B96F2]"
-                    : "border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:border-[#5B66E2]"
+                    : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted"
                 }`}
               >
                 <Users className="w-4 h-4" />

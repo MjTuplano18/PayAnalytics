@@ -150,7 +150,7 @@ export function DateFilter({ value, onChange, customRange }: DateFilterProps) {
               value={value}
               onValueChange={handleSelectChange}
             >
-                <SelectTrigger className="h-8 w-auto min-w-[140px] gap-1.5 rounded-full border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 focus:ring-[#5B66E2] data-[state=open]:ring-[#5B66E2]">
+                <SelectTrigger className="data-[size=default]:h-auto w-auto gap-2 px-3 py-2 rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted focus:ring-[#5B66E2] data-[state=open]:ring-[#5B66E2]">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                     <SelectValue>

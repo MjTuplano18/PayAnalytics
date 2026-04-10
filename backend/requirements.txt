@@ -3,6 +3,7 @@ fastapi
 uvicorn[standard]
 pydantic[email]
 pydantic-settings
+python-multipart
 
 # Database
 sqlalchemy[asyncio]
@@ -13,6 +14,9 @@ alembic
 python-jose[cryptography]
 passlib[bcrypt]
 bcrypt==4.0.1
+
+# File parsing (streaming)
+openpyxl
 
 # Testing
 pytest

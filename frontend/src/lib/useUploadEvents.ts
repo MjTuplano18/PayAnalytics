@@ -3,7 +3,8 @@
  *
  * Subscribes to the backend SSE stream (/api/v1/events/stream) and
  * invalidates the TanStack Query uploads cache whenever another user
- * (or admin) saves a new Excel file.
+ * (or admin) saves a new Excel file.  Also forwards upload_progress
+ * events so the UI can show a real-time progress bar.
  *
  * Uses the Fetch API instead of the browser's native EventSource so we can
  * pass the Authorization header — EventSource does not support custom headers.
@@ -13,15 +14,23 @@
 
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+export interface UploadProgress {
+  session_id: string;
+  file_name: string;
+  processed: number;
+  total: number;
+}
 
 export function useUploadEvents(token: string | null) {
   const queryClient = useQueryClient();
   const abortRef = useRef<AbortController | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -67,6 +76,15 @@ export function useUploadEvents(token: string | null) {
               if (payload.type === "new_upload") {
                 // Invalidate the uploads list so every subscriber refetches
                 queryClient.invalidateQueries({ queryKey: ["uploads"] });
+                // Clear progress when upload completes
+                setUploadProgress(null);
+              } else if (payload.type === "upload_progress") {
+                setUploadProgress({
+                  session_id: payload.session_id,
+                  file_name: payload.file_name,
+                  processed: payload.processed,
+                  total: payload.total,
+                });
               }
             } catch {
               // Ignore malformed JSON (e.g. keepalive comments)
@@ -91,4 +109,6 @@ export function useUploadEvents(token: string | null) {
       if (retryTimer.current) clearTimeout(retryTimer.current);
     };
   }, [token, queryClient]);
+
+  return { uploadProgress };
 }

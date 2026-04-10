@@ -1,10 +1,15 @@
 import logging
+from typing import Callable, Awaitable
+
 from sqlalchemy import delete as sql_delete, func, select, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.upload import PaymentRecord, UploadSession
 from app.schemas.upload import PaymentRecordIn
+
+# Optional progress callback: async fn(session_id, file_name, processed, total)
+ProgressCallback = Callable[[str, str, int, int], Awaitable[None]] | None
 
 
 class UploadRepository:
@@ -17,6 +22,7 @@ class UploadRepository:
         user_id: str,
         file_name: str,
         records: list[PaymentRecordIn],
+        on_progress: ProgressCallback = None,
     ) -> UploadSession:
         total_amount = sum(r.payment_amount for r in records)
         upload = UploadSession(
@@ -28,9 +34,10 @@ class UploadRepository:
         self.session.add(upload)
         await self.session.flush()  # get the id before bulk insert
 
+        total = len(records)
         # Batch insert using core INSERT to minimise memory (no ORM object per row)
         BATCH = 2000
-        for i in range(0, len(records), BATCH):
+        for i in range(0, total, BATCH):
             batch = records[i : i + BATCH]
             await self.session.execute(
                 PaymentRecord.__table__.insert(),
@@ -47,6 +54,8 @@ class UploadRepository:
                     for r in batch
                 ],
             )
+            if on_progress:
+                await on_progress(upload.id, file_name, min(i + BATCH, total), total)
         await self.session.commit()
         await self.session.refresh(upload)
         return upload

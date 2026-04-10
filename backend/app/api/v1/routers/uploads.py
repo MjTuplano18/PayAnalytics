@@ -9,11 +9,12 @@ class _DecimalEncoder(json.JSONEncoder):
             return float(o)
         return super().default(o)
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies.auth import get_current_user
-from app.api.v1.routers.events import broadcast_new_upload
+from app.core.cache import cache_get, cache_set, cache_invalidate
+from app.api.v1.routers.events import broadcast_new_upload, broadcast_upload_progress
 from app.db.session import get_db
 from app.models.user import User
 from app.models.upload import UploadSession, PaymentRecord
@@ -49,6 +50,7 @@ async def create_upload(
         user_id=current_user.id,
         file_name=payload.file_name,
         records=payload.records,
+        on_progress=broadcast_upload_progress,
     )
     await audit_repo.log_action(
         user_id=current_user.id,
@@ -59,6 +61,74 @@ async def create_upload(
         total_amount=session.total_amount,
     )
     # Notify all SSE-connected clients so their uploads list auto-refreshes
+    await broadcast_new_upload(session.id, session.file_name)
+    return UploadSessionOut.model_validate(session)
+
+
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
+
+
+@router.post("/file", response_model=UploadSessionOut, status_code=status.HTTP_201_CREATED)
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UploadSessionOut:
+    """
+    Upload an Excel/CSV file for server-side streaming parse.
+
+    The file is parsed row-by-row using openpyxl read-only mode to keep
+    peak memory low (important for 512 MB Render free tier).
+    SSE progress events are broadcast during batch inserts.
+    """
+    import os
+    from app.utils.file_parser import stream_xlsx, stream_csv
+
+    file_name = file.filename or "upload"
+    ext = os.path.splitext(file_name)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+
+    # Read file with size guard
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File exceeds 10 MB limit.",
+        )
+
+    # Stream-parse into records
+    if ext == ".csv":
+        records = list(stream_csv(contents))
+    else:
+        records = list(stream_xlsx(contents))
+
+    if not records:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The uploaded file contains no data rows.",
+        )
+
+    repo = UploadRepository(db)
+    audit_repo = AuditLogRepository(db)
+    session = await repo.create_session(
+        user_id=current_user.id,
+        file_name=file_name,
+        records=records,
+        on_progress=broadcast_upload_progress,
+    )
+    await audit_repo.log_action(
+        user_id=current_user.id,
+        action="file_upload",
+        file_name=file_name,
+        session_id=session.id,
+        record_count=session.total_records,
+        total_amount=session.total_amount,
+    )
     await broadcast_new_upload(session.id, session.file_name)
     return UploadSessionOut.model_validate(session)
 
@@ -177,11 +247,17 @@ async def get_dashboard(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DashboardSummary:
-    """Get aggregated KPI summary for an upload session."""
+    """Get aggregated KPI summary for an upload session (cached 5 min)."""
+    cache_key = f"dashboard:{session_id}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return DashboardSummary(**cached)
+
     repo = UploadRepository(db)
     summary = await repo.get_dashboard_summary(session_id=session_id, user_id=current_user.id)
     if not summary:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
+    cache_set(cache_key, summary, ttl=300)
     return DashboardSummary(**summary)
 
 
@@ -233,6 +309,7 @@ async def delete_upload(
         await repo.delete_session_admin(session_id)
     else:
         await repo.delete_session(session_id, current_user.id)
+    cache_invalidate(f"dashboard:{session_id}")
 
 
 @router.post("/{session_id}/transactions", response_model=PaymentRecordOut, status_code=status.HTTP_201_CREATED)
@@ -282,6 +359,7 @@ async def create_transaction(
         details=f"Created record {getattr(record, 'id', 'unknown')}",
         snapshot_data=snapshot,
     )
+    cache_invalidate(f"dashboard:{session_id}")
     return PaymentRecordOut.model_validate(record)
 
 
@@ -345,6 +423,7 @@ async def update_transaction(
         details=f"Updated record {record_id}",
         snapshot_data=snapshot,
     )
+    cache_invalidate(f"dashboard:{session_id}")
     return PaymentRecordOut.model_validate(updated)
 
 
@@ -401,6 +480,7 @@ async def bulk_delete_transactions(
             snapshot_data=snapshot,
         )
 
+    cache_invalidate(f"dashboard:{session_id}")
     return {"deleted": count}
 
 
@@ -448,6 +528,7 @@ async def delete_transaction(
         details=f"Deleted record {record_id}",
         snapshot_data=snapshot,
     )
+    cache_invalidate(f"dashboard:{session_id}")
 
 
 @router.delete("/{session_id}/transactions", status_code=status.HTTP_200_OK)
@@ -491,6 +572,7 @@ async def delete_transactions_by_date_range(
             snapshot_data=snapshot,
         )
 
+    cache_invalidate(f"dashboard:{session_id}")
     return {"deleted": count}
 
 
@@ -649,4 +731,8 @@ async def undo_audit_entry(
 
     await audit_repo.mark_undone(entry)
     await db.commit()
+    # Invalidate dashboard cache for the affected session
+    affected_session_id = snapshot.get("session_id") or entry.session_id
+    if affected_session_id:
+        cache_invalidate(f"dashboard:{affected_session_id}")
     return {"detail": f"Successfully undone: {entry.action} — {entry.file_name}"}

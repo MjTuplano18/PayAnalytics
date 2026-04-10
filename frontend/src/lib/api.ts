@@ -322,3 +322,31 @@ export function createAuditLog(token: string, payload: AuditLogCreate) {
     body: JSON.stringify(payload),
   });
 }
+
+/**
+ * Upload an Excel/CSV file for server-side streaming parse.
+ * The backend parses the file in read-only/streaming mode to keep
+ * memory usage low. Progress events are broadcast via SSE.
+ */
+export async function uploadFile(
+  token: string,
+  file: File
+): Promise<UploadSessionOut> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(
+    `${API_BASE}/api/v1/uploads/file`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail || `Upload failed (${res.status})`);
+  }
+  return res.json() as Promise<UploadSessionOut>;
+}
