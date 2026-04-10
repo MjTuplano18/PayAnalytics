@@ -121,6 +121,9 @@ export function DynamicChart({
     fontSize: "13px",
   };
 
+  const tooltipLabelStyle = { color: "#ffffff" };
+  const tooltipItemStyle  = { color: "#ffffff" };
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formatTooltipValue = (value: any) => {
     const num = Number(value);
@@ -167,6 +170,8 @@ export function DynamicChart({
             />
             <Tooltip
               contentStyle={tooltipStyle}
+              labelStyle={tooltipLabelStyle}
+              itemStyle={tooltipItemStyle}
               formatter={formatTooltipValue}
               cursor={{ fill: "rgba(209, 213, 219, 0.08)" }}
             />
@@ -206,6 +211,8 @@ export function DynamicChart({
             />
             <Tooltip
               contentStyle={tooltipStyle}
+              labelStyle={tooltipLabelStyle}
+              itemStyle={tooltipItemStyle}
               formatter={formatTooltipValue}
               cursor={{ fill: "rgba(209, 213, 219, 0.08)" }}
             />
@@ -230,7 +237,7 @@ export function DynamicChart({
               tick={{ fontSize: 12 }}
               tickFormatter={formatAxisTick}
             />
-            <Tooltip contentStyle={tooltipStyle} formatter={formatTooltipValue} />
+            <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={formatTooltipValue} />
             <Legend />
             <Line
               type="monotone"
@@ -264,6 +271,8 @@ export function DynamicChart({
             />
             <Tooltip
               contentStyle={tooltipStyle}
+              labelStyle={tooltipLabelStyle}
+              itemStyle={tooltipItemStyle}
               formatter={formatTooltipValue}
               cursor={{ fill: "rgba(209, 213, 219, 0.08)" }}
             />
@@ -328,7 +337,7 @@ export function DynamicChart({
                 />
               ))}
             </Pie>
-            <Tooltip contentStyle={tooltipStyle} formatter={formatTooltipValue} />
+            <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={formatTooltipValue} />
             {isNarrow ? (
               <Legend
                 layout="horizontal"
