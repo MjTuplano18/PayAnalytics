@@ -28,19 +28,25 @@ class UploadRepository:
         self.session.add(upload)
         await self.session.flush()  # get the id before bulk insert
 
-        payment_records = [
-            PaymentRecord(
-                session_id=upload.id,
-                bank=r.bank,
-                account=r.account,
-                touchpoint=r.touchpoint,
-                payment_date=r.payment_date,
-                payment_amount=r.payment_amount,
-                environment=r.environment,
+        # Batch insert using core INSERT to minimise memory (no ORM object per row)
+        BATCH = 2000
+        for i in range(0, len(records), BATCH):
+            batch = records[i : i + BATCH]
+            await self.session.execute(
+                PaymentRecord.__table__.insert(),
+                [
+                    {
+                        "session_id": upload.id,
+                        "bank": r.bank,
+                        "account": r.account,
+                        "touchpoint": r.touchpoint,
+                        "payment_date": r.payment_date,
+                        "payment_amount": r.payment_amount,
+                        "environment": r.environment,
+                    }
+                    for r in batch
+                ],
             )
-            for r in records
-        ]
-        self.session.add_all(payment_records)
         await self.session.commit()
         await self.session.refresh(upload)
         return upload
