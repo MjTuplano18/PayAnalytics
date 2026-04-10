@@ -53,6 +53,9 @@ def create_app() -> FastAPI:
         redoc_url="/redoc" if settings.DEBUG else None,
     )
 
+    logger.info("CORS allowed_origins: %s", settings.ALLOWED_ORIGINS)
+    logger.info("CORS allowed_origin_regex: %s", settings.ALLOWED_ORIGINS_REGEX or "(none)")
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.ALLOWED_ORIGINS,

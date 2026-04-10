@@ -195,18 +195,14 @@ async def delete_upload(
     repo = UploadRepository(db)
     audit_repo = AuditLogRepository(db)
 
-    # Fetch the session before deletion to capture its details for the audit log
-    # Use get_session (which loads records) for both admin and user so we can snapshot
+    # Fetch session metadata only (no records) to avoid OOM on large datasets
     if current_user.is_superuser:
-        # For admin, first check if session exists, then load with records
-        session_check = await repo.get_session_any_user(session_id)
-        if session_check:
-            # Load the full session with records using the owner's user_id
-            session_obj = await repo.get_session(session_id, session_check.user_id)
-        else:
-            session_obj = None
+        session_obj = await repo.get_session_any_user(session_id)
     else:
-        session_obj = await repo.get_session(session_id, current_user.id)
+        # Use a lightweight query — do NOT load records
+        session_obj = await repo.get_session_any_user(session_id)
+        if session_obj and session_obj.user_id != current_user.id:
+            session_obj = None
 
     if not session_obj:
         raise HTTPException(
@@ -214,22 +210,12 @@ async def delete_upload(
             detail="Upload session not found or you are not authorized to delete it.",
         )
 
-    # Build snapshot of the full session + records for undo capability
-    records_snapshot = [
-        {
-            "bank": r.bank,
-            "account": r.account,
-            "touchpoint": r.touchpoint,
-            "payment_date": r.payment_date,
-            "payment_amount": r.payment_amount,
-            "environment": r.environment,
-        }
-        for r in (session_obj.records if hasattr(session_obj, "records") and session_obj.records else [])
-    ]
+    # Lightweight snapshot — metadata only, no individual records (avoids OOM)
     snapshot = json.dumps({
         "user_id": session_obj.user_id,
         "file_name": session_obj.file_name,
-        "records": records_snapshot,
+        "total_records": session_obj.total_records,
+        "total_amount": session_obj.total_amount,
     }, cls=_DecimalEncoder)
 
     # Log the deletion before actually deleting
@@ -272,7 +258,7 @@ async def create_transaction(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
     # Log creation of a single record
     audit_repo = AuditLogRepository(db)
-    session_obj = await repo.get_session(session_id, current_user.id)
+    session_obj = await repo.get_session_metadata(session_id, current_user.id)
     # compact snapshot of the created record
     snapshot = json.dumps({
         "session_id": session_id,
@@ -310,20 +296,18 @@ async def update_transaction(
     """Update a single transaction record."""
     repo = UploadRepository(db)
     # Capture existing record snapshot (compact) before update
-    session_obj = await repo.get_session(session_id, current_user.id)
+    before_record = await repo.get_record(record_id, session_id, current_user.id)
     before_rec = None
-    if session_obj and getattr(session_obj, "records", None):
-        before = next((r for r in session_obj.records if r.id == record_id), None)
-        if before:
-            before_rec = {
-                "id": before.id,
-                "bank": before.bank,
-                "account": before.account,
-                "touchpoint": before.touchpoint,
-                "payment_date": before.payment_date,
-                "payment_amount": before.payment_amount,
-                "environment": before.environment,
-            }
+    if before_record:
+        before_rec = {
+            "id": before_record.id,
+            "bank": before_record.bank,
+            "account": before_record.account,
+            "touchpoint": before_record.touchpoint,
+            "payment_date": before_record.payment_date,
+            "payment_amount": before_record.payment_amount,
+            "environment": before_record.environment,
+        }
 
     updated = await repo.update_transaction(
         record_id=record_id,
@@ -351,7 +335,7 @@ async def update_transaction(
         "environment": updated.environment,
     }
     snapshot = json.dumps({"session_id": session_id, "before": before_rec, "after": after_rec}, cls=_DecimalEncoder)
-    session_obj = await repo.get_session(session_id, current_user.id)
+    session_obj = await repo.get_session_metadata(session_id, current_user.id)
     await audit_repo.log_action(
         user_id=current_user.id,
         action="record_update",
@@ -378,13 +362,12 @@ async def bulk_delete_transactions(
     audit_repo = AuditLogRepository(db)
 
     # Get session info for audit log
-    session_obj = await repo.get_session(session_id, current_user.id)
+    session_obj = await repo.get_session_metadata(session_id, current_user.id)
     if not session_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
 
-    # Build snapshot of records that will be deleted
-    ids_set = set(payload.ids)
-    matching_records = [r for r in session_obj.records if r.id in ids_set]
+    # Fetch only the specific records being deleted (not all records)
+    matching_records = await repo.get_records_by_ids(session_id, current_user.id, payload.ids)
     snapshot = None
     if matching_records:
         snapshot = json.dumps({
@@ -432,13 +415,12 @@ async def delete_transaction(
     repo = UploadRepository(db)
     audit_repo = AuditLogRepository(db)
 
-    # Get session info and the record data before deleting
-    session_obj = await repo.get_session(session_id, current_user.id)
+    # Fetch only the specific record (not all records)
+    target_record = await repo.get_record(record_id, session_id, current_user.id)
+    session_obj = await repo.get_session_metadata(session_id, current_user.id)
     if not session_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found.")
 
-    # Find the specific record in the loaded records for snapshot
-    target_record = next((r for r in session_obj.records if r.id == record_id), None)
     snapshot = None
     if target_record:
         snapshot = json.dumps({
@@ -482,38 +464,23 @@ async def delete_transactions_by_date_range(
     repo = UploadRepository(db)
     audit_repo = AuditLogRepository(db)
 
-    # Get session info and matching records for snapshot before deleting
-    session_obj = await repo.get_session(session_id, current_user.id)
+    # Lightweight session check (no records loaded)
+    session_obj = await repo.get_session_metadata(session_id, current_user.id)
     if not session_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
 
-    # Build snapshot of records that will be deleted
-    matching_records = [
-        r for r in session_obj.records
-        if r.payment_date and r.payment_date >= date_from and r.payment_date <= date_to
-    ]
-    snapshot = None
-    if matching_records:
-        snapshot = json.dumps({
-            "session_id": session_id,
-            "records": [
-                {
-                    "bank": r.bank,
-                    "account": r.account,
-                    "touchpoint": r.touchpoint,
-                    "payment_date": r.payment_date,
-                    "payment_amount": r.payment_amount,
-                    "environment": r.environment,
-                }
-                for r in matching_records
-            ],
-        }, cls=_DecimalEncoder)
-
+    # Lightweight snapshot — just metadata about the date range (avoids loading all records)
     count = await repo.delete_transactions_by_date_range(
         session_id=session_id, user_id=current_user.id, date_from=date_from, date_to=date_to
     )
 
     if count > 0:
+        snapshot = json.dumps({
+            "session_id": session_id,
+            "date_from": date_from,
+            "date_to": date_to,
+            "deleted_count": count,
+        }, cls=_DecimalEncoder)
         await audit_repo.log_action(
             user_id=current_user.id,
             action="record_bulk_delete",

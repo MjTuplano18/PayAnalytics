@@ -71,6 +71,50 @@ class UploadRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_session_metadata(self, session_id: str, user_id: str) -> UploadSession | None:
+        """Fetch session without loading records — lightweight for audit logging."""
+        result = await self.session.execute(
+            select(UploadSession)
+            .where(UploadSession.id == session_id, UploadSession.user_id == user_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_record(self, record_id: str, session_id: str, user_id: str) -> PaymentRecord | None:
+        """Fetch a single payment record by ID (verifies session ownership)."""
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return None
+        result = await self.session.execute(
+            select(PaymentRecord).where(
+                PaymentRecord.id == record_id,
+                PaymentRecord.session_id == session_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_records_by_ids(self, session_id: str, user_id: str, record_ids: list[str]) -> list[PaymentRecord]:
+        """Fetch specific payment records by their IDs (verifies session ownership)."""
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return []
+        result = await self.session.execute(
+            select(PaymentRecord).where(
+                PaymentRecord.session_id == session_id,
+                PaymentRecord.id.in_(record_ids),
+            )
+        )
+        return list(result.scalars().all())
+
     async def get_session_any_user(self, session_id: str) -> UploadSession | None:
         """Admin: get session regardless of owner."""
         result = await self.session.execute(
