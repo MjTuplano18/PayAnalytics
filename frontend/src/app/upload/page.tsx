@@ -2,7 +2,7 @@
 
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, AlertCircle, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, History, Merge, X, CalendarDays, Info, Zap } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, FileSpreadsheet, RotateCcw, Trash2, History, Merge, X, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -108,8 +108,8 @@ export default function UploadPage() {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
 
-  // Upload mode: "standard" (client-side parse + date filter) or "fast" (server-side streaming)
-  const [uploadMode, setUploadMode] = useState<"standard" | "fast">("standard");
+  // Upload mode: "standard" (client-side parse + date filter) or "fast" (direct import)
+  const [uploadMode, setUploadMode] = useState<"standard" | "fast">("fast");
 
   const handleRemoveCurrentData = async () => {
     setRemoving(true);
@@ -317,7 +317,7 @@ export default function UploadPage() {
 
   const handleFastUpload = async (file: File) => {
     if (!token) {
-      setError("You must be logged in to use Fast Upload.");
+      setError("You must be logged in to upload.");
       return;
     }
     setUploading(true);
@@ -376,7 +376,7 @@ export default function UploadPage() {
     }
     if (uploadMode === 'fast') {
       if (files.length > 1) {
-        setError("Fast Upload supports one file at a time. Switch to Standard Upload to merge multiple files.");
+        setError("Enable Controlled Upload to merge multiple files.");
         return;
       }
       handleFileUpload(files[0]);
@@ -397,7 +397,7 @@ export default function UploadPage() {
     );
     if (uploadMode === 'fast') {
       if (files.length > 1) {
-        setError("Fast Upload supports one file at a time. Switch to Standard Upload to merge multiple files.");
+        setError("Enable Controlled Upload to merge multiple files.");
         return;
       }
       if (files.length === 1) handleFileUpload(files[0]);
@@ -727,73 +727,60 @@ export default function UploadPage() {
         </p>
       </div>
 
-      {/* Upload Mode Toggle */}
-      <div className="max-w-4xl mx-auto mb-6 flex gap-3">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => setUploadMode('standard')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                uploadMode === 'standard'
-                  ? 'border-[#5B66E2] bg-[#5B66E2]/10 text-[#5B66E2]'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-            >
-              <Upload className="w-4 h-4" />
-              Standard Upload
-              <Info className="w-3.5 h-3.5 opacity-50" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-[220px] text-center">
-            Preview your data and filter by date range before importing. Best for smaller files.
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => setUploadMode('fast')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                uploadMode === 'fast'
-                  ? 'border-[#5B66E2] bg-[#5B66E2]/10 text-[#5B66E2]'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-            >
-              <Zap className="w-4 h-4" />
-              Fast Upload
-              <Info className="w-3.5 h-3.5 opacity-50" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-[240px] text-center">
-            Import your data instantly — skips the date filter and preview steps. Best when you want speed. You can filter dates on the dashboard after.
-          </TooltipContent>
-        </Tooltip>
-      </div>
-
       {/* Main content */}
       <div className="max-w-4xl mx-auto">
         <div className="space-y-6">
           {/* Combined Upload & Merge Area */}
           <Card
-            className="p-8 sm:p-12 border-2 border-dashed bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-center cursor-pointer hover:border-[#5B66E2] hover:shadow-lg transition-all duration-300 animate-fade-in-up"
+            className="relative p-8 sm:p-12 border-2 border-dashed bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-center cursor-pointer hover:border-[#5B66E2] hover:shadow-lg transition-all duration-300 animate-fade-in-up"
             style={{ animationDelay: '0.15s' }}
             onDrop={handleFileDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => fileInputRef.current?.click()}
           >
-            <Upload className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600" />
-            <h3 className="text-lg sm:text-xl font-semibold mb-2 text-gray-900 dark:text-white">
-              {uploadMode === 'fast' ? 'Drop a file here' : 'Drop one or more files here'}
+            {/* Controlled Upload Toggle */}
+            <div className="absolute top-4 right-4 z-10" onClick={(e) => e.stopPropagation()}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className="flex items-center gap-2.5 cursor-pointer select-none"
+                    onClick={() => setUploadMode(prev => prev === 'fast' ? 'standard' : 'fast')}
+                  >
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Controlled Upload
+                    </span>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
+                      uploadMode === 'standard'
+                        ? 'bg-[#5B66E2]'
+                        : 'bg-gray-300 dark:bg-gray-600'
+                    }`}>
+                      <div className={`absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                        uploadMode === 'standard' ? 'translate-x-[22px]' : 'translate-x-[3px]'
+                      }`} />
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[280px] text-center">
+                  <p className="font-medium mb-1">Controlled Upload</p>
+                  <p>Preview your data and filter by date range before importing. Supports merging multiple files. Best for smaller files when you need precise control over which records to import.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <Upload className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-3 text-gray-400 dark:text-gray-600" />
+            <h3 className="text-xl sm:text-2xl font-bold mb-1 text-gray-900 dark:text-white">
+              {uploadMode === 'fast' ? 'Fast Upload' : 'Controlled Upload'}
             </h3>
-            <p className="mb-1 text-gray-500 dark:text-gray-400">
+            <p className="text-base font-medium mb-1 text-gray-700 dark:text-gray-300">
+              {uploadMode === 'fast' ? 'Drop a file here' : 'Drop one or more files here'}
+            </p>
+            <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
               Supports .xlsx, .xls, and .csv files
             </p>
-            <p className="mb-4 text-sm text-gray-400 dark:text-gray-500">
+            <p className="mb-5 text-sm text-gray-400 dark:text-gray-500 max-w-md mx-auto">
               {uploadMode === 'fast'
-                ? 'Skips preview and date filter — imports directly to your dashboard'
-                : 'Drop a single file to import, or multiple files to merge them into one dataset'}
+                ? 'Drop a single file to import directly to your dashboard. For larger files or to filter by date, enable the Controlled Upload toggle.'
+                : 'Preview your data and choose a date range before importing. You can also drop multiple files to merge them into one dataset.'}
             </p>
             {uploading && uploadProgress > 0 ? (
               <div className="relative w-full h-11 rounded-lg overflow-hidden bg-[#4a55d1]/20 border border-[#4a55d1]/30">
@@ -944,13 +931,19 @@ export default function UploadPage() {
 
           {/* Import Instructions */}
           <div className="p-6 rounded-lg bg-card border border-border animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+            {/* Mode description header */}
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              {uploadMode === 'fast'
+                ? 'Drop a single file to import directly to your dashboard'
+                : 'Preview and filter your data before importing'}
+            </h4>
             <div className="flex items-start gap-2 mb-4">
               <AlertCircle className="w-5 h-5 text-[#8B96F2] flex-shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-gray-900 dark:text-white font-semibold mb-2">
-                  Import Instructions
+                  What your file needs
                 </h4>
-                <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
                   <li>
                     <strong>Required Columns:</strong> Bank, Payment Date
                     (leads_result_edate), Payment Amount (leads_result_amount),
@@ -964,7 +957,7 @@ export default function UploadPage() {
                   <h5 className="text-gray-900 dark:text-white font-semibold mb-2">
                     Tips:
                   </h5>
-                  <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                  <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5">
                     <li>Dates can be in YYYY-MM-DD format or Excel serial numbers</li>
                     <li>Payment amounts should be numeric values</li>
                     <li>Column headers are matched flexibly (e.g. &quot;Bank&quot;, &quot;BANK&quot;, &quot;bank&quot; all work)</li>
