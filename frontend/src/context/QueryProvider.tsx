@@ -9,11 +9,10 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Cache for 5 minutes — avoids repeated Neon DB round-trips on navigation
-            staleTime: 5 * 60 * 1000,
-            // Keep unused data in cache for 10 minutes
-            gcTime: 10 * 60 * 1000,
-            // Don't retry on 401/403/404 errors
+            staleTime: 10 * 60 * 1000,   // 10 min default
+            gcTime: 30 * 60 * 1000,       // 30 min
+            refetchOnWindowFocus: false,   // never refetch just because user switched tabs
+            refetchOnMount: false,         // use cache if available
             retry: (failureCount, error) => {
               const msg = (error as Error).message ?? "";
               if (

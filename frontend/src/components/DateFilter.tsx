@@ -1,17 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Calendar } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Calendar, ChevronDown } from "lucide-react";
 import { type DateRange as DayPickerRange } from "react-day-picker";
 import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export type DateRange = "today" | "week" | "month" | "year" | "all" | "custom";
 
@@ -33,79 +26,150 @@ interface DateFilterProps {
   value: DateRange;
   onChange: (range: DateRange, custom?: CustomDateRange) => void;
   customRange?: CustomDateRange;
+  dataStartDate?: Date;
 }
 
-export function DateFilter({ value, onChange, customRange }: DateFilterProps) {
+export function DateFilter({ value, onChange, customRange, dataStartDate }: DateFilterProps) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const [selected, setSelected] = useState<DayPickerRange | undefined>(
     customRange ? { from: customRange.from, to: customRange.to } : undefined
   );
+  const defaultMonth = customRange?.from ?? dataStartDate ?? new Date();
+  const [calendarMonth, setCalendarMonth] = useState<Date>(defaultMonth);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   useEffect(() => {
     if (calendarOpen) {
       setSelected(customRange ? { from: customRange.from, to: customRange.to } : undefined);
+      setCalendarMonth(customRange?.from ?? dataStartDate ?? new Date());
     }
   }, [calendarOpen]);
 
-  const handleDayPickerSelect = (range: DayPickerRange | undefined) => {
-    setSelected(range);
-    if (range?.from && range?.to) {
-      onChange("custom", { from: range.from, to: range.to });
-      setCalendarOpen(false);
-    }
-  };
-
-  const handleSelectChange = (val: string) => {
+  const handleOptionClick = (val: DateRange) => {
+    setDropdownOpen(false);
     if (val === "custom") {
       setCalendarOpen(true);
     } else {
       setSelected(undefined);
-      onChange(val as DateRange);
+      onChange(val);
     }
+  };
+
+  const handleApply = () => {
+    if (selected?.from && selected?.to) {
+      onChange("custom", { from: selected.from, to: selected.to });
+      setCalendarOpen(false);
+    }
+  };
+
+  const handleClear = () => {
+    setSelected(undefined);
+    onChange("all");
+    setCalendarOpen(false);
   };
 
   const displayLabel =
     value === "custom" && customRange
       ? `${customRange.from.toLocaleDateString("en-PH", { month: "short", day: "numeric" })} – ${customRange.to.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}`
-      : undefined;
+      : options.find((o) => o.value === value)?.label ?? "All Time";
+
+  const pickingEnd = selected?.from && !selected?.to;
 
   return (
     <div className="flex items-center gap-2">
       <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400 hidden sm:block" />
 
+      {/* Custom dropdown — always fires on click regardless of current value */}
+      <div ref={dropdownRef} className="relative">
+        <button
+          onClick={() => setDropdownOpen((v) => !v)}
+          className="h-8 min-w-[140px] flex items-center justify-between gap-1.5 px-3 rounded-full border border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+        >
+          <span className="truncate">{displayLabel}</span>
+          <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+        </button>
+
+        {dropdownOpen && (
+          <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleOptionClick(opt.value)}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                  value === opt.value
+                    ? "bg-[#5B66E2] text-white hover:bg-[#4a55d1] dark:hover:bg-[#4a55d1]"
+                    : "text-gray-700 dark:text-gray-200"
+                }`}
+              >
+                {opt.label}
+                {/* Show edit hint when custom is already selected */}
+                {opt.value === "custom" && value === "custom" && (
+                  <span className="text-xs opacity-70 ml-1">edit</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Calendar popover */}
       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
         <PopoverTrigger asChild>
-          <div>
-            <Select value={value} onValueChange={handleSelectChange}>
-              <SelectTrigger className="h-8 w-auto min-w-[140px] gap-1.5 rounded-full border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 focus:ring-[#5B66E2] data-[state=open]:ring-[#5B66E2]">
-                <SelectValue>
-                  {displayLabel ?? options.find((o) => o.value === value)?.label}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {options.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <span />
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
+          <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+            <p className="text-xs font-medium text-gray-700 dark:text-gray-200">
+              {!selected?.from
+                ? "Select start date"
+                : pickingEnd
+                ? "Now select end date"
+                : `${selected.from.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })} → ${selected.to?.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}`}
+            </p>
+            {dataStartDate && !selected?.from && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                Data range starts {dataStartDate.toLocaleDateString("en-PH", { month: "short", year: "numeric" })}
+              </p>
+            )}
+          </div>
           <ShadcnCalendar
             mode="range"
             selected={selected}
-            onSelect={handleDayPickerSelect}
-            numberOfMonths={2}
+            onSelect={setSelected}
+            month={calendarMonth}
+            onMonthChange={setCalendarMonth}
+            numberOfMonths={1}
             captionLayout="dropdown"
-            className="[--rdp-accent-color:#14b8a6] [--rdp-accent-background-color:#ccfbf1] dark:[--rdp-accent-background-color:rgba(20,184,166,0.25)]"
+            className="[--rdp-accent-color:#5B66E2] [--rdp-accent-background-color:#EEF0FD] dark:[--rdp-accent-background-color:rgba(91,102,226,0.25)]"
           />
-          {selected?.from && !selected?.to && (
-            <p className="text-center text-xs text-gray-500 dark:text-gray-400 pb-2">
-              Select end date
-            </p>
-          )}
+          <div className="flex items-center justify-between gap-2 p-3 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={handleClear}
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleApply}
+              disabled={!selected?.from || !selected?.to}
+              className="px-4 py-1.5 text-xs font-medium rounded-md bg-[#5B66E2] text-white hover:bg-[#4a55d1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Apply
+            </button>
+          </div>
         </PopoverContent>
       </Popover>
     </div>
@@ -121,14 +185,18 @@ export function filterByDateRange<T>(
 ): T[] {
   if (range === "all") return items;
 
+  const parseLocal = (s: string): Date | null => {
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  };
+
   if (range === "custom" && custom) {
-    const start = new Date(custom.from);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(custom.to);
-    end.setHours(23, 59, 59, 999);
+    const start = new Date(custom.from.getFullYear(), custom.from.getMonth(), custom.from.getDate());
+    const end = new Date(custom.to.getFullYear(), custom.to.getMonth(), custom.to.getDate());
     return items.filter((item) => {
-      const d = new Date(getDate(item));
-      return !isNaN(d.getTime()) && d >= start && d <= end;
+      const d = parseLocal(getDate(item));
+      return d !== null && d >= start && d <= end;
     });
   }
 
@@ -157,7 +225,7 @@ export function filterByDateRange<T>(
   }
 
   return items.filter((item) => {
-    const d = new Date(getDate(item));
-    return !isNaN(d.getTime()) && d >= start;
+    const d = parseLocal(getDate(item));
+    return d !== null && d >= start;
   });
 }

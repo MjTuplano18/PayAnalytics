@@ -16,7 +16,7 @@ class UploadRepository:
         file_name: str,
         records: list[PaymentRecordIn],
     ) -> UploadSession:
-        total_amount = sum(r.payment_amount for r in records)
+        total_amount = round(sum(r.payment_amount for r in records), 2)
         upload = UploadSession(
             user_id=user_id,
             file_name=file_name,
@@ -33,8 +33,9 @@ class UploadRepository:
                 account=r.account,
                 touchpoint=r.touchpoint,
                 payment_date=r.payment_date,
-                payment_amount=r.payment_amount,
+                payment_amount=round(r.payment_amount, 2),
                 environment=r.environment,
+                month=r.month,
             )
             for r in records
         ]
@@ -253,6 +254,7 @@ class UploadRepository:
         search: str | None = None,
         payment_date: str | None = None,
         environment: str | None = None,
+        month: str | None = None,
         page: int = 1,
         page_size: int = 25,
     ) -> tuple[int, float, list[PaymentRecord]]:
@@ -276,6 +278,8 @@ class UploadRepository:
             query = query.where(PaymentRecord.payment_date == payment_date)
         if environment:
             query = query.where(PaymentRecord.environment == environment)
+        if month:
+            query = query.where(func.upper(PaymentRecord.month) == month.upper())
         if search:
             pattern = f"%{search}%"
             query = query.where(
@@ -324,7 +328,7 @@ class UploadRepository:
             ).where(PaymentRecord.session_id == session_id)
         )
         total_payments, total_amount, total_accounts, total_banks = totals.one()
-        total_amount = total_amount or 0.0
+        total_amount = round(total_amount or 0.0, 2)
 
         # Bank breakdown
         bank_rows = await self.session.execute(
@@ -343,7 +347,7 @@ class UploadRepository:
                 "bank": row.bank,
                 "payment_count": row.payment_count,
                 "account_count": row.account_count,
-                "total_amount": row.total_amount or 0.0,
+                "total_amount": round(row.total_amount or 0.0, 2),
                 "percentage": round((row.total_amount or 0.0) / total_amount * 100, 2) if total_amount else 0,
             }
             for row in bank_rows.all()
@@ -388,6 +392,20 @@ class UploadRepository:
         )
         environments = [row[0] for row in env_rows.all()]
 
+        # Distinct months (in calendar order)
+        _month_order = {
+            "JANUARY": 1, "FEBRUARY": 2, "MARCH": 3, "APRIL": 4,
+            "MAY": 5, "JUNE": 6, "JULY": 7, "AUGUST": 8,
+            "SEPTEMBER": 9, "OCTOBER": 10, "NOVEMBER": 11, "DECEMBER": 12,
+        }
+        month_rows = await self.session.execute(
+            select(func.distinct(func.upper(PaymentRecord.month)))
+            .where(PaymentRecord.session_id == session_id)
+            .where(PaymentRecord.month.isnot(None))
+        )
+        months_raw = [row[0] for row in month_rows.all() if row[0]]
+        months = sorted(months_raw, key=lambda m: _month_order.get(m, 99))
+
         # Environment → bank → touchpoint mapping (for cascading filters)
         env_bank_tp_rows = await self.session.execute(
             select(
@@ -430,6 +448,7 @@ class UploadRepository:
             "touchpoints": touchpoints,
             "dates": dates,
             "environments": environments,
+            "months": months,
             "environment_map": environment_map,
             "session_id": session_id,
         }

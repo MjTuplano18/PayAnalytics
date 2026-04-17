@@ -38,12 +38,16 @@ export const queryKeys = {
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
-/** Fetch aggregated dashboard KPIs for a session — cached 5 minutes */
+/** Fetch aggregated dashboard KPIs for a session — cached 10 minutes */
 export function useDashboard(token: string | null, sessionId: string | null) {
   return useQuery({
     queryKey: queryKeys.dashboard(token!, sessionId!),
     queryFn: () => getDashboardSummary(token!, sessionId!),
     enabled: !!token && !!sessionId,
+    staleTime: 10 * 60 * 1000,   // 10 min — don't refetch on tab switch
+    gcTime: 30 * 60 * 1000,      // 30 min — keep in memory
+    refetchOnWindowFocus: false,  // don't refetch when user switches browser tabs
+    refetchOnMount: false,        // don't refetch if data already in cache
   });
 }
 
@@ -65,12 +69,15 @@ export function useTransactions(
     queryKey: queryKeys.transactions(token!, sessionId!, filters),
     queryFn: () => getTransactions(token!, sessionId!, filters),
     enabled: !!token && !!sessionId,
-    placeholderData: keepPreviousData, // smooth page transitions
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    placeholderData: keepPreviousData,
   });
 }
 
-/** List all upload sessions for the current user — cached 5 minutes.
- *  Pass `{ refetchInterval }` to enable polling (e.g. for auto-reload on Uploads page). */
+/** List all upload sessions for the current user */
 export function useUploads(
   token: string | null,
   options: { refetchInterval?: number } = {}
@@ -79,6 +86,10 @@ export function useUploads(
     queryKey: queryKeys.uploads(token!),
     queryFn: () => listUploads(token!),
     enabled: !!token,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
     select: (data) =>
       [...data].sort(
         (a, b) =>

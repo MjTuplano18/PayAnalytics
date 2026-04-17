@@ -33,15 +33,39 @@ function findColumn(
   });
 }
 
-/** Convert Excel date values to a readable date string */
+/** Convert Excel date values to YYYY-MM-DD string */
 function formatDate(value: unknown): string {
   if (value instanceof Date) {
-    return value.toISOString().split("T")[0];
+    // Avoid timezone shift by using UTC parts
+    const y = value.getUTCFullYear();
+    const m = String(value.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(value.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
   }
   if (typeof value === "number" && value > 30000 && value < 100000) {
-    // Excel serial date fallback
+    // Excel serial date
     const date = new Date((value - 25569) * 86400 * 1000);
-    return date.toISOString().split("T")[0];
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(date.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const s = value.trim();
+    // MM/DD/YYYY → YYYY-MM-DD
+    const mdyMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (mdyMatch) {
+      const [, mm, dd, yyyy] = mdyMatch;
+      return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+    }
+    // DD-MM-YYYY → YYYY-MM-DD
+    const dmyMatch = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (dmyMatch) {
+      const [, dd, mm, yyyy] = dmyMatch;
+      return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+    }
+    // Already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
   }
   return String(value || "");
 }
@@ -71,6 +95,16 @@ function extractCellValue(
       .join("");
   }
   return String(cellValue);
+}
+
+/**
+ * Sum an array of peso amounts accurately.
+ * Converts each value to centavos (integer) before summing to avoid
+ * IEEE 754 floating-point drift across large datasets.
+ */
+function sumAmounts(amounts: number[]): number {
+  const centavos = amounts.reduce((s, a) => s + Math.round(a * 100), 0);
+  return centavos / 100;
 }
 
 export async function parseExcelFile(file: File): Promise<ParsedData> {
@@ -124,28 +158,34 @@ function categorizePaymentData(data: DataRow[]): ParsedData {
   const bankCol = findColumn(keys, ["bank"]);
   const dateCol = findColumn(keys, [
     "leads_result_edate",
+    "date_created",
     "payment date",
+    "paymentdate",
     "edate",
     "date",
   ]);
   const amountCol = findColumn(keys, [
     "leads_result_amount",
     "payment amount",
+    "paymentamount",
     "amount",
   ]);
-  const accountCol = findColumn(keys, ["debtor_id", "account", "debtor"]);
+  const accountCol = findColumn(keys, ["debtor_id", "debtorid", "account", "debtor"]);
   const touchpointCol = findColumn(keys, ["tagging", "touchpoint", "tag"]);
   const envCol = findColumn(keys, ["environment", "env"]);
+
+  const monthCol = findColumn(keys, ["month"]);
 
   const payments: PaymentRecord[] = data.map((row) => ({
     bank: bankCol ? String(row[bankCol] || "Unknown") : "Unknown",
     paymentDate: dateCol ? formatDate(row[dateCol]) : "",
-    paymentAmount: amountCol ? Number(row[amountCol]) || 0 : 0,
+    paymentAmount: amountCol ? Math.round((Number(row[amountCol]) || 0) * 100) / 100 : 0,
     account: accountCol ? String(row[accountCol] || "") : "",
     touchpoint: touchpointCol
       ? String(row[touchpointCol] || "NO TOUCHPOINT")
       : "NO TOUCHPOINT",
     environment: envCol ? String(row[envCol] || "") : undefined,
+    month: monthCol ? String(row[monthCol] || "").toUpperCase() || undefined : undefined,
   }));
 
   return computeAnalytics(payments, data);
@@ -155,60 +195,66 @@ function computeAnalytics(
   payments: PaymentRecord[],
   raw: DataRow[]
 ): ParsedData {
-  const totalAmount = payments.reduce((s, p) => s + p.paymentAmount, 0);
+  const totalAmount = sumAmounts(payments.map((p) => p.paymentAmount));
   const uniqueAccounts = new Set(payments.map((p) => p.account));
 
   // Bank analytics
   const bankMap = new Map<
     string,
-    { accounts: Set<string>; amount: number; debtorIds: number; count: number }
+    { accounts: Set<string>; amounts: number[]; debtorIds: number; count: number }
   >();
   for (const p of payments) {
     if (!bankMap.has(p.bank)) {
       bankMap.set(p.bank, {
         accounts: new Set(),
-        amount: 0,
+        amounts: [],
         debtorIds: 0,
         count: 0,
       });
     }
     const entry = bankMap.get(p.bank)!;
     entry.accounts.add(p.account);
-    entry.amount += p.paymentAmount;
+    entry.amounts.push(p.paymentAmount);
     entry.debtorIds += Number(p.account) || 0;
     entry.count++;
   }
 
   const bankAnalytics: BankAnalytics[] = Array.from(bankMap.entries())
-    .map(([bank, d]) => ({
-      bank,
-      accountCount: d.accounts.size,
-      totalAmount: d.amount,
-      debtorSum: d.debtorIds,
-      percentage: totalAmount > 0 ? (d.amount / totalAmount) * 100 : 0,
-      paymentCount: d.count,
-    }))
+    .map(([bank, d]) => {
+      const bankTotal = sumAmounts(d.amounts);
+      return {
+        bank,
+        accountCount: d.accounts.size,
+        totalAmount: bankTotal,
+        debtorSum: d.debtorIds,
+        percentage: totalAmount > 0 ? (bankTotal / totalAmount) * 100 : 0,
+        paymentCount: d.count,
+      };
+    })
     .sort((a, b) => b.totalAmount - a.totalAmount);
 
   // Touchpoint analytics
-  const tpMap = new Map<string, { count: number; amount: number }>();
+  const tpMap = new Map<string, { count: number; amounts: number[] }>();
   for (const p of payments) {
     const tp = p.touchpoint || "NO TOUCHPOINT";
-    if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, amount: 0 });
+    if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, amounts: [] });
     const entry = tpMap.get(tp)!;
     entry.count++;
-    entry.amount += p.paymentAmount;
+    entry.amounts.push(p.paymentAmount);
   }
 
   const touchpointAnalytics: TouchpointAnalytics[] = Array.from(
     tpMap.entries()
   )
-    .map(([touchpoint, d]) => ({
-      touchpoint,
-      count: d.count,
-      totalAmount: d.amount,
-      percentage: totalAmount > 0 ? (d.amount / totalAmount) * 100 : 0,
-    }))
+    .map(([touchpoint, d]) => {
+      const tpTotal = sumAmounts(d.amounts);
+      return {
+        touchpoint,
+        count: d.count,
+        totalAmount: tpTotal,
+        percentage: totalAmount > 0 ? (tpTotal / totalAmount) * 100 : 0,
+      };
+    })
     .sort((a, b) => b.count - a.count);
 
   return {

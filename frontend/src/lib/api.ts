@@ -1,14 +1,18 @@
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
 
+const TOKEN_KEY = "pa_access_token";
+const REFRESH_KEY = "pa_refresh_token";
+
 interface FetchOptions extends RequestInit {
   token?: string;
+  _isRetry?: boolean;
 }
 
 export async function apiFetch<T>(
   path: string,
   options: FetchOptions = {}
 ): Promise<T> {
-  const { token, headers, ...rest } = options;
+  const { token, headers, _isRetry, ...rest } = options;
 
   const res = await fetch(`${API_BASE}${path}`, {
     headers: {
@@ -19,12 +23,39 @@ export async function apiFetch<T>(
     ...rest,
   });
 
+  // Auto-refresh on 401 — try once with a fresh token
+  if (res.status === 401 && !_isRetry && typeof window !== "undefined") {
+    const refreshToken = localStorage.getItem(REFRESH_KEY);
+    if (refreshToken) {
+      try {
+        const refreshRes = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (refreshRes.ok) {
+          const tokens = await refreshRes.json();
+          localStorage.setItem(TOKEN_KEY, tokens.access_token);
+          localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
+          // Retry original request with new token
+          return apiFetch<T>(path, { ...options, token: tokens.access_token, _isRetry: true });
+        }
+      } catch {
+        // refresh failed — fall through to throw
+      }
+    }
+    // Refresh failed or no refresh token — redirect to login
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+    window.location.href = "/login";
+    throw new Error("Session expired. Please log in again.");
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail || `Request failed (${res.status})`);
   }
 
-  // Handle 204 No Content (empty body)
   if (res.status === 204) {
     return undefined as T;
   }
@@ -100,6 +131,7 @@ export interface PaymentRecordIn {
   payment_date?: string;
   payment_amount: number;
   environment?: string;
+  month?: string;
 }
 
 export interface PaymentRecordOut extends PaymentRecordIn {
@@ -158,6 +190,7 @@ export interface DashboardSummary {
   touchpoints: TouchpointSummary[];
   dates: string[];
   environments: string[];
+  months: string[];
   environment_map: EnvironmentCampaignMap[];
   session_id: string | null;
 }

@@ -1,392 +1,349 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
-import { DollarSign, Users, FileText, Landmark, Waypoints, Hash, BarChart3, ChevronDown, Check, Globe, Info } from "lucide-react";
+import { DollarSign, Users, FileText, Landmark, Waypoints, Hash, BarChart3, ChevronDown, Check, Globe, Info, TrendingUp, Building2, Radio } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { DynamicChart } from "@/components/DynamicChart";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
-import { PeriodComparison } from "@/components/PeriodComparison";
 import { type DashboardSummary } from "@/lib/api";
 import { useDashboard } from "@/lib/queries";
 
-/** Format number with commas */
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { maximumFractionDigits: 0 });
+}
+function fmtAmt(n: number): string {
+  return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Classify touchpoint into channel type
+function channelType(tp: string): string {
+  const u = tp.toUpperCase().trim();
+  if (u.startsWith("IB ") || u === "IB CALL" || u === "IB EMAIL" || u === "IB SMS" || u === "IB VIBER" || u === "IB FIELD" || u === "IB WALKIN" || u === "IB WHATSAPP" || u === "IB VISIT" || u === "IB DEBIT" || u === "IB REPO AI" || u === "IB SKIPTRACE") return "Inbound";
+  if (u.startsWith("OB ") || u === "OB CALL" || u === "OB EMAIL" || u === "OB SMS" || u === "OB VIBER" || u === "OB FIELD" || u === "OB WALKIN" || u === "OB DEBIT" || u === "OB REPO AI" || u === "OB SKIPTRACE" || u === "OB PAIDLIST") return "Outbound";
+  if (u === "GHOST PAYMENT") return "Ghost Payment";
+  if (u === "NO TOUCHPOINT") return "No Touchpoint";
+  // Bare touchpoints (no IB/OB prefix) — CALL, EMAIL, SMS, VIBER, FIELD, WALKIN,
+  // DEBIT, DIGITAL, VISIT, WHATSAPP, SKIPTRACE, VIBER, REPO AI, FINNONE, WALKIN, etc.
+  return "With Touchpoint";
 }
 
 export default function DashboardPage() {
   const { data, sessionId } = useData();
   const { token, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"overview" | "touchpoints" | "environments">("overview");
+  const [activeTab, setActiveTab] = useState<"summary" | "portfolio" | "channels">("summary");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const { data: apiSummary, isLoading: apiLoading } = useDashboard(token, sessionId);
 
-  // Touchpoints tab state
+  // Portfolio tab filters
+  const [selectedEnvironments, setSelectedEnvironments] = useState<Set<string>>(new Set());
+  const [envDropdownOpen, setEnvDropdownOpen] = useState(false);
+  const envDropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedBanks, setSelectedBanks] = useState<Set<string>>(new Set());
+  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
+  const bankDropdownRef = useRef<HTMLDivElement>(null);
+  const [portfolioBankTopN, setPortfolioBankTopN] = useState<number | "all">(20);
+  const [portfolioBankPage, setPortfolioBankPage] = useState(1);
+
+  // Channels tab filters
   const [selectedTouchpoints, setSelectedTouchpoints] = useState<Set<string>>(new Set());
   const [tpDropdownOpen, setTpDropdownOpen] = useState(false);
   const tpDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Environment filter state
-  const [selectedEnvironments, setSelectedEnvironments] = useState<Set<string>>(new Set());
-  const [envDropdownOpen, setEnvDropdownOpen] = useState(false);
-  const envDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Bank filter state (environments tab)
-  const [selectedBanks, setSelectedBanks] = useState<Set<string>>(new Set());
-  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
-  const bankDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Top-N bank chart limit
-  const [bankTopN, setBankTopN] = useState<number | "all">(20);
-  const [envBankTopN, setEnvBankTopN] = useState<number | "all">(20);
-
-  // Bank Analytics table pagination
-  const [bankPage, setBankPage] = useState(1);
-  const [envBankPage, setEnvBankPage] = useState(1);
   const bankRowsPerPage = 15;
 
-  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (tpDropdownRef.current && !tpDropdownRef.current.contains(e.target as Node)) {
-        setTpDropdownOpen(false);
-      }
-      if (envDropdownRef.current && !envDropdownRef.current.contains(e.target as Node)) {
-        setEnvDropdownOpen(false);
-      }
-      if (bankDropdownRef.current && !bankDropdownRef.current.contains(e.target as Node)) {
-        setBankDropdownOpen(false);
-      }
+      if (tpDropdownRef.current && !tpDropdownRef.current.contains(e.target as Node)) setTpDropdownOpen(false);
+      if (envDropdownRef.current && !envDropdownRef.current.contains(e.target as Node)) setEnvDropdownOpen(false);
+      if (bankDropdownRef.current && !bankDropdownRef.current.contains(e.target as Node)) setBankDropdownOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Base filtered payments (date filter applies to all tabs)
   const payments = useMemo(() => {
     if (!data) return [];
     return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
   }, [data, dateRange, customRange]);
 
-  // Monthly trend from in-memory data (API doesn't aggregate by month yet)
-  const monthlyTrend = useMemo(() => {
-    if (payments.length === 0) return [];
-    const map = new Map<string, number>();
-    for (const p of payments) {
-      const month = p.paymentDate.slice(0, 7) || "Unknown";
-      map.set(month, (map.get(month) || 0) + p.paymentAmount);
-    }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, amount]) => ({ month, amount }));
-  }, [payments]);
+  const dataStartDate = useMemo(() => {
+    if (!data || data.payments.length === 0) return undefined;
+    const dates = data.payments.map((p) => p.paymentDate).filter(Boolean).sort();
+    if (!dates.length) return undefined;
+    const [y, m, d] = dates[0].split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }, [data]);
 
-  // Use backend summary only when showing all data (no date filter active)
-  // When a date filter is active, always compute in-memory from filtered payments
   const isFiltered = dateRange !== "all";
 
+  // ── Core analytics (used by Summary + Portfolio) ──
   const rawFa = useMemo(() => {
     if (apiSummary && !isFiltered) {
       return {
         totalAmount: apiSummary.total_amount,
         totalAccounts: apiSummary.total_accounts,
         totalPayments: apiSummary.total_payments,
-        bankAnalytics: apiSummary.banks.map((b) => {
-          // compute debtorSum from in-memory data for this bank
-          const bankPayments = (data?.payments ?? []).filter((p) => p.bank === b.bank);
-          const debtorSum = bankPayments.reduce((s, p) => s + (Number(p.account) || 0), 0);
-          return {
-            bank: b.bank,
-            accountCount: b.account_count,
-            totalAmount: b.total_amount,
-            debtorSum,
-            percentage: b.percentage,
-            paymentCount: b.payment_count,
-          };
-        }),
+        bankAnalytics: apiSummary.banks.map((b) => ({
+          bank: b.bank, accountCount: b.account_count, totalAmount: b.total_amount,
+          debtorSum: b.payment_count, percentage: b.percentage, paymentCount: b.payment_count,
+        })),
         touchpointAnalytics: apiSummary.touchpoints.map((t) => ({
-          touchpoint: t.touchpoint,
-          count: t.count,
-          totalAmount: t.total_amount,
-          percentage: t.percentage,
+          touchpoint: t.touchpoint, count: t.count, totalAmount: t.total_amount, percentage: t.percentage,
         })),
       };
     }
     if (payments.length === 0) return null;
-    const bankMap = new Map<string, { accountCount: number; totalAmount: number; debtorSum: number; paymentCount: number; accounts: Set<string> }>();
-    const tpMap = new Map<string, { count: number; totalAmount: number }>();
-    let totalAmount = 0;
+    const bankMap = new Map<string, { amounts: number[]; paymentCount: number; accounts: Set<string> }>();
+    const tpMap = new Map<string, { count: number; amounts: number[] }>();
     const allAccounts = new Set<string>();
-
+    const sc = (nums: number[]) => nums.reduce((s, n) => s + Math.round(n * 100), 0) / 100;
     for (const p of payments) {
-      totalAmount += p.paymentAmount;
       allAccounts.add(p.account);
-
-      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { accountCount: 0, totalAmount: 0, debtorSum: 0, paymentCount: 0, accounts: new Set() });
-      const bEntry = bankMap.get(p.bank)!;
-      bEntry.totalAmount += p.paymentAmount;
-      bEntry.debtorSum += parseInt(p.account) || 0;
-      bEntry.paymentCount++;
-      bEntry.accounts.add(p.account);
-
-      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
-      const tEntry = tpMap.get(p.touchpoint)!;
-      tEntry.count++;
-      tEntry.totalAmount += p.paymentAmount;
+      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { amounts: [], paymentCount: 0, accounts: new Set() });
+      const b = bankMap.get(p.bank)!; b.amounts.push(p.paymentAmount); b.paymentCount++; b.accounts.add(p.account);
+      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, amounts: [] });
+      const t = tpMap.get(p.touchpoint)!; t.count++; t.amounts.push(p.paymentAmount);
     }
-
+    const totalAmount = sc(payments.map((p) => p.paymentAmount));
     const bankAnalytics = Array.from(bankMap.entries())
-      .map(([bank, d]) => ({ bank, accountCount: d.accounts.size, totalAmount: d.totalAmount, debtorSum: d.debtorSum, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount }))
+      .map(([bank, d]) => { const bt = sc(d.amounts); return { bank, accountCount: d.accounts.size, totalAmount: bt, debtorSum: d.paymentCount, percentage: totalAmount > 0 ? (bt / totalAmount) * 100 : 0, paymentCount: d.paymentCount }; })
       .sort((a, b) => b.totalAmount - a.totalAmount);
-
     const touchpointAnalytics = Array.from(tpMap.entries())
-      .map(([touchpoint, d]) => ({ touchpoint, count: d.count, totalAmount: d.totalAmount, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0 }))
+      .map(([touchpoint, d]) => { const tt = sc(d.amounts); return { touchpoint, count: d.count, totalAmount: tt, percentage: totalAmount > 0 ? (tt / totalAmount) * 100 : 0 }; })
       .sort((a, b) => b.count - a.count);
-
     return { bankAnalytics, touchpointAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: payments.length };
   }, [apiSummary, payments, isFiltered]);
 
-  // Fallback empty analytics object so layout always renders
-  const fa = rawFa ?? {
-    totalAmount: 0,
-    totalAccounts: 0,
-    totalPayments: 0,
-    bankAnalytics: [],
-    touchpointAnalytics: [],
-  };
-
+  const fa = rawFa ?? { totalAmount: 0, totalAccounts: 0, totalPayments: 0, bankAnalytics: [], touchpointAnalytics: [] };
   const noData = !rawFa && !apiLoading;
 
-  // ── Touchpoints tab data ──
-  // ── Environment filter data ──
+  // ── Monthly trend ──
+  const monthlyTrend = useMemo(() => {
+    if (payments.length === 0) return [];
+    const map = new Map<string, number>();
+    for (const p of payments) {
+      const raw = p.paymentDate.slice(0, 7) || "";
+      if (!raw || raw === "Unknown") continue;
+      map.set(raw, (map.get(raw) || 0) + p.paymentAmount);
+    }
+    if (map.size === 0) return [];
+
+    // Sort all months and remove outliers:
+    // keep only months within 3 months of the month that has the most records
+    const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    const peakMonth = Array.from(map.entries()).sort(([, a], [, b]) => b - a)[0][0];
+    const [py, pm] = peakMonth.split("-").map(Number);
+    const peakNum = py * 12 + pm;
+
+    return sorted
+      .filter(([raw]) => {
+        const [y, m] = raw.split("-").map(Number);
+        return Math.abs(y * 12 + m - peakNum) <= 6;
+      })
+      .map(([raw, amount]) => {
+        const parts = raw.split("-");
+        const label = new Date(Number(parts[0]), Number(parts[1]) - 1, 1)
+          .toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        return { month: label, rawMonth: raw, amount };
+      });
+  }, [payments]);
+
+  // ── Portfolio tab data ──
   const allEnvironments = useMemo(() => {
     if (apiSummary) return apiSummary.environments;
     if (!data) return [];
     return [...new Set(data.payments.map((p) => p.environment).filter(Boolean) as string[])].sort();
   }, [apiSummary, data]);
 
-  const toggleEnvironment = (env: string) => {
-    setSelectedEnvironments((prev) => {
-      const next = new Set(prev);
-      if (next.has(env)) next.delete(env);
-      else next.add(env);
-      // Reset touchpoint selection when env changes
-      setSelectedTouchpoints(new Set());
-      return next;
-    });
-  };
-
-  const clearEnvFilter = () => {
-    setSelectedEnvironments(new Set());
-    setSelectedTouchpoints(new Set());
-  };
-
-  // Bank filter data (for environments tab)
+  // Banks filtered by selected environments (cascading)
   const allBanks = useMemo(() => {
+    // If environments are selected, only show banks that exist in those environments
+    if (selectedEnvironments.size > 0) {
+      if (apiSummary?.environment_map) {
+        const bankSet = new Set<string>();
+        for (const envEntry of apiSummary.environment_map) {
+          if (selectedEnvironments.has(envEntry.environment)) {
+            envEntry.banks.forEach((b) => bankSet.add(b));
+          }
+        }
+        return Array.from(bankSet).sort();
+      }
+      // In-memory fallback
+      if (data) {
+        const bankSet = new Set<string>();
+        data.payments
+          .filter((p) => selectedEnvironments.has(p.environment || "Unknown"))
+          .forEach((p) => bankSet.add(p.bank));
+        return Array.from(bankSet).sort();
+      }
+      return [];
+    }
+    // No environment selected — show all banks
     if (apiSummary) return apiSummary.banks.map((b) => b.bank).sort();
     if (!data) return [];
     return [...new Set(data.payments.map((p) => p.bank))].sort();
-  }, [apiSummary, data]);
-
-  const toggleBank = (bank: string) => {
-    setSelectedBanks((prev) => {
-      const next = new Set(prev);
-      if (next.has(bank)) next.delete(bank);
-      else next.add(bank);
-      return next;
-    });
-  };
-
-  const clearBankFilter = () => setSelectedBanks(new Set());
-
-  // Touchpoints available based on selected environments (cascading)
-  const allTouchpoints = useMemo(() => {
-    if (apiSummary) {
-      const envMap = apiSummary.environment_map ?? [];
-      if (selectedEnvironments.size > 0 && envMap.length > 0) {
-        const tpSet = new Set<string>();
-        for (const envEntry of envMap) {
-          if (selectedEnvironments.has(envEntry.environment)) {
-            for (const tps of Object.values(envEntry.touchpoints_by_bank)) {
-              tps.forEach((tp) => tpSet.add(tp));
-            }
-          }
-        }
-        return Array.from(tpSet).sort();
-      }
-      return apiSummary.touchpoints.map((t) => t.touchpoint);
-    }
-    if (!data) return [];
-    const filteredPayments = selectedEnvironments.size > 0
-      ? data.payments.filter((p) => selectedEnvironments.has(p.environment || "Unknown"))
-      : data.payments;
-    return [...new Set(filteredPayments.map((p) => p.touchpoint || "Unknown"))].sort();
   }, [apiSummary, data, selectedEnvironments]);
 
-  const toggleTouchpoint = (tp: string) => {
-    setSelectedTouchpoints((prev) => {
-      const next = new Set(prev);
-      if (next.has(tp)) next.delete(tp);
-      else next.add(tp);
-      return next;
-    });
-  };
-
-  const clearTpFilter = () => setSelectedTouchpoints(new Set());
-
-  const touchpointAnalytics = useMemo(() => {
-    // When environments are selected, always use in-memory filtering for accuracy
-    const envFiltered = selectedEnvironments.size > 0
-      ? payments.filter((p) => selectedEnvironments.has(p.environment || "Unknown"))
-      : payments;
-
-    if (apiSummary && !isFiltered && selectedEnvironments.size === 0) {
-      return apiSummary.touchpoints.map((t) => ({
-        touchpoint: t.touchpoint,
-        count: t.count,
-        totalAmount: t.total_amount,
-        percentage: t.percentage,
-      }));
-    }
-    if (envFiltered.length === 0) return [];
-    const tpMap = new Map<string, { count: number; totalAmount: number }>();
-    let totalAmount = 0;
-    for (const p of envFiltered) {
-      totalAmount += p.paymentAmount;
-      const tp = p.touchpoint || "Unknown";
-      if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, totalAmount: 0 });
-      const entry = tpMap.get(tp)!;
-      entry.count++;
-      entry.totalAmount += p.paymentAmount;
-    }
-    return Array.from(tpMap.entries())
-      .map(([touchpoint, d]) => ({
-        touchpoint,
-        count: d.count,
-        totalAmount: d.totalAmount,
-        percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [apiSummary, payments, isFiltered, selectedEnvironments]);
-
-  const filteredTpAnalytics = useMemo(() => {
-    if (selectedTouchpoints.size === 0) return touchpointAnalytics;
-    return touchpointAnalytics.filter((t) => selectedTouchpoints.has(t.touchpoint));
-  }, [touchpointAnalytics, selectedTouchpoints]);
-
-  const tpTotalTransactions = filteredTpAnalytics.reduce((s, t) => s + t.count, 0);
-  const tpTotalAmount = filteredTpAnalytics.reduce((s, t) => s + t.totalAmount, 0);
-  const tpUniqueTouchpoints = filteredTpAnalytics.length;
-  const tpTopTouchpoint = filteredTpAnalytics[0]?.touchpoint ?? "—";
-  const tpNoData = filteredTpAnalytics.length === 0 && !apiLoading;
-
-  const tpMetricCards = [
-    { label: "Total Transactions", value: fmt(tpTotalTransactions), icon: Hash, iconBg: "bg-[#5B66E2]" },
-    { label: "Total Amount", value: `₱${fmt(tpTotalAmount)}`, icon: DollarSign, iconBg: "bg-[#4a55d1]" },
-    { label: "Unique Touchpoints", value: fmt(tpUniqueTouchpoints), icon: Waypoints, iconBg: "bg-[#5B66E2]" },
-    { label: "Top Touchpoint", value: tpTopTouchpoint, icon: BarChart3, iconBg: "bg-[#4048c0]" },
-  ];
-
-  // ── Environments tab data (bank-only, filtered by environment and bank) ──
-  const envFilteredPayments = useMemo(() => {
-    let filtered = payments;
-    if (selectedEnvironments.size > 0) {
-      filtered = filtered.filter((p) => selectedEnvironments.has(p.environment || "Unknown"));
-    }
-    if (selectedBanks.size > 0) {
-      filtered = filtered.filter((p) => selectedBanks.has(p.bank));
-    }
-    return filtered;
+  const portfolioFiltered = useMemo(() => {
+    let f = payments;
+    if (selectedEnvironments.size > 0) f = f.filter((p) => selectedEnvironments.has(p.environment || "Unknown"));
+    if (selectedBanks.size > 0) f = f.filter((p) => selectedBanks.has(p.bank));
+    return f;
   }, [payments, selectedEnvironments, selectedBanks]);
 
-  const envBankAnalytics = useMemo(() => {
-    const src = envFilteredPayments;
+  const portfolioAnalytics = useMemo(() => {
+    const src = portfolioFiltered;
     if (src.length === 0) return { bankAnalytics: [] as typeof fa.bankAnalytics, totalAmount: 0, totalAccounts: 0, totalPayments: 0 };
-    const bankMap = new Map<string, { accountCount: number; totalAmount: number; debtorSum: number; paymentCount: number; accounts: Set<string> }>();
-    let totalAmount = 0;
+    const bankMap = new Map<string, { amounts: number[]; paymentCount: number; accounts: Set<string> }>();
     const allAccounts = new Set<string>();
     for (const p of src) {
-      totalAmount += p.paymentAmount;
       allAccounts.add(p.account);
-      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { accountCount: 0, totalAmount: 0, debtorSum: 0, paymentCount: 0, accounts: new Set() });
-      const bEntry = bankMap.get(p.bank)!;
-      bEntry.totalAmount += p.paymentAmount;
-      bEntry.debtorSum += parseInt(p.account) || 0;
-      bEntry.paymentCount++;
-      bEntry.accounts.add(p.account);
+      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { amounts: [], paymentCount: 0, accounts: new Set() });
+      const b = bankMap.get(p.bank)!; b.amounts.push(p.paymentAmount); b.paymentCount++; b.accounts.add(p.account);
     }
+    const totalAmount = src.reduce((s, p) => s + Math.round(p.paymentAmount * 100), 0) / 100;
     const bankAnalytics = Array.from(bankMap.entries())
-      .map(([bank, d]) => ({ bank, accountCount: d.accounts.size, totalAmount: d.totalAmount, debtorSum: d.debtorSum, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount }))
+      .map(([bank, d]) => { const bt = d.amounts.reduce((s, n) => s + Math.round(n * 100), 0) / 100; return { bank, accountCount: d.accounts.size, totalAmount: bt, debtorSum: d.paymentCount, percentage: totalAmount > 0 ? (bt / totalAmount) * 100 : 0, paymentCount: d.paymentCount }; })
       .sort((a, b) => b.totalAmount - a.totalAmount);
     return { bankAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: src.length };
-  }, [envFilteredPayments]);
+  }, [portfolioFiltered]);
 
-  const envNoData = envFilteredPayments.length === 0 && !apiLoading;
+  // ── Channels tab data ──
+  const allTouchpoints = useMemo(() => {
+    if (apiSummary) return apiSummary.touchpoints.map((t) => t.touchpoint);
+    if (!data) return [];
+    return [...new Set(data.payments.map((p) => p.touchpoint || "Unknown"))].sort();
+  }, [apiSummary, data]);
 
-  const envMetricCards = [
-    { label: "Total Payment Amount", value: `₱${fmt(envBankAnalytics.totalAmount)}`, icon: DollarSign, iconBg: "bg-[#5B66E2]" },
-    { label: "Count of Accounts", value: fmt(envBankAnalytics.totalAccounts), icon: Users, iconBg: "bg-[#4a55d1]" },
-    { label: "Total Transactions", value: fmt(envBankAnalytics.totalPayments), icon: FileText, iconBg: "bg-[#5B66E2]" },
-    { label: "Banks / Portfolios", value: fmt(envBankAnalytics.bankAnalytics.length), icon: Landmark, iconBg: "bg-[#4048c0]" },
+  const channelAnalytics = useMemo(() => {
+    const src = selectedTouchpoints.size > 0
+      ? payments.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
+      : payments;
+    if (src.length === 0) return [];
+    const tpMap = new Map<string, { count: number; amounts: number[] }>();
+    for (const p of src) {
+      const tp = p.touchpoint || "Unknown";
+      if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, amounts: [] });
+      const t = tpMap.get(tp)!; t.count++; t.amounts.push(p.paymentAmount);
+    }
+    const totalAmount = src.reduce((s, p) => s + Math.round(p.paymentAmount * 100), 0) / 100;
+    return Array.from(tpMap.entries())
+      .map(([touchpoint, d]) => { const tt = d.amounts.reduce((s, n) => s + Math.round(n * 100), 0) / 100; return { touchpoint, count: d.count, totalAmount: tt, percentage: totalAmount > 0 ? (tt / totalAmount) * 100 : 0 }; })
+      .sort((a, b) => b.count - a.count);
+  }, [payments, selectedTouchpoints]);
+
+  // Channel type grouping (IB / OB / Direct / Ghost / Automated / No Touchpoint)
+  const channelGroupData = useMemo(() => {
+    const src = selectedTouchpoints.size > 0
+      ? payments.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
+      : payments;
+    const groupMap = new Map<string, { count: number; amount: number }>();
+    for (const p of src) {
+      const g = channelType(p.touchpoint || "");
+      if (!groupMap.has(g)) groupMap.set(g, { count: 0, amount: 0 });
+      const e = groupMap.get(g)!; e.count++; e.amount += p.paymentAmount;
+    }
+    return Array.from(groupMap.entries())
+      .map(([group, d]) => ({ group, count: d.count, amount: Math.round(d.amount * 100) / 100 }))
+      .sort((a, b) => b.count - a.count);
+  }, [payments, selectedTouchpoints]);
+
+  const tpTotal = channelAnalytics.reduce((s, t) => s + t.count, 0);
+  const tpTotalAmount = channelAnalytics.reduce((s, t) => s + Math.round(t.totalAmount * 100), 0) / 100;
+
+  // ── Shared pagination reset on tab change ──
+  useEffect(() => { setPortfolioBankPage(1); }, [activeTab, selectedEnvironments, selectedBanks, dateRange]);
+
+  const TABS = [
+    { id: "summary" as const, label: "Overview", icon: TrendingUp },
+    { id: "portfolio" as const, label: "Banks", icon: Building2 },
+    { id: "channels" as const, label: "Touchpoints", icon: Radio },
   ];
 
-  const metricCards = [
-    { label: "Total Payment Amount", value: `₱${fmt(fa.totalAmount)}`, icon: DollarSign, iconBg: "bg-[#5B66E2]", info: "Sum of all payment amounts" },
-    { label: "Count of Accounts", value: fmt(fa.totalAccounts), icon: Users, iconBg: "bg-[#4a55d1]", info: "Unique accounts in dataset" },
-    { label: "Total Transactions", value: fmt(fa.totalPayments), icon: FileText, iconBg: "bg-[#5B66E2]", info: "Total number of payments" },
-    { label: "Banks / Portfolios", value: fmt(fa.bankAnalytics.length), icon: Landmark, iconBg: "bg-[#4048c0]", info: "Distinct banks or portfolios" },
-  ];
+  const paginationBtnClass = "px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors";
+  const dropdownBtnClass = "flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors";
+  const dropdownPanelClass = "absolute right-0 top-full mt-1 z-50 w-64 max-h-72 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg";
+
+  function MetricCard({ label, value, icon: Icon, iconBg, info }: { label: string; value: string; icon: React.ElementType; iconBg: string; info?: string }) {
+    return (
+      <Card className="p-5 bg-card border-border hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-default">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</span>
+          <div className={`p-2 ${iconBg} rounded-lg`}><Icon className="w-4 h-4 text-white" /></div>
+        </div>
+        <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">{value}</div>
+        {info && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{info}</p>}
+      </Card>
+    );
+  }
+
+  function SkeletonCard() {
+    return (
+      <Card className="p-5 bg-card border-border">
+        <div className="flex items-center justify-between mb-3"><Skeleton className="h-3 w-28" /><Skeleton className="h-8 w-8 rounded-lg" /></div>
+        <Skeleton className="h-7 w-32 mt-1" />
+      </Card>
+    );
+  }
+
+  function Pagination({ page, setPage, total, rowsPerPage }: { page: number; setPage: (p: number) => void; total: number; rowsPerPage: number }) {
+    const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
+    if (totalPages <= 1) return null;
+    const pages: number[] = [];
+    let start = Math.max(1, page - 2); let end = Math.min(totalPages, start + 4); start = Math.max(1, end - 4);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return (
+      <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-700">
+        <p className="text-sm text-gray-500 dark:text-gray-400">Showing {fmt((page - 1) * rowsPerPage + 1)}–{fmt(Math.min(page * rowsPerPage, total))} of {fmt(total)}</p>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setPage(1)} disabled={page === 1} className={paginationBtnClass}>First</button>
+          <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className={paginationBtnClass}>Prev</button>
+          {pages.map((pg) => <button key={pg} onClick={() => setPage(pg)} className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${pg === page ? "bg-[#4a55d1] text-white border-[#4a55d1] shadow-sm" : paginationBtnClass}`}>{pg}</button>)}
+          <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className={paginationBtnClass}>Next</button>
+          <button onClick={() => setPage(totalPages)} disabled={page === totalPages} className={paginationBtnClass}>Last</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Welcome{user ? `, ${user.full_name.split(" ")[0]}` : ""}!
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Welcome{user ? `, ${user.full_name.split(" ")[0]}` : ""}!</p>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Environment filter (on touchpoints & environments tabs) */}
-          {(activeTab === "touchpoints" || activeTab === "environments") && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Environment filter — Portfolio + Channels tabs */}
+          {(activeTab === "portfolio" || activeTab === "channels") && (
             <div ref={envDropdownRef} className="relative">
-              <button
-                onClick={() => setEnvDropdownOpen((v) => !v)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
-              >
+              <button onClick={() => setEnvDropdownOpen((v) => !v)} className={dropdownBtnClass}>
                 <Globe className="h-4 w-4" />
-                {selectedEnvironments.size === 0
-                  ? "All Environments"
-                  : `${selectedEnvironments.size} selected`}
+                {selectedEnvironments.size === 0 ? "All Environments" : `${selectedEnvironments.size} selected`}
                 <ChevronDown className={`h-4 w-4 transition-transform ${envDropdownOpen ? "rotate-180" : ""}`} />
               </button>
               {envDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 z-50 w-64 max-h-72 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+                <div className={dropdownPanelClass}>
                   {selectedEnvironments.size > 0 && (
-                    <button
-                      onClick={clearEnvFilter}
-                      className="w-full px-3 py-2 text-left text-xs text-[#5B66E2] dark:text-[#8B96F2] hover:bg-muted/50 dark:hover:bg-muted border-b border-gray-200 dark:border-gray-700"
-                    >
-                      Clear selection
-                    </button>
+                    <button onClick={() => { setSelectedEnvironments(new Set()); setSelectedBanks(new Set()); setSelectedTouchpoints(new Set()); }} className="w-full px-3 py-2 text-left text-xs text-[#5B66E2] hover:bg-muted/50 border-b border-gray-200 dark:border-gray-700">Clear selection</button>
                   )}
                   {allEnvironments.map((env) => (
-                    <button
-                      key={env}
-                      onClick={() => toggleEnvironment(env)}
-                      className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
-                    >
-                      <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${
-                        selectedEnvironments.has(env)
-                          ? "bg-[#5B66E2] border-[#5B66E2]"
-                          : "border-gray-300 dark:border-gray-600"
-                      }`}>
-                        {selectedEnvironments.has(env) && <Check className="h-3 w-3 text-white" />}
-                      </span>
+                    <button key={env} onClick={() => {
+                      setSelectedEnvironments((prev) => {
+                        const n = new Set(prev);
+                        n.has(env) ? n.delete(env) : n.add(env);
+                        return n;
+                      });
+                      // Clear banks that may not exist in the new env selection
+                      setSelectedBanks(new Set());
+                    }} className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 transition-colors">
+                      <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${selectedEnvironments.has(env) ? "bg-[#5B66E2] border-[#5B66E2]" : "border-gray-300 dark:border-gray-600"}`}>{selectedEnvironments.has(env) && <Check className="h-3 w-3 text-white" />}</span>
                       {env}
                     </button>
                   ))}
@@ -394,42 +351,22 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-          {/* Bank filter (only on environments tab) */}
-          {activeTab === "environments" && (
+          {/* Bank filter — Portfolio tab only */}
+          {activeTab === "portfolio" && (
             <div ref={bankDropdownRef} className="relative">
-              <button
-                onClick={() => setBankDropdownOpen((v) => !v)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
-              >
+              <button onClick={() => setBankDropdownOpen((v) => !v)} className={dropdownBtnClass}>
                 <Landmark className="h-4 w-4" />
-                {selectedBanks.size === 0
-                  ? "All Banks"
-                  : `${selectedBanks.size} bank${selectedBanks.size !== 1 ? "s" : ""}`}
+                {selectedBanks.size === 0 ? "All Banks" : `${selectedBanks.size} bank${selectedBanks.size !== 1 ? "s" : ""}`}
                 <ChevronDown className={`h-4 w-4 transition-transform ${bankDropdownOpen ? "rotate-180" : ""}`} />
               </button>
               {bankDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 z-50 w-64 max-h-72 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+                <div className={dropdownPanelClass}>
                   {selectedBanks.size > 0 && (
-                    <button
-                      onClick={clearBankFilter}
-                      className="w-full px-3 py-2 text-left text-xs text-[#5B66E2] dark:text-[#8B96F2] hover:bg-muted/50 dark:hover:bg-muted border-b border-gray-200 dark:border-gray-700"
-                    >
-                      Clear selection
-                    </button>
+                    <button onClick={() => setSelectedBanks(new Set())} className="w-full px-3 py-2 text-left text-xs text-[#5B66E2] hover:bg-muted/50 border-b border-gray-200 dark:border-gray-700">Clear selection</button>
                   )}
                   {allBanks.map((bank) => (
-                    <button
-                      key={bank}
-                      onClick={() => toggleBank(bank)}
-                      className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
-                    >
-                      <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${
-                        selectedBanks.has(bank)
-                          ? "bg-[#5B66E2] border-[#5B66E2]"
-                          : "border-gray-300 dark:border-gray-600"
-                      }`}>
-                        {selectedBanks.has(bank) && <Check className="h-3 w-3 text-white" />}
-                      </span>
+                    <button key={bank} onClick={() => setSelectedBanks((prev) => { const n = new Set(prev); n.has(bank) ? n.delete(bank) : n.add(bank); return n; })} className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 transition-colors">
+                      <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${selectedBanks.has(bank) ? "bg-[#5B66E2] border-[#5B66E2]" : "border-gray-300 dark:border-gray-600"}`}>{selectedBanks.has(bank) && <Check className="h-3 w-3 text-white" />}</span>
                       {bank}
                     </button>
                   ))}
@@ -437,42 +374,22 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-          {/* Touchpoint filter (only on touchpoints tab) */}
-          {activeTab === "touchpoints" && (
+          {/* Touchpoint filter — Channels tab only */}
+          {activeTab === "channels" && (
             <div ref={tpDropdownRef} className="relative">
-              <button
-                onClick={() => setTpDropdownOpen((v) => !v)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
-              >
+              <button onClick={() => setTpDropdownOpen((v) => !v)} className={dropdownBtnClass}>
                 <Waypoints className="h-4 w-4" />
-                {selectedTouchpoints.size === 0
-                  ? "All Touchpoints"
-                  : `${selectedTouchpoints.size} selected`}
+                {selectedTouchpoints.size === 0 ? "All Touchpoints" : `${selectedTouchpoints.size} selected`}
                 <ChevronDown className={`h-4 w-4 transition-transform ${tpDropdownOpen ? "rotate-180" : ""}`} />
               </button>
               {tpDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 z-50 w-64 max-h-72 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+                <div className={dropdownPanelClass}>
                   {selectedTouchpoints.size > 0 && (
-                    <button
-                      onClick={clearTpFilter}
-                      className="w-full px-3 py-2 text-left text-xs text-[#5B66E2] dark:text-[#8B96F2] hover:bg-muted/50 dark:hover:bg-muted border-b border-gray-200 dark:border-gray-700"
-                    >
-                      Clear selection
-                    </button>
+                    <button onClick={() => setSelectedTouchpoints(new Set())} className="w-full px-3 py-2 text-left text-xs text-[#5B66E2] hover:bg-muted/50 border-b border-gray-200 dark:border-gray-700">Clear selection</button>
                   )}
                   {allTouchpoints.map((tp) => (
-                    <button
-                      key={tp}
-                      onClick={() => toggleTouchpoint(tp)}
-                      className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
-                    >
-                      <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${
-                        selectedTouchpoints.has(tp)
-                          ? "bg-[#5B66E2] border-[#5B66E2]"
-                          : "border-gray-300 dark:border-gray-600"
-                      }`}>
-                        {selectedTouchpoints.has(tp) && <Check className="h-3 w-3 text-white" />}
-                      </span>
+                    <button key={tp} onClick={() => setSelectedTouchpoints((prev) => { const n = new Set(prev); n.has(tp) ? n.delete(tp) : n.add(tp); return n; })} className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 transition-colors">
+                      <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${selectedTouchpoints.has(tp) ? "bg-[#5B66E2] border-[#5B66E2]" : "border-gray-300 dark:border-gray-600"}`}>{selectedTouchpoints.has(tp) && <Check className="h-3 w-3 text-white" />}</span>
                       {tp}
                     </button>
                   ))}
@@ -480,768 +397,324 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-          <DateFilter
-            value={dateRange}
-            onChange={(r, c) => { setDateRange(r); setCustomRange(c); }}
-            customRange={customRange}
-          />
+          <DateFilter value={dateRange} onChange={(r, c) => { setDateRange(r); setCustomRange(c); }} customRange={customRange} dataStartDate={dataStartDate} />
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ── Tabs ── */}
       <div className="flex gap-0 border-b border-gray-200 dark:border-gray-700 mb-6">
-        {(["overview", "touchpoints", "environments"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-5 py-3 text-sm font-medium transition-colors -mb-px ${
-              activeTab === tab
-                ? "border-b-2 border-[#5B66E2] text-[#5B66E2] bg-[#5B66E2]/5"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}
-          >
-            {tab === "overview" ? "Overview" : tab === "touchpoints" ? "Touchpoints" : "Environments"}
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => setActiveTab(id)} className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors -mb-px ${activeTab === id ? "border-b-2 border-[#5B66E2] text-[#5B66E2] bg-[#5B66E2]/5" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}>
+            <Icon className="w-4 h-4" />{label}
           </button>
         ))}
       </div>
 
-      {activeTab === "environments" ? (
-      /* ── Environments Tab (Bank-only stats) ── */
-      <>
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
-        {apiLoading
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-6 bg-card border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-9 w-9 rounded-lg" />
-                </div>
-                <Skeleton className="h-8 w-24 mt-2" />
-              </Card>
-            ))
-          : envMetricCards.map((card) => {
-              const Icon = card.icon;
-              return (
-                <Card
-                  key={card.label}
-                  className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {card.label}
-                    </span>
-                    <div className={`p-2 ${card.iconBg} rounded-lg`}>
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {card.value}
-                  </div>
-                </Card>
-              );
-            })}
-      </div>
-
-      {envNoData && (
-        <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
-          No records found for the selected filters. Upload data or try a different filter.
-        </div>
-      )}
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
-        <Card className="p-6 bg-card border-border">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Payments per Bank
-            </h3>
-            <select
-              value={envBankTopN === "all" ? "all" : String(envBankTopN)}
-              onChange={(e) => setEnvBankTopN(e.target.value === "all" ? "all" : parseInt(e.target.value))}
-              className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#5B66E2]"
-            >
-              <option value="10">Top 10</option>
-              <option value="20">Top 20</option>
-              <option value="50">Top 50</option>
-              <option value="all">All</option>
-            </select>
-          </div>
-          {apiLoading ? (
-            <Skeleton className="h-[350px] w-full rounded-xl" />
-          ) : (() => {
-            const envBankData = envBankTopN === "all"
-              ? envBankAnalytics.bankAnalytics
-              : envBankAnalytics.bankAnalytics.slice(0, envBankTopN);
-            const minWidth = Math.max(550, envBankData.length * 28);
-            return (
-              <div className="overflow-x-auto rounded-xl">
-                <div style={{ minWidth }}>
-                  <DynamicChart
-                    data={envBankData.map((a) => ({ bank: a.bank, amount: a.totalAmount }))}
-                    type="bar"
-                    dataKey="amount"
-                    xAxisKey="bank"
-                    height={350}
-                  />
-                </div>
-              </div>
-            );
-          })()}
-        </Card>
-
-        <Card className="p-6 bg-card border-border">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Bank Distribution
-          </h3>
-          {apiLoading ? (
-            <Skeleton className="h-[350px] w-full rounded-xl" />
-          ) : (
-            <DynamicChart
-              data={envBankAnalytics.bankAnalytics.slice(0, 8).map((a) => ({
-                bank: a.bank,
-                amount: a.totalAmount,
-              }))}
-              type="pie"
-              dataKey="amount"
-              xAxisKey="bank"
-              height={350}
-            />
-          )}
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children mb-12">
-        <Card className="p-6 bg-card border-border">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Amount Distribution by Bank
-          </h3>
-          {apiLoading ? (
-            <Skeleton className="h-[300px] w-full rounded-xl" />
-          ) : (
-            <DynamicChart
-              data={envBankAnalytics.bankAnalytics.slice(0, 10).map((a) => ({
-                bank: a.bank,
-                amount: a.totalAmount,
-              }))}
-              type="barh"
-              dataKey="amount"
-              xAxisKey="bank"
-              height={300}
-            />
-          )}
-        </Card>
-
-        <Card className="p-6 bg-card border-border">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            % Share by Bank
-          </h3>
-          {apiLoading ? (
-            <Skeleton className="h-[300px] w-full rounded-xl" />
-          ) : (() => {
-            const shareData = envBankTopN === "all"
-              ? envBankAnalytics.bankAnalytics
-              : envBankAnalytics.bankAnalytics.slice(0, envBankTopN);
-            const minWidth = Math.max(550, shareData.length * 28);
-            return (
-              <div className="overflow-x-auto rounded-xl">
-                <div style={{ minWidth }}>
-                  <DynamicChart
-                    data={shareData.map((a) => ({ bank: a.bank, percentage: Math.round(a.percentage * 10) / 10 }))}
-                    type="bar"
-                    dataKey="percentage"
-                    xAxisKey="bank"
-                    height={300}
-                  />
-                </div>
-              </div>
-            );
-          })()}
-        </Card>
-      </div>
-
-      {/* Bank Analytics Table */}
-      {apiLoading ? (
-        <div className="rounded-lg border bg-card border-border mb-8 p-6">
-          <Skeleton className="h-6 w-40 mb-4" />
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />
-          ))}
-        </div>
-      ) : (
-      <div className="rounded-lg border bg-card border-border overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Bank Analytics
-          </h3>
-        </div>
-        <table className="w-full min-w-[700px]">
-          <thead className="bg-muted">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bank</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Count of Account</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sum of Amount</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sum of Debtor ID</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">% of Total</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Payments</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            <tr className="bg-muted font-semibold">
-              <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">Total</td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(envBankAnalytics.totalAccounts)}</td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmt(envBankAnalytics.totalAmount)}</td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(envBankAnalytics.bankAnalytics.reduce((s, b) => s + b.debtorSum, 0))}</td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">100.0%</td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(envBankAnalytics.totalPayments)}</td>
-            </tr>
-            {(() => {
-              const allRows = envBankAnalytics.bankAnalytics;
-              const totalPages = Math.max(1, Math.ceil(allRows.length / bankRowsPerPage));
-              const paged = allRows.slice((envBankPage - 1) * bankRowsPerPage, envBankPage * bankRowsPerPage);
-              return paged.map((b) => (
-              <tr key={b.bank} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200">
-                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{b.bank}</td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.accountCount)}</td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">₱{fmt(b.totalAmount)}</td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.debtorSum)}</td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{b.percentage.toFixed(1)}%</td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.paymentCount)}</td>
-              </tr>
-              ));
-            })()}
-          </tbody>
-        </table>
-        {/* Env Bank Analytics Pagination */}
-        {(() => {
-          const totalRows = envBankAnalytics.bankAnalytics.length;
-          const totalPages = Math.max(1, Math.ceil(totalRows / bankRowsPerPage));
-          if (totalPages <= 1) return null;
-          const pages: number[] = [];
-          let start = Math.max(1, envBankPage - 2);
-          let end = Math.min(totalPages, start + 4);
-          start = Math.max(1, end - 4);
-          for (let i = start; i <= end; i++) pages.push(i);
-          return (
-            <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Showing {fmt((envBankPage - 1) * bankRowsPerPage + 1)}&ndash;{fmt(Math.min(envBankPage * bankRowsPerPage, totalRows))} of {fmt(totalRows)} banks
-              </p>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setEnvBankPage(1)} disabled={envBankPage === 1} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">First</button>
-                <button onClick={() => setEnvBankPage((p) => Math.max(1, p - 1))} disabled={envBankPage === 1} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Prev</button>
-                {pages.map((pg) => (
-                  <button key={pg} onClick={() => setEnvBankPage(pg)} className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${pg === envBankPage ? "bg-[#4a55d1] text-white border-[#4a55d1] shadow-sm" : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2]"}`}>{pg}</button>
-                ))}
-                <button onClick={() => setEnvBankPage((p) => Math.min(totalPages, p + 1))} disabled={envBankPage === totalPages} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Next</button>
-                <button onClick={() => setEnvBankPage(totalPages)} disabled={envBankPage === totalPages} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Last</button>
-              </div>
+      {/* ════════════════════════════════════════════════════════
+          TAB 1 — SUMMARY
+      ════════════════════════════════════════════════════════ */}
+      {activeTab === "summary" && (
+        <>
+          {noData && (
+            <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
+              No records found for the selected time range. Upload data or try a different filter.
             </div>
-          );
-        })()}
-      </div>
-      )}
-      </>
-      ) : activeTab === "overview" ? (
-      <>
-      {/* No data notice when a date filter yields no results */}
-      {noData && (
-        <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
-          No records found for the selected time range. Upload data or try a different filter.
-        </div>
-      )}
+          )}
 
-      {/* Row 1: Bar chart (wide) + 2 stacked metric cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 mb-6 overflow-hidden">
-        {/* Bar chart */}
-        <Card className="p-4 bg-card border-border overflow-hidden min-w-0">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Payments per Bank
-            </h3>
-            <select
-              value={bankTopN === "all" ? "all" : String(bankTopN)}
-              onChange={(e) => setBankTopN(e.target.value === "all" ? "all" : parseInt(e.target.value))}
-              className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#5B66E2]"
-            >
-              <option value="10">Top 10</option>
-              <option value="20">Top 20</option>
-              <option value="50">Top 50</option>
-              <option value="all">All</option>
-            </select>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {apiLoading ? (
+              Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+            ) : (
+              <>
+                <MetricCard label="Total Payment Amount" value={`₱${fmt(fa.totalAmount)}`} icon={DollarSign} iconBg="bg-[#5B66E2]" info="Sum of all payments" />
+                <MetricCard label="Unique Accounts" value={fmt(fa.totalAccounts)} icon={Users} iconBg="bg-[#4a55d1]" info="Distinct debtor IDs" />
+                <MetricCard label="Total Transactions" value={fmt(fa.totalPayments)} icon={FileText} iconBg="bg-[#5B66E2]" info="Total payment rows" />
+                <MetricCard label="Banks / Portfolios" value={fmt(fa.bankAnalytics.length)} icon={Landmark} iconBg="bg-[#4048c0]" info="Distinct banks" />
+              </>
+            )}
           </div>
-          {apiLoading ? (
-            <Skeleton className="h-[280px] w-full rounded-xl" />
-          ) : (() => {
-            const bankData = bankTopN === "all"
-              ? fa.bankAnalytics
-              : fa.bankAnalytics.slice(0, bankTopN);
-            const minWidth = Math.max(550, bankData.length * 28);
-            return (
-              <div className="overflow-x-auto rounded-xl">
-                <div style={{ minWidth }}>
-                  <DynamicChart
-                    data={bankData.map((a) => ({ bank: a.bank, amount: a.totalAmount }))}
-                    type="bar"
-                    dataKey="amount"
-                    xAxisKey="bank"
-                    height={280}
-                  />
-                </div>
-              </div>
-            );
-          })()}
-        </Card>
 
-        {/* Card 1 + Card 2 stacked */}
-        <div className="flex flex-col gap-4">
-          {apiLoading
-            ? Array.from({ length: 2 }).map((_, i) => (
-                <Card key={i} className="flex-1 overflow-hidden bg-card border-border gap-0">
-                  <div className="h-1 bg-[#5B66E2]" />
-                  <div className="p-4">
-                    <Skeleton className="h-4 w-24 mb-3" />
-                    <Skeleton className="h-8 w-full rounded-full" />
-                  </div>
-                </Card>
-              ))
-            : metricCards.slice(0, 2).map((card) => {
-                const Icon = card.icon;
-                return (
-                  <Card
-                    key={card.label}
-                    className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
-                  >
-                    <div className="h-1 bg-[#5B66E2]" />
-                    <div className="flex flex-col h-[calc(100%-4px)] px-4 pt-1 pb-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                          {card.label}:
-                        </span>
-                        <div className={`p-2 mt-1 mr-0.5 ${card.iconBg} rounded-lg`}>
-                          <Icon className="w-6 h-6 text-white" />
-                        </div>
-                      </div>
-                      <div className="flex-1 flex items-center justify-center">
-                        <span className="inline-block px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-lg font-bold text-gray-900 dark:text-white">
-                          {card.value}
-                        </span>
-                      </div>
-                      <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex items-center justify-between">
-                        <span className="text-xs text-gray-400 dark:text-gray-500">{card.info}</span>
-                        <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-        </div>
-      </div>
-
-      {/* Row 2: Pie chart + Horizontal bar chart + 2 stacked metric cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_400px] gap-6 mb-6">
-        {/* Pie chart */}
-        <Card className="p-4 bg-card border-border">
-          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
-            Transaction per Touchpoints
-          </h3>
-          {apiLoading ? (
-            <Skeleton className="h-[280px] w-full rounded-xl" />
-          ) : (
-            <DynamicChart
-              data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({
-                touchpoint: t.touchpoint,
-                count: t.count,
-              }))}
-              type="pie"
-              dataKey="count"
-              xAxisKey="touchpoint"
-              height={280}
-            />
-          )}
-        </Card>
-
-        {/* Horizontal bar chart */}
-        <Card className="p-4 bg-card border-border">
-          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
-            Amount Distribution by Bank
-          </h3>
-          {apiLoading ? (
-            <Skeleton className="h-[280px] w-full rounded-xl" />
-          ) : (
-            <DynamicChart
-              data={fa.bankAnalytics.slice(0, 10).map((a) => ({
-                bank: a.bank,
-                amount: a.totalAmount,
-              }))}
-              type="barh"
-              dataKey="amount"
-              xAxisKey="bank"
-              height={280}
-            />
-          )}
-        </Card>
-
-        {/* Card 3 + Card 4 stacked */}
-        <div className="flex flex-col gap-4">
-          {apiLoading
-            ? Array.from({ length: 2 }).map((_, i) => (
-                <Card key={i} className="flex-1 overflow-hidden bg-card border-border gap-0">
-                  <div className="h-1 bg-[#5B66E2]" />
-                  <div className="p-4">
-                    <Skeleton className="h-4 w-24 mb-3" />
-                    <Skeleton className="h-8 w-full rounded-full" />
-                  </div>
-                </Card>
-              ))
-            : metricCards.slice(2, 4).map((card) => {
-                const Icon = card.icon;
-                return (
-                  <Card
-                    key={card.label}
-                    className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
-                  >
-                    <div className="h-1 bg-[#5B66E2]" />
-                    <div className="flex flex-col h-[calc(100%-4px)] px-4 pt-1 pb-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                          {card.label}:
-                        </span>
-                        <div className={`p-2 mt-1 mr-0.5 ${card.iconBg} rounded-lg`}>
-                          <Icon className="w-6 h-6 text-white" />
-                        </div>
-                      </div>
-                      <div className="flex-1 flex items-center justify-center">
-                        <span className="inline-block px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-lg font-bold text-gray-900 dark:text-white">
-                          {card.value}
-                        </span>
-                      </div>
-                      <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex items-center justify-between">
-                        <span className="text-xs text-gray-400 dark:text-gray-500">{card.info}</span>
-                        <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-        </div>
-      </div>
-
-      {/* Row 3: Bank Analytics Table (full width) */}
-      {apiLoading ? (
-        <div className="rounded-lg border bg-card border-border mb-8 p-6">
-          <Skeleton className="h-6 w-40 mb-4" />
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />
-          ))}
-        </div>
-      ) : (
-      <div className="rounded-lg border bg-card border-border overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Bank Analytics
-          </h3>
-        </div>
-        <table className="w-full min-w-[700px]">
-          <thead className="bg-muted">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Bank
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Count of Account
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Sum of Amount
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Sum of Debtor ID
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                % of Total
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Payments
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {/* Totals row - at the top */}
-            <tr className="bg-muted font-semibold">
-              <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                Total
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                {fmt(fa.totalAccounts)}
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                ₱{fmt(fa.totalAmount)}
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                {fmt(fa.bankAnalytics.reduce((s, b) => s + b.debtorSum, 0))}
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                100.0%
-              </td>
-              <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                {fmt(fa.totalPayments)}
-              </td>
-            </tr>
-            {(() => {
-              const allRows = fa.bankAnalytics;
-              const totalPages = Math.max(1, Math.ceil(allRows.length / bankRowsPerPage));
-              const paged = allRows.slice((bankPage - 1) * bankRowsPerPage, bankPage * bankRowsPerPage);
-              return paged.map((b) => (
-              <tr
-                key={b.bank}
-                className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200"
-              >
-                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                  {b.bank}
-                </td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                  {fmt(b.accountCount)}
-                </td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                  ₱{fmt(b.totalAmount)}
-                </td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                  {fmt(b.debtorSum)}
-                </td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                  {b.percentage.toFixed(1)}%
-                </td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                  {fmt(b.paymentCount)}
-                </td>
-              </tr>
-              ));
-            })()}
-          </tbody>
-        </table>
-        {/* Bank Analytics Pagination */}
-        {(() => {
-          const totalRows = fa.bankAnalytics.length;
-          const totalPages = Math.max(1, Math.ceil(totalRows / bankRowsPerPage));
-          if (totalPages <= 1) return null;
-          const pages: number[] = [];
-          let start = Math.max(1, bankPage - 2);
-          let end = Math.min(totalPages, start + 4);
-          start = Math.max(1, end - 4);
-          for (let i = start; i <= end; i++) pages.push(i);
-          return (
-            <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Showing {fmt((bankPage - 1) * bankRowsPerPage + 1)}&ndash;{fmt(Math.min(bankPage * bankRowsPerPage, totalRows))} of {fmt(totalRows)} banks
-              </p>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setBankPage(1)} disabled={bankPage === 1} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">First</button>
-                <button onClick={() => setBankPage((p) => Math.max(1, p - 1))} disabled={bankPage === 1} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Prev</button>
-                {pages.map((pg) => (
-                  <button key={pg} onClick={() => setBankPage(pg)} className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${pg === bankPage ? "bg-[#4a55d1] text-white border-[#4a55d1] shadow-sm" : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2]"}`}>{pg}</button>
-                ))}
-                <button onClick={() => setBankPage((p) => Math.min(totalPages, p + 1))} disabled={bankPage === totalPages} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Next</button>
-                <button onClick={() => setBankPage(totalPages)} disabled={bankPage === totalPages} className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Last</button>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-      )}
-      </>
-      ) : (
-      /* ── Touchpoints Tab ── */
-      <>
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
-        {apiLoading
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-6 bg-card border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-9 w-9 rounded-lg" />
-                </div>
-                <Skeleton className="h-8 w-24 mt-2" />
-              </Card>
-            ))
-          : tpMetricCards.map((card) => {
-              const Icon = card.icon;
+          {/* Monthly Trend — full width */}
+          <Card className="p-6 bg-card border-border mb-6">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Payment Trend by Month</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Total payment amount collected per month — shows growth or decline over time</p>
+            {apiLoading ? <Skeleton className="h-[220px] w-full rounded-xl" /> : monthlyTrend.length === 0 ? (
+              <div className="h-[220px] flex items-center justify-center text-sm text-gray-400">No date data available</div>
+            ) : (
+              <DynamicChart data={monthlyTrend} type="area" dataKey="amount" xAxisKey="month" height={220} />
+            )}
+            {!apiLoading && monthlyTrend.length >= 2 && (() => {
+              const first = monthlyTrend[0];
+              const last = monthlyTrend[monthlyTrend.length - 1];
+              // Only show % change if first month has substantial data (> 1% of last month)
+              // to avoid misleading % from outlier months
+              const showPct = first.amount > (last.amount * 0.01);
+              const diff = last.amount - first.amount;
+              const pct = showPct && first.amount > 0 ? ((diff / first.amount) * 100).toFixed(1) : null;
+              const up = diff >= 0;
               return (
-                <Card
-                  key={card.label}
-                  className="p-6 bg-card border-border hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {card.label}
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    Showing {first.month} – {last.month}
+                  </p>
+                  {pct !== null && Math.abs(Number(pct)) < 1000 && (
+                    <span className={`flex items-center gap-1 text-xs font-medium ${up ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>
+                      {up ? "▲" : "▼"} {Math.abs(Number(pct))}% vs first month
                     </span>
-                    <div className={`p-2 ${card.iconBg} rounded-lg`}>
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">
-                    {card.value}
-                  </div>
-                </Card>
+                  )}
+                </div>
               );
-            })}
-      </div>
+            })()}
+          </Card>
 
-      {tpNoData && (
-        <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
-          No records found for the selected time range. Upload data or try a different filter.
-        </div>
-      )}
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 stagger-children">
-        <Card className="p-6 bg-card border-border">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Transactions per Touchpoint
-          </h3>
-          {apiLoading ? (
-            <Skeleton className="h-[350px] w-full rounded-xl" />
-          ) : (
-            <DynamicChart
-              data={filteredTpAnalytics.map((t) => ({
-                touchpoint: t.touchpoint,
-                count: t.count,
-              }))}
-              type="bar"
-              dataKey="count"
-              xAxisKey="touchpoint"
-              height={350}
-            />
-          )}
-        </Card>
-
-        <Card className="p-6 bg-card border-border">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Touchpoint Distribution
-          </h3>
-          {apiLoading ? (
-            <Skeleton className="h-[350px] w-full rounded-xl" />
-          ) : (
-            <DynamicChart
-              data={filteredTpAnalytics.slice(0, 8).map((t) => ({
-                touchpoint: t.touchpoint,
-                count: t.count,
-              }))}
-              type="pie"
-              dataKey="count"
-              xAxisKey="touchpoint"
-              height={350}
-            />
-          )}
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children mb-12">
-        <Card className="p-6 bg-card border-border">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Amount by Touchpoint
-          </h3>
-          {apiLoading ? (
-            <Skeleton className="h-[300px] w-full rounded-xl" />
-          ) : (
-            <DynamicChart
-              data={filteredTpAnalytics.map((t) => ({
-                touchpoint: t.touchpoint,
-                amount: t.totalAmount,
-              }))}
-              type="barh"
-              dataKey="amount"
-              xAxisKey="touchpoint"
-              height={300}
-            />
-          )}
-        </Card>
-
-        <Card className="p-6 bg-card border-border">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            % Share by Touchpoint
-          </h3>
-          {apiLoading ? (
-            <Skeleton className="h-[300px] w-full rounded-xl" />
-          ) : (
-            <DynamicChart
-              data={filteredTpAnalytics.map((t) => ({
-                touchpoint: t.touchpoint,
-                percentage: Math.round(t.percentage * 10) / 10,
-              }))}
-              type="bar"
-              dataKey="percentage"
-              xAxisKey="touchpoint"
-              height={300}
-            />
-          )}
-        </Card>
-      </div>
-
-      {/* Touchpoint Table */}
-      {apiLoading ? (
-        <div className="rounded-lg border bg-card border-border mb-8 p-6">
-          <Skeleton className="h-6 w-40 mb-4" />
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-lg border bg-card border-border overflow-x-auto mb-8 animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Touchpoint Analytics
-            </h3>
+          {/* Row 2: Top Banks bar + Touchpoint mix donut */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <Card className="p-6 bg-card border-border">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Top Banks by Payment Amount</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Top 10 banks ranked by total amount collected</p>
+              {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (() => {
+                const d = fa.bankAnalytics.slice(0, 10);
+                return <DynamicChart data={[...d].sort((a, b) => a.totalAmount - b.totalAmount).map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="barh" dataKey="amount" xAxisKey="bank" height={280} />;
+              })()}
+            </Card>
+            <Card className="p-6 bg-card border-border">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Touchpoint Mix (Top 8)</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Distribution of transactions across the top 8 touchpoints by count</p>
+              {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
+                <DynamicChart data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({ touchpoint: t.touchpoint, count: t.count }))} type="pie" dataKey="count" xAxisKey="touchpoint" height={280} valueType="count" />
+              )}
+            </Card>
           </div>
-          <table className="w-full min-w-[500px]">
-            <thead className="bg-muted">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Touchpoint
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Transactions
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Total Amount
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  % of Total
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {/* Totals row */}
-              <tr className="bg-muted font-semibold">
-                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">Total</td>
-                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(tpTotalTransactions)}</td>
-                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmt(tpTotalAmount)}</td>
-                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">100.0%</td>
-              </tr>
-              {filteredTpAnalytics.map((t) => (
-                <tr
-                  key={t.touchpoint}
-                  className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200"
-                >
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                    {t.touchpoint}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                    {fmt(t.count)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                    ₱{fmt(t.totalAmount)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                    {t.percentage.toFixed(1)}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        </>
       )}
-      </>
+
+      {/* ════════════════════════════════════════════════════════
+          TAB 2 — PORTFOLIO
+      ════════════════════════════════════════════════════════ */}
+      {activeTab === "portfolio" && (
+        <>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {apiLoading ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />) : (
+              <>
+                <MetricCard label="Total Payment Amount" value={`₱${fmt(portfolioAnalytics.totalAmount)}`} icon={DollarSign} iconBg="bg-[#5B66E2]" />
+                <MetricCard label="Unique Accounts" value={fmt(portfolioAnalytics.totalAccounts)} icon={Users} iconBg="bg-[#4a55d1]" />
+                <MetricCard label="Total Transactions" value={fmt(portfolioAnalytics.totalPayments)} icon={FileText} iconBg="bg-[#5B66E2]" />
+                <MetricCard label="Total Banks" value={fmt(portfolioAnalytics.bankAnalytics.length)} icon={Landmark} iconBg="bg-[#4048c0]" />
+              </>
+            )}
+          </div>
+
+          {portfolioFiltered.length === 0 && !apiLoading && (
+            <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
+              No records found for the selected filters.
+            </div>
+          )}
+
+          {/* Row 1: Amount by Bank (bar) + Portfolio share (donut) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <Card className="p-6 bg-card border-border">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Payment Amount by Bank</h3>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Total amount collected per bank — filter by environment to drill down</p>
+                <select value={portfolioBankTopN === "all" ? "all" : String(portfolioBankTopN)} onChange={(e) => setPortfolioBankTopN(e.target.value === "all" ? "all" : parseInt(e.target.value))} className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#5B66E2]">
+                  <option value="10">Top 10</option><option value="20">Top 20</option><option value="50">Top 50</option><option value="all">All</option>
+                </select>
+              </div>
+              {apiLoading ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (() => {
+                const d = portfolioBankTopN === "all" ? portfolioAnalytics.bankAnalytics : portfolioAnalytics.bankAnalytics.slice(0, portfolioBankTopN);
+                const minWidth = Math.max(500, d.length * 28);
+                return <div className="overflow-x-auto rounded-xl"><div style={{ minWidth }}><DynamicChart data={d.map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="bar" dataKey="amount" xAxisKey="bank" height={320} /></div></div>;
+              })()}
+            </Card>
+            <Card className="p-6 bg-card border-border">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Top 8 Banks by Amount</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Which banks collected the most — by total payment amount</p>
+              {apiLoading ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (
+                <DynamicChart data={portfolioAnalytics.bankAnalytics.slice(0, 8).map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="pie" dataKey="amount" xAxisKey="bank" height={320} />
+              )}
+            </Card>
+          </div>
+
+          {/* Row 2: Transaction Count vs Amount — side by side horizontal bars */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <Card className="p-6 bg-card border-border">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Transaction Count by Bank</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Number of payment transactions per bank — high count means high volume, not necessarily high value</p>
+              {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
+                <DynamicChart data={[...portfolioAnalytics.bankAnalytics].sort((a, b) => a.paymentCount - b.paymentCount).slice(0, 10).map((a) => ({ bank: a.bank, transactions: a.paymentCount }))} type="barh" dataKey="transactions" xAxisKey="bank" height={280} valueType="count" />
+              )}
+            </Card>
+            <Card className="p-6 bg-card border-border">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">% Share by Bank</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Each bank's percentage of total collected amount — all banks ranked</p>
+              {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (() => {
+                const d = portfolioAnalytics.bankAnalytics.slice(0, portfolioBankTopN === "all" ? undefined : portfolioBankTopN);
+                const minWidth = Math.max(500, d.length * 28);
+                return <div className="overflow-x-auto rounded-xl"><div style={{ minWidth }}><DynamicChart data={d.map((a) => ({ bank: a.bank, percentage: Math.round(a.percentage * 10) / 10 }))} type="bar" dataKey="percentage" xAxisKey="bank" height={280} /></div></div>;
+              })()}
+            </Card>
+          </div>
+
+          {/* Bank Analytics Table */}
+          {apiLoading ? (
+            <div className="rounded-lg border bg-card border-border mb-8 p-6">
+              <Skeleton className="h-6 w-40 mb-4" />
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />)}
+            </div>
+          ) : (
+            <div className="rounded-lg border bg-card border-border overflow-x-auto mb-8">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">Bank Analytics</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Detailed breakdown per bank — unique accounts, total amount collected, transaction count and share</p>
+                </div>
+                <span className="text-xs text-gray-400">{fmt(portfolioAnalytics.bankAnalytics.length)} banks</span>
+              </div>
+              <table className="w-full min-w-[700px]">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bank</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Unique Accounts</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Amount</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Transactions</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">% of Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  <tr className="bg-muted font-semibold">
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">Total</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(portfolioAnalytics.totalAccounts)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmt(portfolioAnalytics.totalAmount)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(portfolioAnalytics.totalPayments)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">100.0%</td>
+                  </tr>
+                  {portfolioAnalytics.bankAnalytics.slice((portfolioBankPage - 1) * bankRowsPerPage, portfolioBankPage * bankRowsPerPage).map((b) => (
+                    <tr key={b.bank} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{b.bank}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.accountCount)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">₱{fmt(b.totalAmount)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(b.paymentCount)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{b.percentage.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Pagination page={portfolioBankPage} setPage={setPortfolioBankPage} total={portfolioAnalytics.bankAnalytics.length} rowsPerPage={bankRowsPerPage} />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ════════════════════════════════════════════════════════
+          TAB 3 — CHANNELS
+      ════════════════════════════════════════════════════════ */}
+      {activeTab === "channels" && (
+        <>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {apiLoading ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />) : (
+              <>
+                <MetricCard label="Total Transactions" value={fmt(tpTotal)} icon={Hash} iconBg="bg-[#5B66E2]" />
+                <MetricCard label="Total Amount" value={`₱${fmt(tpTotalAmount)}`} icon={DollarSign} iconBg="bg-[#4a55d1]" />
+                <MetricCard label="Active Touchpoints" value={fmt(channelAnalytics.length)} icon={Waypoints} iconBg="bg-[#5B66E2]" />
+                <MetricCard label="Top Touchpoint" value={channelAnalytics[0]?.touchpoint ?? "—"} icon={BarChart3} iconBg="bg-[#4048c0]" />
+              </>
+            )}
+          </div>
+
+          {channelAnalytics.length === 0 && !apiLoading && (
+            <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
+              No records found for the selected filters.
+            </div>
+          )}
+
+          {/* Row 1: Channel type groups + Touchpoint donut */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <Card className="p-6 bg-card border-border">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Touchpoint Type Performance</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Inbound (IB) vs Outbound (OB) vs With Touchpoint vs Ghost Payment vs No Touchpoint — transaction count</p>
+              {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
+                <DynamicChart data={channelGroupData.map((g) => ({ group: g.group, count: g.count }))} type="bar" dataKey="count" xAxisKey="group" height={280} valueType="count" />
+              )}
+            </Card>
+            <Card className="p-6 bg-card border-border">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Touchpoint Type — Amount Share</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Total payment amount collected per touchpoint type — shows which strategy drives the most value</p>
+              {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
+                <DynamicChart data={channelGroupData.map((g) => ({ group: g.group, amount: g.amount }))} type="pie" dataKey="amount" xAxisKey="group" height={280} />
+              )}
+            </Card>
+          </div>
+
+          {/* Row 2: Amount by touchpoint (horizontal) + % share bar */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <Card className="p-6 bg-card border-border">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Amount by Touchpoint</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Total payment amount collected per individual touchpoint — ranked highest to lowest</p>
+              {apiLoading ? <Skeleton className="h-[300px] w-full rounded-xl" /> : (
+                <DynamicChart data={[...channelAnalytics].sort((a, b) => a.totalAmount - b.totalAmount).slice(0, 12).map((t) => ({ touchpoint: t.touchpoint, amount: t.totalAmount }))} type="barh" dataKey="amount" xAxisKey="touchpoint" height={300} />
+              )}
+            </Card>
+            <Card className="p-6 bg-card border-border">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Top Touchpoints by Amount</h3>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Top 8 individual touchpoints by total amount — shows which specific touchpoints generate the most collections</p>
+              {apiLoading ? <Skeleton className="h-[300px] w-full rounded-xl" /> : (
+                <DynamicChart data={channelAnalytics.slice(0, 8).map((t) => ({ touchpoint: t.touchpoint, amount: t.totalAmount }))} type="pie" dataKey="amount" xAxisKey="touchpoint" height={300} />
+              )}
+            </Card>
+          </div>
+
+          {/* Touchpoint Analytics Table */}
+          {apiLoading ? (
+            <div className="rounded-lg border bg-card border-border mb-8 p-6">
+              <Skeleton className="h-6 w-40 mb-4" />
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />)}
+            </div>
+          ) : (
+            <div className="rounded-lg border bg-card border-border overflow-x-auto mb-8">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">Touchpoint Analytics</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Full breakdown per touchpoint — transaction count, amount collected, touchpoint type and share of total</p>
+                </div>
+                <span className="text-xs text-gray-400">{fmt(channelAnalytics.length)} touchpoints</span>
+              </div>
+              <table className="w-full min-w-[500px]">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Touchpoint</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Touchpoint Type</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Transactions</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Amount</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">% of Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  <tr className="bg-muted font-semibold">
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">Total</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">—</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(tpTotal)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmt(tpTotalAmount)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">100.0%</td>
+                  </tr>
+                  {channelAnalytics.map((t) => (
+                    <tr key={t.touchpoint} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{t.touchpoint}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#5B66E2]/10 text-[#5B66E2] dark:text-[#8B96F2]">{channelType(t.touchpoint)}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{fmt(t.count)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">₱{fmt(t.totalAmount)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">{t.percentage.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -176,6 +176,7 @@ export default function UploadPage() {
           payment_date: p.paymentDate,
           payment_amount: p.paymentAmount,
           environment: p.environment,
+          month: p.month,
         }));
         const saved = await saveUpload(token, { file_name: fileName, records });
         setSessionId(saved.id);
@@ -685,8 +686,8 @@ export default function UploadPage() {
                 <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                   <li>
                     <strong>Required Columns:</strong> Bank, Payment Date
-                    (leads_result_edate), Payment Amount (leads_result_amount),
-                    Account (debtor_id), Touchpoint (TAGGING)
+                    (leads_result_edate or date_created), Payment Amount (leads_result_amount),
+                    Account (debtor_id), Touchpoint (TAGGING), Environment (ENVIRONMENT)
                   </li>
                   <li>
                     <strong>Supported formats:</strong> .xlsx, .xls, .csv

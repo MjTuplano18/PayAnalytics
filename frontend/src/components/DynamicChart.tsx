@@ -28,6 +28,8 @@ interface DynamicChartProps {
   xAxisKey: string;
   height?: number;
   title?: string;
+  /** "amount" (default) = ₱ prefix | "count" = plain number | "percentage" = % suffix */
+  valueType?: "amount" | "count" | "percentage";
 }
 
 /** Brand palette — 12 slots for multi-series / pie charts */
@@ -78,6 +80,7 @@ export function DynamicChart({
   xAxisKey,
   height = 350,
   title,
+  valueType,
 }: DynamicChartProps) {
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useCallback((node: HTMLDivElement | null) => {
@@ -123,13 +126,19 @@ export function DynamicChart({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formatTooltipValue = (value: any) => {
     const num = Number(value);
-    return `₱${fmtNum(isNaN(num) ? 0 : num)}`;
+    if (isNaN(num)) return "0";
+    const vt = valueType ?? (dataKey === "percentage" ? "percentage" : dataKey === "count" || dataKey === "transactions" ? "count" : "amount");
+    if (vt === "percentage") return `${num.toFixed(1)}%`;
+    if (vt === "count") return num.toLocaleString("en-PH");
+    return `₱${fmtNum(num)}`;
   };
 
   const renderChart = () => {
-    // Responsive: on narrow containers, skip some x-axis labels to prevent overlap
     const isCompact = containerWidth < 500;
     const barInterval = isCompact ? Math.max(1, Math.floor(processedData.length / 15)) : 0;
+    const vt = valueType ?? (dataKey === "percentage" ? "percentage" : dataKey === "count" || dataKey === "transactions" ? "count" : "amount");
+    const isPercentage = vt === "percentage";
+    const yAxisFormatter = isPercentage ? (v: number) => `${v}%` : vt === "count" ? (v: number) => fmtNum(v) : fmtNum;
 
     switch (type) {
       case "bar":
@@ -154,7 +163,7 @@ export function DynamicChart({
             <YAxis
               className="text-muted-foreground"
               tick={{ fontSize: 12 }}
-              tickFormatter={fmtNum}
+              tickFormatter={yAxisFormatter}
             />
             <Tooltip
               contentStyle={tooltipStyle}
@@ -235,37 +244,41 @@ export function DynamicChart({
         );
       case "area":
         return (
-          <AreaChart data={processedData} margin={{ left: 30, right: 30, top: 5, bottom: 5 }}>
+          <AreaChart data={processedData} margin={{ left: 30, right: 30, top: 10, bottom: 5 }}>
             <defs>
               <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#5B66E2" stopOpacity={0.85} />
-                <stop offset="100%" stopColor="#ffffff" stopOpacity={0.02} />
+                <stop offset="0%" stopColor="#5B66E2" stopOpacity={0.15} />
+                <stop offset="100%" stopColor="#5B66E2" stopOpacity={0.01} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
             <XAxis
               dataKey={xAxisKey}
               className="text-muted-foreground"
               tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
             />
             <YAxis
               className="text-muted-foreground"
               tick={{ fontSize: 12 }}
-              tickFormatter={fmtNum}
+              tickFormatter={yAxisFormatter}
+              axisLine={false}
+              tickLine={false}
             />
             <Tooltip
               contentStyle={tooltipStyle}
-              formatter={formatTooltipValue}
-              cursor={{ fill: "rgba(209, 213, 219, 0.08)" }}
+              formatter={(value: unknown) => [formatTooltipValue(value), "Total"]}
+              cursor={{ stroke: "#5B66E2", strokeWidth: 1, strokeDasharray: "4 4" }}
             />
-            <Legend />
             <Area
               type="monotone"
               dataKey={dataKey}
               stroke={BRAND}
               fill="url(#areaGradient)"
-              strokeWidth={2}
-              activeDot={{ r: 6, fill: BRAND }}
+              strokeWidth={2.5}
+              dot={{ fill: BRAND, r: 4, strokeWidth: 2, stroke: "#fff" }}
+              activeDot={{ r: 6, fill: BRAND, stroke: "#fff", strokeWidth: 2 }}
             />
           </AreaChart>
         );

@@ -52,6 +52,7 @@ class PaymentRecord(Base):
     payment_date: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     payment_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     environment: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    month: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
 
     # Relationship
     session: Mapped["UploadSession"] = relationship("UploadSession", back_populates="records")

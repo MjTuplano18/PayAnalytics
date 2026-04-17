@@ -41,6 +41,29 @@ export function useUploadEvents(token: string | null) {
         });
 
         if (!response.ok || !response.body) {
+          // On 401, try to refresh the token once
+          if (response.status === 401) {
+            const refreshToken = typeof window !== "undefined" ? localStorage.getItem("pa_refresh_token") : null;
+            if (refreshToken) {
+              try {
+                const refreshRes = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ refresh_token: refreshToken }),
+                });
+                if (refreshRes.ok) {
+                  const tokens = await refreshRes.json();
+                  localStorage.setItem("pa_access_token", tokens.access_token);
+                  localStorage.setItem("pa_refresh_token", tokens.refresh_token);
+                  // Reconnect with new token after short delay
+                  retryTimer.current = setTimeout(connect, 1_000);
+                  return;
+                }
+              } catch { /* fall through */ }
+            }
+            // Can't refresh — stop retrying
+            return;
+          }
           throw new Error(`SSE connection failed (${response.status})`);
         }
 
@@ -77,8 +100,11 @@ export function useUploadEvents(token: string | null) {
         if (!active) return;
         const isAbort = (err as Error).name === "AbortError";
         if (!isAbort) {
-          // Reconnect after 5 seconds on non-intentional failures
-          retryTimer.current = setTimeout(connect, 5_000);
+          // Don't retry on 401 — token is invalid, no point hammering the server
+          const is401 = (err as Error).message?.includes("401");
+          if (!is401) {
+            retryTimer.current = setTimeout(connect, 5_000);
+          }
         }
       }
     }
