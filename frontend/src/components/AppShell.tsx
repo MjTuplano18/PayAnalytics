@@ -26,6 +26,7 @@ function SessionRestorer() {
   // Helper: build ParsedData from upload detail records
   const hydrateFromDetail = (detail: UploadSessionDetail) => {
     const payments = detail.records.map((r) => ({
+      id: r.id,
       bank: r.bank,
       paymentDate: r.payment_date ?? "",
       paymentAmount: r.payment_amount,
@@ -34,28 +35,36 @@ function SessionRestorer() {
       environment: r.environment,
     }));
 
-    const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
-    const tpMap = new Map<string, { count: number; totalAmount: number }>();
-    let totalAmount = 0;
+    // Use integer-cents accumulation to avoid floating-point drift
+    const bankMap = new Map<string, { totalAmountCents: number; paymentCount: number; accounts: Set<string> }>();
+    const tpMap = new Map<string, { count: number; totalAmountCents: number }>();
     const allAccounts = new Set<string>();
 
     for (const p of payments) {
-      totalAmount += p.paymentAmount;
       allAccounts.add(p.account);
-      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
+      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmountCents: 0, paymentCount: 0, accounts: new Set() });
       const b = bankMap.get(p.bank)!;
-      b.totalAmount += p.paymentAmount; b.paymentCount++; b.accounts.add(p.account);
-      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
+      b.totalAmountCents += Math.round(p.paymentAmount * 100); b.paymentCount++; b.accounts.add(p.account);
+      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmountCents: 0 });
       const t = tpMap.get(p.touchpoint)!;
-      t.count++; t.totalAmount += p.paymentAmount;
+      t.count++; t.totalAmountCents += Math.round(p.paymentAmount * 100);
     }
 
+    // Use backend-computed total (SQL SUM on NUMERIC — exact) when available
+    const totalAmount = detail.total_amount ?? 0;
+
     const bankAnalytics = Array.from(bankMap.entries())
-      .map(([bank, d]) => ({ bank, accountCount: d.accounts.size, totalAmount: d.totalAmount, debtorSum: 0, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount }))
+      .map(([bank, d]) => {
+        const bankAmount = d.totalAmountCents / 100;
+        return { bank, accountCount: d.accounts.size, totalAmount: bankAmount, debtorSum: 0, percentage: totalAmount > 0 ? (bankAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount };
+      })
       .sort((a, b) => b.totalAmount - a.totalAmount);
 
     const touchpointAnalytics = Array.from(tpMap.entries())
-      .map(([tp, d]) => ({ touchpoint: tp, count: d.count, totalAmount: d.totalAmount, percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0 }))
+      .map(([tp, d]) => {
+        const tpAmount = d.totalAmountCents / 100;
+        return { touchpoint: tp, count: d.count, totalAmount: tpAmount, percentage: totalAmount > 0 ? (tpAmount / totalAmount) * 100 : 0 };
+      })
       .sort((a, b) => b.count - a.count);
 
     return { payments, bankAnalytics, touchpointAnalytics, totalAccounts: allAccounts.size, totalAmount, totalPayments: payments.length, raw: [] } as ParsedData;
@@ -191,7 +200,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#070D12]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#5B66E2] border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }

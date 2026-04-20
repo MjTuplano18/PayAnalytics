@@ -3,6 +3,7 @@ export interface DataRow {
 }
 
 export interface PaymentRecord {
+  id?: string;
   bank: string;
   paymentDate: string;
   paymentAmount: number;

@@ -318,7 +318,7 @@ export function DynamicChart({
         };
 
         return (
-          <PieChart margin={{ top: 5, bottom: 30, left: 10, right: 0 }} style={{ overflow: 'visible' }}>            <Pie
+          <PieChart margin={{ top: 40, bottom: 40, left: 10, right: 0 }} style={{ overflow: 'visible' }}>            <Pie
               data={processedData}
               cx={isNarrow ? "50%" : "38%"}
               cy={isNarrow ? "50%" : "50%"}

@@ -62,9 +62,10 @@ def _format_date(value: object) -> str:
 
 
 def _safe_float(value: object) -> float:
+    from decimal import Decimal, InvalidOperation
     try:
-        return round(float(value), 2)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+        return float(Decimal(str(value)).quantize(Decimal("0.01")))
+    except (TypeError, ValueError, InvalidOperation):
         return 0.0
 
 

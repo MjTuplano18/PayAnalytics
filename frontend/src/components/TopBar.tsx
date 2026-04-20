@@ -15,12 +15,12 @@ export function TopBar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-[60] flex h-16 items-center justify-between border-b bg-white/75 dark:bg-[rgba(7,13,18,0.75)] backdrop-blur-xl border-gray-200 dark:border-white/10 px-4 sm:px-6">
+    <header className="sticky top-0 z-[60] flex h-16 items-center justify-between border-b bg-white/80 dark:bg-[rgba(7,13,18,0.80)] backdrop-blur-xl border-border/40 dark:border-white/6 px-4 sm:px-6">
       {/* Left: logo + file name */}
       <div className="flex items-center gap-6">
         <img src="/SVG Lgo.svg" alt="Logo" className="h-7 w-auto flex-shrink-0" />
         {fileName && (
-          <span className="hidden sm:inline text-sm text-gray-500 dark:text-[#939393] truncate max-w-[500px]">
+          <span className="hidden sm:inline text-sm text-muted-foreground truncate max-w-[500px]">
             {fileName}
           </span>
         )}
@@ -32,7 +32,7 @@ export function TopBar() {
         {mounted ? (
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="rounded-lg p-2 text-gray-500 dark:text-[#939393] hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
+            className="rounded-full p-2 text-muted-foreground hover:bg-muted dark:hover:bg-white/8 hover:text-foreground transition-all duration-[200ms] ease-[cubic-bezier(0.2,0,0,1)]"
             aria-label="Toggle theme"
           >
             {theme === "dark" ? (

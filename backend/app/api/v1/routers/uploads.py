@@ -194,6 +194,15 @@ async def get_upload(
     session = await repo.get_session(session_id=session_id, user_id=current_user.id)
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
+    # Recompute total from SQL SUM (exact on NUMERIC columns) instead of
+    # relying on the stored value which may have floating-point drift.
+    from sqlalchemy import func as sa_func, select as sa_select
+    from app.models.upload import PaymentRecord
+    agg = await db.execute(
+        sa_select(sa_func.coalesce(sa_func.sum(PaymentRecord.payment_amount), 0))
+        .where(PaymentRecord.session_id == session_id)
+    )
+    session.total_amount = float(agg.scalar_one())
     return UploadSessionDetail.model_validate(session)
 
 

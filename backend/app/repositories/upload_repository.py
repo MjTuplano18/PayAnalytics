@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from typing import Callable, Awaitable
 
 from sqlalchemy import delete as sql_delete, func, select, or_, cast, String
@@ -24,7 +25,7 @@ class UploadRepository:
         records: list[PaymentRecordIn],
         on_progress: ProgressCallback = None,
     ) -> UploadSession:
-        total_amount = sum(r.payment_amount for r in records)
+        total_amount = float(sum(Decimal(str(r.payment_amount)) for r in records))
         upload = UploadSession(
             user_id=user_id,
             file_name=file_name,

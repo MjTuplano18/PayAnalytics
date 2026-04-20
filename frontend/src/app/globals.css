@@ -3,106 +3,183 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── PayAnalytics Brand Palette ──────────────────────────────────────────────
-   #0B0C10  deepest background
-   #1F2833  card / panel background
-   #C5C6C7  primary text on dark
-   #00BF6D  green accent (primary interactive color)
-   #009E5A  dark green (secondary accent / hover)
+/* AG Grid header center alignment */
+.ag-header-center .ag-header-cell-label {
+  justify-content: center;
+}
+
+/* ── Material 3 Expressive Design System ─────────────────────────────────────
+   Adapted from M3 Expressive design tokens with PayAnalytics brand colors.
+   Primary seed: #5B66E2 (indigo)
+   Uses M3 tonal palette, expressive shapes, spring motion.
    ─────────────────────────────────────────────────────────────────────────── */
 
 :root {
   --font-size: 16px;
 
-  /* Light mode – white cards, new indigo accent */
-  --background: #f4f7f9;
-  --foreground: #1f2833;
-  --card: #ffffff;
-  --card-foreground: #1f2833;
-  --popover: #ffffff;
-  --popover-foreground: #1f2833;
-  --primary: #5b66e2;
+  /* ── M3 Tonal Palette — Primary (Indigo) ── */
+  --md-primary-0: #000000;
+  --md-primary-10: #1a1b4b;
+  --md-primary-20: #2e3072;
+  --md-primary-30: #434599;
+  --md-primary-40: #5b66e2;
+  --md-primary-50: #7278e8;
+  --md-primary-60: #8b96f2;
+  --md-primary-70: #a6aef6;
+  --md-primary-80: #c1c6f9;
+  --md-primary-90: #dfe1fc;
+  --md-primary-95: #eff0fe;
+  --md-primary-99: #fafafe;
+  --md-primary-100: #ffffff;
+
+  /* ── M3 Tonal Palette — Tertiary (Teal) ── */
+  --md-tertiary-40: #00897b;
+  --md-tertiary-80: #80cbc4;
+  --md-tertiary-90: #b2dfdb;
+
+  /* ── M3 Surface / Neutral ── */
+  --md-surface-dim: #ddd9d9;
+  --md-surface: #fcf8f8;
+  --md-surface-bright: #fcf8f8;
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: #f7f3f3;
+  --md-surface-container: #f1eded;
+  --md-surface-container-high: #ebe7e7;
+  --md-surface-container-highest: #e5e1e1;
+
+  /* ── M3 Mapped tokens — Light ── */
+  --background: var(--md-surface);
+  --foreground: #1c1b1f;
+  --card: var(--md-surface-container-lowest);
+  --card-foreground: #1c1b1f;
+  --popover: var(--md-surface-container-lowest);
+  --popover-foreground: #1c1b1f;
+  --primary: var(--md-primary-40);
   --primary-foreground: #ffffff;
-  --secondary: #e2ecee;
-  --secondary-foreground: #1f2833;
-  --muted: #e9f0f0;
-  --muted-foreground: #5a6e6e;
-  --accent: #4a55d1;
-  --accent-foreground: #ffffff;
-  --destructive: #d4183d;
+  --secondary: var(--md-primary-90);
+  --secondary-foreground: var(--md-primary-10);
+  --muted: var(--md-surface-container);
+  --muted-foreground: #49454f;
+  --accent: var(--md-primary-90);
+  --accent-foreground: var(--md-primary-10);
+  --destructive: #b3261e;
   --destructive-foreground: #ffffff;
-  --border: rgba(31, 40, 51, 0.12);
-  --input: #f0f6f6;
-  --input-background: #f0f6f6;
-  --switch-background: #5b66e2;
+  --border: #c4c7c5;
+  --input: var(--md-surface-container-high);
+  --input-background: var(--md-surface-container-low);
+  --switch-background: var(--md-primary-40);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: #5b66e2;
+  --ring: var(--md-primary-40);
 
-  /* Chart colours (light mode) */
-  --chart-1: #5b66e2;
-  --chart-2: #8b96f2;
-  --chart-3: #4a55d1;
-  --chart-4: #7b86e8;
-  --chart-5: #939393;
+  /* ── M3 Elevation surface tints ── */
+  --md-elevation-1: rgba(91, 102, 226, 0.05);
+  --md-elevation-2: rgba(91, 102, 226, 0.08);
+  --md-elevation-3: rgba(91, 102, 226, 0.11);
 
-  --radius: 0.625rem;
+  /* ── M3 State layers ── */
+  --md-state-hover: rgba(28, 27, 31, 0.08);
+  --md-state-focus: rgba(28, 27, 31, 0.12);
+  --md-state-pressed: rgba(28, 27, 31, 0.12);
+  --md-state-dragged: rgba(28, 27, 31, 0.16);
+
+  /* ── Chart colours (light) ── */
+  --chart-1: var(--md-primary-40);
+  --chart-2: var(--md-primary-60);
+  --chart-3: var(--md-primary-30);
+  --chart-4: var(--md-tertiary-40);
+  --chart-5: var(--md-primary-80);
+
+  /* ── M3 Expressive Shape — much rounder ── */
+  --radius: 1rem;
+  --radius-full: 9999px;
 
   /* Sidebar */
-  --sidebar-background: rgba(7, 13, 18, 0.85);
-  --sidebar-foreground: #939393;
-  --sidebar-primary: #5b66e2;
+  --sidebar-background: rgba(7, 13, 18, 0.92);
+  --sidebar-foreground: #c4c7c5;
+  --sidebar-primary: var(--md-primary-40);
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: rgba(255, 255, 255, 0.08);
   --sidebar-accent-foreground: #e5e5e8;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #5b66e2;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: var(--md-primary-40);
+
+  /* ── M3 Motion — spring-based ── */
+  --md-motion-duration-short: 200ms;
+  --md-motion-duration-medium: 350ms;
+  --md-motion-duration-long: 500ms;
+  --md-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --md-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --md-motion-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .dark {
-  /* Dark mode – login page palette */
-  --background: #070d12;
-  --foreground: #e5e5e8;
-  --card: rgba(20, 22, 36, 0.80);
-  --card-foreground: #e5e5e8;
-  --popover: rgba(10, 12, 20, 0.95);
-  --popover-foreground: #e5e5e8;
-  --primary: #5b66e2;
-  --primary-foreground: #ffffff;
-  --secondary: rgba(30, 32, 50, 0.60);
-  --secondary-foreground: #e5e5e8;
-  --muted: rgba(30, 32, 50, 0.60);
-  --muted-foreground: #939393;
-  --accent: #4a55d1;
-  --accent-foreground: #ffffff;
-  --destructive: #f05060;
-  --destructive-foreground: #ffffff;
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(172, 172, 172, 0.20);
-  --input-background: rgba(172, 172, 172, 0.20);
-  --switch-background: #5b66e2;
-  --ring: #5b66e2;
+  /* ── M3 Dark surfaces ── */
+  --md-surface-dim: #141218;
+  --md-surface: #141218;
+  --md-surface-bright: #3b383e;
+  --md-surface-container-lowest: #0f0d13;
+  --md-surface-container-low: #1d1b20;
+  --md-surface-container: #211f26;
+  --md-surface-container-high: #2b2930;
+  --md-surface-container-highest: #36343b;
 
-  /* Chart colours (dark mode) */
-  --chart-1: #5b66e2;
-  --chart-2: #8b96f2;
-  --chart-3: #4a55d1;
-  --chart-4: #7b86e8;
-  --chart-5: #939393;
+  /* ── M3 Mapped tokens — Dark ── */
+  --background: var(--md-surface);
+  --foreground: #e6e1e5;
+  --card: var(--md-surface-container);
+  --card-foreground: #e6e1e5;
+  --popover: var(--md-surface-container);
+  --popover-foreground: #e6e1e5;
+  --primary: var(--md-primary-80);
+  --primary-foreground: var(--md-primary-20);
+  --secondary: var(--md-primary-30);
+  --secondary-foreground: var(--md-primary-90);
+  --muted: var(--md-surface-container-high);
+  --muted-foreground: #cac4d0;
+  --accent: var(--md-primary-30);
+  --accent-foreground: var(--md-primary-90);
+  --destructive: #f2b8b5;
+  --destructive-foreground: #601410;
+  --border: rgba(255, 255, 255, 0.12);
+  --input: var(--md-surface-container-high);
+  --input-background: var(--md-surface-container-low);
+  --switch-background: var(--md-primary-80);
+  --ring: var(--md-primary-80);
+
+  /* State layers — dark */
+  --md-state-hover: rgba(230, 225, 229, 0.08);
+  --md-state-focus: rgba(230, 225, 229, 0.12);
+  --md-state-pressed: rgba(230, 225, 229, 0.12);
+  --md-state-dragged: rgba(230, 225, 229, 0.16);
+
+  /* Elevation tints — dark (tonal elevation) */
+  --md-elevation-1: rgba(193, 198, 249, 0.05);
+  --md-elevation-2: rgba(193, 198, 249, 0.08);
+  --md-elevation-3: rgba(193, 198, 249, 0.11);
+
+  /* Chart colours (dark) */
+  --chart-1: var(--md-primary-80);
+  --chart-2: var(--md-primary-60);
+  --chart-3: var(--md-primary-70);
+  --chart-4: var(--md-tertiary-80);
+  --chart-5: var(--md-primary-90);
 
   /* Sidebar */
-  --sidebar-background: rgba(7, 13, 18, 0.85);
-  --sidebar-foreground: #939393;
-  --sidebar-primary: #5b66e2;
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-background: rgba(7, 13, 18, 0.92);
+  --sidebar-foreground: #cac4d0;
+  --sidebar-primary: var(--md-primary-80);
+  --sidebar-primary-foreground: var(--md-primary-20);
   --sidebar-accent: rgba(255, 255, 255, 0.08);
   --sidebar-accent-foreground: #e5e5e8;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #5b66e2;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: var(--md-primary-80);
 }
 
 @theme inline {
-  /* Fonts — Jeko (Plus Jakarta Sans) used everywhere */
+  /* Fonts — Plus Jakarta Sans for M3 feel */
   --font-sans: var(--font-jeko), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-jeko), ui-sans-serif, system-ui, sans-serif;
   --font-ui: var(--font-jeko), ui-sans-serif, system-ui, sans-serif;
@@ -131,10 +208,15 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+
+  /* ── M3 Expressive Shape Scale ── */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+
   --color-sidebar: var(--sidebar-background);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -153,57 +235,114 @@
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
   }
-  /* Glass card effect – cards sit on top of the blurred background */
+  /* M3 Elevated cards — tonal surface tint instead of heavy shadows */
   [data-slot="card"] {
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
+    background-image: linear-gradient(var(--md-elevation-1), var(--md-elevation-1));
   }
   html {
     font-size: var(--font-size);
   }
+  /* M3 Type scale — headlines use display weight */
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
+  h1 { font-weight: 400; letter-spacing: -0.02em; }
+  h2 { font-weight: 400; letter-spacing: -0.015em; }
+  h3 { font-weight: 500; letter-spacing: 0; }
   caption, label, .badge, .tag {
     font-family: var(--font-ui);
+    letter-spacing: 0.01em;
   }
 }
 
-/* ---- entrance animations ---- */
+/* ── M3 Expressive Motion ──────────────────────────────────────────────────── */
+
+/* Spring-based entrance */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.92); }
   to   { opacity: 1; transform: scale(1); }
+}
+/* M3 container transform — morph in */
+@keyframes m3ContainerIn {
+  from { opacity: 0; transform: scale(0.85); border-radius: 28px; }
+  to   { opacity: 1; transform: scale(1); }
+}
+/* M3 Expressive spring pop */
+@keyframes m3SpringPop {
+  0%   { transform: scale(0.9); opacity: 0; }
+  60%  { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.5s ease-out both;
+  animation: fadeInUp 0.5s var(--md-motion-easing-emphasized-decelerate) both;
 }
 .animate-fade-in {
-  animation: fadeIn 0.4s ease-out both;
+  animation: fadeIn 0.35s var(--md-motion-easing-standard) both;
 }
 .animate-scale-in {
-  animation: scaleIn 0.4s ease-out both;
+  animation: scaleIn 0.4s var(--md-motion-easing-emphasized-decelerate) both;
+}
+.animate-m3-container {
+  animation: m3ContainerIn 0.5s var(--md-motion-easing-emphasized-decelerate) both;
+}
+.animate-m3-spring {
+  animation: m3SpringPop 0.45s var(--md-motion-spring) both;
 }
 
-/* stagger children — apply on parent, children get incremental delay */
-.stagger-children > * { animation: fadeInUp 0.45s ease-out both; }
-.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
-.stagger-children > *:nth-child(2) { animation-delay: 0.10s; }
-.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
-.stagger-children > *:nth-child(4) { animation-delay: 0.20s; }
-.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
-.stagger-children > *:nth-child(6) { animation-delay: 0.30s; }
-.stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
-.stagger-children > *:nth-child(8) { animation-delay: 0.40s; }
+/* stagger children — M3 cascade */
+.stagger-children > * { animation: fadeInUp 0.5s var(--md-motion-easing-emphasized-decelerate) both; }
+.stagger-children > *:nth-child(1) { animation-delay: 0.03s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.07s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.11s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.19s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.23s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.27s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.31s; }
+
+/* ── M3 State layer utility classes ── */
+.m3-state-layer {
+  position: relative;
+  overflow: hidden;
+}
+.m3-state-layer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  background: currentColor;
+  transition: opacity var(--md-motion-duration-short) var(--md-motion-easing-standard);
+  pointer-events: none;
+}
+.m3-state-layer:hover::after { opacity: 0.08; }
+.m3-state-layer:focus-visible::after { opacity: 0.12; }
+.m3-state-layer:active::after { opacity: 0.12; }
+
+/* ── M3 Ripple effect ── */
+@keyframes m3Ripple {
+  from { transform: scale(0); opacity: 0.12; }
+  to   { transform: scale(2.5); opacity: 0; }
+}
+.m3-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+  animation: m3Ripple 0.5s var(--md-motion-easing-standard) forwards;
+  pointer-events: none;
+}
 
 ::-webkit-scrollbar {
   width: 6px;

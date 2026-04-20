@@ -44,7 +44,7 @@ export default function LoginPage() {
       <div className="pointer-events-none absolute inset-0" />
 
       {/* Glassmorphism card */}
-      <div className="relative z-10 w-full max-w-[440px] mx-4 rounded-[40px] border border-white/5 bg-[rgba(56,56,56,0.20)] px-8 py-10 sm:px-14 sm:py-14 backdrop-blur-md shadow-2xl flex flex-col min-h-[620px]">
+      <div className="relative z-10 w-full max-w-[440px] mx-4 rounded-[32px] border border-white/8 bg-[rgba(56,56,56,0.20)] px-8 py-10 sm:px-14 sm:py-14 backdrop-blur-md shadow-2xl flex flex-col min-h-[620px]">
         {/* Brand: Logo */}
         <div className="mt-6 mb-10 flex items-center justify-center">
           <Image
@@ -58,7 +58,7 @@ export default function LoginPage() {
 
         {/* Error message */}
         {error && (
-          <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-3 text-sm text-red-400 text-center">
+          <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-5 py-3 text-sm text-red-400 text-center">
             {error}
           </div>
         )}
@@ -77,7 +77,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 text-sm text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-[#5B66E2]/50 transition-all [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgba(172,172,172,0.4)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[caret-color:white]"
+              className="w-full rounded-2xl bg-[#ACACAC]/40 px-4 py-3.5 text-sm text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-[#5B66E2]/50 transition-all duration-[200ms] ease-[cubic-bezier(0.2,0,0,1)] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgba(172,172,172,0.4)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[caret-color:white]"
             />
           </div>
 
@@ -95,7 +95,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full rounded-[12px] bg-[#ACACAC]/40 px-4 py-3 pr-10 text-sm text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-[#5B66E2]/50 transition-all [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgba(172,172,172,0.4)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[caret-color:white]"
+                className="w-full rounded-2xl bg-[#ACACAC]/40 px-4 py-3.5 pr-10 text-sm text-white placeholder:text-gray-500 shadow-[8px_8px_4px_0_rgba(0,0,0,0.25)] outline-none focus:ring-2 focus:ring-[#5B66E2]/50 transition-all duration-[200ms] ease-[cubic-bezier(0.2,0,0,1)] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgba(172,172,172,0.4)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[caret-color:white]"
               />
               <button
                 type="button"
@@ -117,7 +117,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-[10px] bg-[#5B66E2] px-6 py-2 text-sm font-normal text-white transition-all hover:bg-[#4B56D2] disabled:opacity-50 shadow-lg"
+              className="rounded-full bg-[#5B66E2] px-8 py-2.5 text-sm font-medium text-white transition-all duration-[250ms] ease-[cubic-bezier(0.2,0,0,1)] hover:bg-[#4B56D2] hover:shadow-lg active:scale-[0.97] disabled:opacity-38 shadow-md"
             >
               {isSubmitting ? "Signing in…" : "Login"}
             </button>

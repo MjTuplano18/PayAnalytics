@@ -257,7 +257,7 @@ export default function TouchpointsDashboardPage() {
             Touchpoint Distribution
           </h3>
           {apiLoading ? (
-            <Skeleton className="h-[350px] w-full rounded-xl" />
+            <Skeleton className="h-[600px] w-full rounded-xl" />
           ) : (
             <DynamicChart
               data={filteredAnalytics.slice(0, 8).map((t) => ({
@@ -267,7 +267,7 @@ export default function TouchpointsDashboardPage() {
               type="pie"
               dataKey="count"
               xAxisKey="touchpoint"
-              height={350}
+              height={600}
             />
           )}
         </div>
