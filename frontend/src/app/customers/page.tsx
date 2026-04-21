@@ -158,19 +158,20 @@ export default function AccountsPage() {
 
       {/* Top 10 Accounts Chart */}
       <div className="mb-8 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-          Top 10 Accounts by Amount
-        </h3>
-        <DynamicChart
-          data={accountData.slice(0, 10).map((a) => ({
-            account: a.account,
-            amount: a.totalAmount,
-          }))}
-          type="bar"
-          dataKey="amount"
-          xAxisKey="account"
-          height={350}
-        />
+        <Card className="p-6 bg-card border-border">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Top 10 Accounts by Amount</h3>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Top 10 debtor accounts ranked by total payment amount collected</p>
+          <DynamicChart
+            data={accountData.slice(0, 10).map((a) => ({
+              account: a.account,
+              amount: a.totalAmount,
+            }))}
+            type="bar"
+            dataKey="amount"
+            xAxisKey="account"
+            height={350}
+          />
+        </Card>
       </div>
 
       {/* Account Details Table */}

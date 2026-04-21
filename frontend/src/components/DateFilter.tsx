@@ -229,3 +229,38 @@ export function filterByDateRange<T>(
     return d !== null && d >= start;
   });
 }
+
+/** Convert a DateRange + optional CustomDateRange to API-compatible date_from / date_to strings (YYYY-MM-DD) */
+export function dateRangeToBounds(
+  range: DateRange,
+  custom?: CustomDateRange
+): { date_from?: string; date_to?: string } {
+  const fmt = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  if (range === "all") return {};
+
+  if (range === "custom" && custom) {
+    return { date_from: fmt(custom.from), date_to: fmt(custom.to) };
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  switch (range) {
+    case "today":
+      return { date_from: fmt(today), date_to: fmt(today) };
+    case "week": {
+      const day = today.getDay();
+      const start = new Date(today);
+      start.setDate(today.getDate() - day);
+      return { date_from: fmt(start) };
+    }
+    case "month":
+      return { date_from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)) };
+    case "year":
+      return { date_from: fmt(new Date(today.getFullYear(), 0, 1)) };
+    default:
+      return {};
+  }
+}

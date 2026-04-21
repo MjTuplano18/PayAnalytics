@@ -31,13 +31,20 @@ function channelType(tp: string): string {
 }
 
 export default function DashboardPage() {
-  const { data, sessionId } = useData();
+  const { data, sessionId, setSessionId } = useData();
   const { token, user } = useAuth();
   const [activeTab, setActiveTab] = useState<"summary" | "portfolio" | "channels">("summary");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const [monthFilter, setMonthFilter] = useState("all");
-  const { data: apiSummary, isLoading: apiLoading } = useDashboard(token, sessionId);
+  const { data: apiSummary, isLoading: apiLoading, error: apiError } = useDashboard(token, sessionId);
+
+  // Auto-clear stale session on 404 or 500 (e.g. after DB migration / new database)
+  useEffect(() => {
+    if (apiError && (apiError.message.includes("404") || apiError.message.includes("Not Found") || apiError.message.includes("500") || apiError.message.includes("Internal Server Error"))) {
+      setSessionId(null);
+    }
+  }, [apiError, setSessionId]);
 
   // Portfolio tab filters
   const [selectedEnvironments, setSelectedEnvironments] = useState<Set<string>>(new Set());
@@ -568,9 +575,11 @@ export default function DashboardPage() {
           {/* Row 1: Amount by Bank (bar) + Portfolio share (donut) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <Card className="p-6 bg-card border-border">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Payment Amount by Bank</h3>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Total amount collected per bank — filter by environment to drill down</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Payment Amount by Bank</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Total amount collected per bank — filter by environment to drill down</p>
+                </div>
                 <select value={portfolioBankTopN === "all" ? "all" : String(portfolioBankTopN)} onChange={(e) => setPortfolioBankTopN(e.target.value === "all" ? "all" : parseInt(e.target.value))} className="text-xs px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#5B66E2]">
                   <option value="10">Top 10</option><option value="20">Top 20</option><option value="50">Top 50</option><option value="all">All</option>
                 </select>
