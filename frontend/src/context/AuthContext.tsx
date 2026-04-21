@@ -90,6 +90,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
+    // Clear session data so next user doesn't see previous user's state
+    localStorage.removeItem("sessionId");
+    localStorage.removeItem("fileName");
     setTokenState(null);
     setUser(null);
     router.replace("/login");

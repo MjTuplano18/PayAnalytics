@@ -1,7 +1,3 @@
-import logging
-from decimal import Decimal
-from typing import Callable, Awaitable
-
 from sqlalchemy import delete as sql_delete, func, select, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -9,23 +5,18 @@ from sqlalchemy.orm import selectinload
 from app.models.upload import PaymentRecord, UploadSession
 from app.schemas.upload import PaymentRecordIn
 
-# Optional progress callback: async fn(session_id, file_name, processed, total)
-ProgressCallback = Callable[[str, str, int, int], Awaitable[None]] | None
-
 
 class UploadRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
-        self.logger = logging.getLogger(__name__)
 
     async def create_session(
         self,
         user_id: str,
         file_name: str,
         records: list[PaymentRecordIn],
-        on_progress: ProgressCallback = None,
     ) -> UploadSession:
-        total_amount = float(sum(Decimal(str(r.payment_amount)) for r in records))
+        total_amount = round(sum(r.payment_amount for r in records), 2)
         upload = UploadSession(
             user_id=user_id,
             file_name=file_name,
@@ -35,28 +26,20 @@ class UploadRepository:
         self.session.add(upload)
         await self.session.flush()  # get the id before bulk insert
 
-        total = len(records)
-        # Batch insert using core INSERT to minimise memory (no ORM object per row)
-        BATCH = 2000
-        for i in range(0, total, BATCH):
-            batch = records[i : i + BATCH]
-            await self.session.execute(
-                PaymentRecord.__table__.insert(),
-                [
-                    {
-                        "session_id": upload.id,
-                        "bank": r.bank,
-                        "account": r.account,
-                        "touchpoint": r.touchpoint,
-                        "payment_date": r.payment_date,
-                        "payment_amount": r.payment_amount,
-                        "environment": r.environment,
-                    }
-                    for r in batch
-                ],
+        payment_records = [
+            PaymentRecord(
+                session_id=upload.id,
+                bank=r.bank,
+                account=r.account,
+                touchpoint=r.touchpoint,
+                payment_date=r.payment_date,
+                payment_amount=round(r.payment_amount, 2),
+                environment=r.environment,
+                month=r.month,
             )
-            if on_progress:
-                await on_progress(upload.id, file_name, min(i + BATCH, total), total)
+            for r in records
+        ]
+        self.session.add_all(payment_records)
         await self.session.commit()
         await self.session.refresh(upload)
         return upload
@@ -86,50 +69,6 @@ class UploadRepository:
             .where(UploadSession.id == session_id, UploadSession.user_id == user_id)
         )
         return result.scalar_one_or_none()
-
-    async def get_session_metadata(self, session_id: str, user_id: str) -> UploadSession | None:
-        """Fetch session without loading records — lightweight for audit logging."""
-        result = await self.session.execute(
-            select(UploadSession)
-            .where(UploadSession.id == session_id, UploadSession.user_id == user_id)
-        )
-        return result.scalar_one_or_none()
-
-    async def get_record(self, record_id: str, session_id: str, user_id: str) -> PaymentRecord | None:
-        """Fetch a single payment record by ID (verifies session ownership)."""
-        session_check = await self.session.execute(
-            select(UploadSession.id).where(
-                UploadSession.id == session_id,
-                UploadSession.user_id == user_id,
-            )
-        )
-        if not session_check.scalar_one_or_none():
-            return None
-        result = await self.session.execute(
-            select(PaymentRecord).where(
-                PaymentRecord.id == record_id,
-                PaymentRecord.session_id == session_id,
-            )
-        )
-        return result.scalar_one_or_none()
-
-    async def get_records_by_ids(self, session_id: str, user_id: str, record_ids: list[str]) -> list[PaymentRecord]:
-        """Fetch specific payment records by their IDs (verifies session ownership)."""
-        session_check = await self.session.execute(
-            select(UploadSession.id).where(
-                UploadSession.id == session_id,
-                UploadSession.user_id == user_id,
-            )
-        )
-        if not session_check.scalar_one_or_none():
-            return []
-        result = await self.session.execute(
-            select(PaymentRecord).where(
-                PaymentRecord.session_id == session_id,
-                PaymentRecord.id.in_(record_ids),
-            )
-        )
-        return list(result.scalars().all())
 
     async def get_session_any_user(self, session_id: str) -> UploadSession | None:
         """Admin: get session regardless of owner."""
@@ -185,11 +124,6 @@ class UploadRepository:
         record = result.scalar_one_or_none()
         if not record:
             return False
-        # Log deletion intent for observability
-        try:
-            self.logger.info("Deleting PaymentRecord id=%s session=%s user=%s", record_id, session_id, user_id)
-        except Exception:
-            pass
         await self.session.delete(record)
         # Update session totals
         await self._update_session_totals(session_id)
@@ -260,34 +194,6 @@ class UploadRepository:
         await self.session.commit()
         return record
 
-    async def delete_transactions_bulk(
-        self, session_id: str, user_id: str, record_ids: list[str]
-    ) -> int:
-        """Delete multiple payment records by ID in a single operation. Returns count deleted."""
-        if not record_ids:
-            return 0
-        # Verify session ownership
-        session_check = await self.session.execute(
-            select(UploadSession.id).where(
-                UploadSession.id == session_id,
-                UploadSession.user_id == user_id,
-            )
-        )
-        if not session_check.scalar_one_or_none():
-            return 0
-        # Bulk delete in a single statement
-        result = await self.session.execute(
-            sql_delete(PaymentRecord).where(
-                PaymentRecord.session_id == session_id,
-                PaymentRecord.id.in_(record_ids),
-            )
-        )
-        count = result.rowcount
-        if count > 0:
-            await self._update_session_totals(session_id)
-            await self.session.flush()
-        return count
-
     async def delete_transactions_by_date_range(
         self, session_id: str, user_id: str, date_from: str, date_to: str
     ) -> int:
@@ -348,8 +254,7 @@ class UploadRepository:
         search: str | None = None,
         payment_date: str | None = None,
         environment: str | None = None,
-        date_from: str | None = None,
-        date_to: str | None = None,
+        month: str | None = None,
         page: int = 1,
         page_size: int = 25,
     ) -> tuple[int, float, list[PaymentRecord]]:
@@ -371,12 +276,10 @@ class UploadRepository:
             query = query.where(PaymentRecord.touchpoint == touchpoint)
         if payment_date:
             query = query.where(PaymentRecord.payment_date == payment_date)
-        if date_from:
-            query = query.where(PaymentRecord.payment_date >= date_from)
-        if date_to:
-            query = query.where(PaymentRecord.payment_date <= date_to)
         if environment:
             query = query.where(PaymentRecord.environment == environment)
+        if month:
+            query = query.where(func.upper(PaymentRecord.month) == month.upper())
         if search:
             pattern = f"%{search}%"
             query = query.where(
@@ -403,6 +306,18 @@ class UploadRepository:
         result = await self.session.execute(query)
         return total, float(total_amount), list(result.scalars().all())
 
+    async def get_dashboard_summary_any_user(self, session_id: str) -> dict | None:
+        """Get dashboard summary for any session regardless of owner (shared data model)."""
+        # Verify session exists
+        result = await self.session.execute(
+            select(UploadSession).where(UploadSession.id == session_id)
+        )
+        upload = result.scalar_one_or_none()
+        if not upload:
+            return None
+        # Reuse the same logic but with a dummy user_id that matches the actual owner
+        return await self.get_dashboard_summary(session_id=session_id, user_id=upload.user_id)
+
     async def get_dashboard_summary(self, session_id: str, user_id: str) -> dict | None:
         # Verify session ownership
         session_check = await self.session.execute(
@@ -425,7 +340,7 @@ class UploadRepository:
             ).where(PaymentRecord.session_id == session_id)
         )
         total_payments, total_amount, total_accounts, total_banks = totals.one()
-        total_amount = total_amount or 0.0
+        total_amount = round(total_amount or 0.0, 2)
 
         # Bank breakdown
         bank_rows = await self.session.execute(
@@ -444,7 +359,7 @@ class UploadRepository:
                 "bank": row.bank,
                 "payment_count": row.payment_count,
                 "account_count": row.account_count,
-                "total_amount": row.total_amount or 0.0,
+                "total_amount": round(row.total_amount or 0.0, 2),
                 "percentage": round((row.total_amount or 0.0) / total_amount * 100, 2) if total_amount else 0,
             }
             for row in bank_rows.all()
@@ -489,6 +404,20 @@ class UploadRepository:
         )
         environments = [row[0] for row in env_rows.all()]
 
+        # Distinct months (in calendar order)
+        _month_order = {
+            "JANUARY": 1, "FEBRUARY": 2, "MARCH": 3, "APRIL": 4,
+            "MAY": 5, "JUNE": 6, "JULY": 7, "AUGUST": 8,
+            "SEPTEMBER": 9, "OCTOBER": 10, "NOVEMBER": 11, "DECEMBER": 12,
+        }
+        month_rows = await self.session.execute(
+            select(func.distinct(func.upper(PaymentRecord.month)))
+            .where(PaymentRecord.session_id == session_id)
+            .where(PaymentRecord.month.isnot(None))
+        )
+        months_raw = [row[0] for row in month_rows.all() if row[0]]
+        months = sorted(months_raw, key=lambda m: _month_order.get(m, 99))
+
         # Environment → bank → touchpoint mapping (for cascading filters)
         env_bank_tp_rows = await self.session.execute(
             select(
@@ -531,6 +460,7 @@ class UploadRepository:
             "touchpoints": touchpoints,
             "dates": dates,
             "environments": environments,
+            "months": months,
             "environment_map": environment_map,
             "session_id": session_id,
         }

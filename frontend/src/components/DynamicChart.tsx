@@ -28,7 +28,8 @@ interface DynamicChartProps {
   xAxisKey: string;
   height?: number;
   title?: string;
-  
+  /** "amount" (default) = ₱ prefix | "count" = plain number | "percentage" = % suffix */
+  valueType?: "amount" | "count" | "percentage";
 }
 
 /** Brand palette — 12 slots for multi-series / pie charts */
@@ -64,12 +65,12 @@ function truncateAxis(str: string, max: number): string {
 function fmtNum(value: number): string {
   const abs = Math.abs(value);
   if (abs >= 1_000_000_000)
-    return `${(value / 1_000_000_000).toFixed(2).replace(/\.00$/, "")}B`;
+    return `${(value / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
   if (abs >= 1_000_000)
-    return `${(value / 1_000_000).toFixed(2).replace(/\.00$/, "")}M`;
+    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
   if (abs >= 1_000)
-    return `${(value / 1_000).toFixed(2).replace(/\.00$/, "")}K`;
-  return value.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `${(value / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  return String(Math.round(value));
 }
 
 export function DynamicChart({
@@ -79,6 +80,7 @@ export function DynamicChart({
   xAxisKey,
   height = 350,
   title,
+  valueType,
 }: DynamicChartProps) {
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useCallback((node: HTMLDivElement | null) => {
@@ -97,7 +99,7 @@ export function DynamicChart({
     if (!data || data.length === 0) return [];
     return data.map((item, index) => ({
       ...item,
-      _shortName: truncateAxis(String(item[xAxisKey] ?? ""), 10),
+      _shortName: truncateAxis(String(item[xAxisKey] ?? ""), 18),
       _uniqueId: `${xAxisKey}-${item[xAxisKey]}-${index}`,
     }));
   }, [data, xAxisKey]);
@@ -121,27 +123,22 @@ export function DynamicChart({
     fontSize: "13px",
   };
 
-  const tooltipLabelStyle = { color: "#ffffff" };
-  const tooltipItemStyle  = { color: "#ffffff" };
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formatTooltipValue = (value: any) => {
     const num = Number(value);
-    const formatted = fmtNum(isNaN(num) ? 0 : num);
-    if (dataKey === "percentage") return `${formatted}%`;
-    if (dataKey === "count") return formatted;
-    return `₱${formatted}`;
-  };
-
-  const formatAxisTick = (value: number) => {
-    if (dataKey === "percentage") return `${fmtNum(value)}%`;
-    return fmtNum(value);
+    if (isNaN(num)) return "0";
+    const vt = valueType ?? (dataKey === "percentage" ? "percentage" : dataKey === "count" || dataKey === "transactions" ? "count" : "amount");
+    if (vt === "percentage") return `${num.toFixed(1)}%`;
+    if (vt === "count") return num.toLocaleString("en-PH");
+    return `₱${fmtNum(num)}`;
   };
 
   const renderChart = () => {
-    // Responsive: on narrow containers, skip some x-axis labels to prevent overlap
     const isCompact = containerWidth < 500;
     const barInterval = isCompact ? Math.max(1, Math.floor(processedData.length / 15)) : 0;
+    const vt = valueType ?? (dataKey === "percentage" ? "percentage" : dataKey === "count" || dataKey === "transactions" ? "count" : "amount");
+    const isPercentage = vt === "percentage";
+    const yAxisFormatter = isPercentage ? (v: number) => `${v}%` : vt === "count" ? (v: number) => fmtNum(v) : fmtNum;
 
     switch (type) {
       case "bar":
@@ -166,12 +163,10 @@ export function DynamicChart({
             <YAxis
               className="text-muted-foreground"
               tick={{ fontSize: 12 }}
-              tickFormatter={formatAxisTick}
+              tickFormatter={yAxisFormatter}
             />
             <Tooltip
               contentStyle={tooltipStyle}
-              labelStyle={tooltipLabelStyle}
-              itemStyle={tooltipItemStyle}
               formatter={formatTooltipValue}
               cursor={{ fill: "rgba(209, 213, 219, 0.08)" }}
             />
@@ -187,7 +182,7 @@ export function DynamicChart({
           <BarChart
             data={processedData}
             layout="vertical"
-            margin={{ left: 30, right: 30, top: 5, bottom: 5 }}
+            margin={{ left: 10, right: 30, top: 5, bottom: 5 }}
           >
             <defs>
               <linearGradient id="barhGradient" x1="0" y1="0" x2="0" y2="1">
@@ -200,19 +195,17 @@ export function DynamicChart({
               type="number"
               className="text-muted-foreground"
               tick={{ fontSize: 12 }}
-              tickFormatter={formatAxisTick}
+              tickFormatter={fmtNum}
             />
             <YAxis
               type="category"
               dataKey="_shortName"
               className="text-muted-foreground"
-              tick={{ fontSize: 11 }}
-              width={40}
+              tick={{ fontSize: 10 }}
+              width={110}
             />
             <Tooltip
               contentStyle={tooltipStyle}
-              labelStyle={tooltipLabelStyle}
-              itemStyle={tooltipItemStyle}
               formatter={formatTooltipValue}
               cursor={{ fill: "rgba(209, 213, 219, 0.08)" }}
             />
@@ -235,13 +228,13 @@ export function DynamicChart({
             <YAxis
               className="text-muted-foreground"
               tick={{ fontSize: 12 }}
-              tickFormatter={formatAxisTick}
+              tickFormatter={fmtNum}
             />
-            <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={formatTooltipValue} />
+            <Tooltip contentStyle={tooltipStyle} formatter={formatTooltipValue} />
             <Legend />
             <Line
               type="monotone"
-                dataKey={dataKey}
+              dataKey={dataKey}
               stroke={BRAND}
               strokeWidth={2}
               dot={{ fill: BRAND, r: 4 }}
@@ -251,80 +244,57 @@ export function DynamicChart({
         );
       case "area":
         return (
-          <AreaChart data={processedData} margin={{ left: 30, right: 30, top: 5, bottom: 5 }}>
+          <AreaChart data={processedData} margin={{ left: 30, right: 30, top: 10, bottom: 5 }}>
             <defs>
               <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#5B66E2" stopOpacity={0.85} />
-                <stop offset="100%" stopColor="#ffffff" stopOpacity={0.02} />
+                <stop offset="0%" stopColor="#5B66E2" stopOpacity={0.15} />
+                <stop offset="100%" stopColor="#5B66E2" stopOpacity={0.01} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
             <XAxis
               dataKey={xAxisKey}
               className="text-muted-foreground"
               tick={{ fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
             />
             <YAxis
               className="text-muted-foreground"
               tick={{ fontSize: 12 }}
-              tickFormatter={formatAxisTick}
+              tickFormatter={yAxisFormatter}
+              axisLine={false}
+              tickLine={false}
             />
             <Tooltip
               contentStyle={tooltipStyle}
-              labelStyle={tooltipLabelStyle}
-              itemStyle={tooltipItemStyle}
-              formatter={formatTooltipValue}
-              cursor={{ fill: "rgba(209, 213, 219, 0.08)" }}
+              formatter={(value: unknown) => [formatTooltipValue(value), "Total"]}
+              cursor={{ stroke: "#5B66E2", strokeWidth: 1, strokeDasharray: "4 4" }}
             />
-            <Legend />
             <Area
               type="monotone"
               dataKey={dataKey}
               stroke={BRAND}
               fill="url(#areaGradient)"
-              strokeWidth={2}
-              activeDot={{ r: 6, fill: BRAND }}
+              strokeWidth={2.5}
+              dot={{ fill: BRAND, r: 4, strokeWidth: 2, stroke: "#fff" }}
+              activeDot={{ r: 6, fill: BRAND, stroke: "#fff", strokeWidth: 2 }}
             />
           </AreaChart>
         );
-      
       case "pie": {
         const isNarrow = containerWidth < 380;
-        const outerR = Math.min(height * 0.38, isNarrow ? 90 : 140);
-        const RADIAN = Math.PI / 180;
-
-        // Custom label renderer that places labels outside the pie along leader lines.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const renderOuterLabel = (props: any) => {
-          const { cx = 0, cy = 0, midAngle = 0, outerRadius: oR = 0, percent = 0 } = props;
-          if (percent < 0.003) return null; // skip < 0.3%
-          const radius = oR + 32;
-          const x = cx + radius * Math.cos(-midAngle * RADIAN);
-          const y = cy + radius * Math.sin(-midAngle * RADIAN);
-          return (
-            <text
-              x={x}
-              y={y}
-              fill="currentColor"
-              textAnchor={x > cx ? "start" : "end"}
-              dominantBaseline="central"
-              className="text-gray-700 dark:text-gray-300"
-              fontSize={16}
-              fontWeight={600}
-            >
-              {`${(percent * 100).toFixed(2)}%`}
-            </text>
-          );
-        };
-
         return (
-          <PieChart margin={{ top: 40, bottom: 40, left: 10, right: 0 }} style={{ overflow: 'visible' }}>            <Pie
+          <PieChart>
+            <Pie
               data={processedData}
-              cx={isNarrow ? "50%" : "38%"}
-              cy={isNarrow ? "50%" : "50%"}
-              labelLine
-              label={renderOuterLabel}
-              outerRadius={outerR}
+              cx={isNarrow ? "50%" : "40%"}
+              cy={isNarrow ? "40%" : "50%"}
+              labelLine={false}
+              label={({ percent }: { percent?: number }) =>
+                `${((percent ?? 0) * 100).toFixed(1)}%`
+              }
+              outerRadius={Math.min(height / 3, isNarrow ? 90 : 120)}
               dataKey={dataKey}
               nameKey={xAxisKey}
             >
@@ -337,7 +307,7 @@ export function DynamicChart({
                 />
               ))}
             </Pie>
-            <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={formatTooltipValue} />
+            <Tooltip contentStyle={tooltipStyle} formatter={formatTooltipValue} />
             {isNarrow ? (
               <Legend
                 layout="horizontal"
@@ -351,8 +321,8 @@ export function DynamicChart({
                 layout="vertical"
                 align="right"
                 verticalAlign="middle"
-                wrapperStyle={{ fontSize: 14, maxHeight: height, overflow: "auto", paddingLeft: 8, lineHeight: "2" }}
-                formatter={(value: string) => truncate(value, 22)}
+                wrapperStyle={{ fontSize: 11, maxHeight: height, overflow: "auto", paddingLeft: 0 }}
+                formatter={(value: string) => truncate(value, 20)}
               />
             )}
           </PieChart>
@@ -370,11 +340,9 @@ export function DynamicChart({
           {title}
         </h3>
       )}
-      <div style={{ overflow: 'visible', position: 'relative' }}>
-        <ResponsiveContainer width="100%" height={height} style={{ overflow: 'visible' }}>
-          {renderChart() as React.ReactElement}
-        </ResponsiveContainer>
-      </div>
+      <ResponsiveContainer width="100%" height={height}>
+        {renderChart() as React.ReactElement}
+      </ResponsiveContainer>
     </div>
   );
 }

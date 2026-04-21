@@ -10,6 +10,7 @@ class PaymentRecordIn(BaseModel):
     payment_date: str | None = None
     payment_amount: float
     environment: str | None = None
+    month: str | None = None
 
 
 class PaymentRecordOut(PaymentRecordIn):
@@ -78,6 +79,7 @@ class DashboardSummary(BaseModel):
     touchpoints: list[TouchpointSummary]
     dates: list[str] = []
     environments: list[str] = []
+    months: list[str] = []
     environment_map: list[EnvironmentCampaignMap] = []
     session_id: str | None = None
 
