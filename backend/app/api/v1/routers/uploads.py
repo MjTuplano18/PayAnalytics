@@ -1,11 +1,20 @@
 import json
 import uuid
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+
+class _DecimalEncoder(json.JSONEncoder):
+    def default(self, o: object) -> object:
+        if isinstance(o, Decimal):
+            return float(o)
+        return super().default(o)
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies.auth import get_current_user
-from app.api.v1.routers.events import broadcast_new_upload
+from app.core.cache import cache_get, cache_set, cache_invalidate
+from app.api.v1.routers.events import broadcast_new_upload, broadcast_upload_progress
 from app.db.session import get_db
 from app.models.user import User
 from app.models.upload import UploadSession, PaymentRecord
@@ -13,6 +22,7 @@ from app.repositories.audit_log_repository import AuditLogRepository
 from app.repositories.upload_repository import UploadRepository
 from app.schemas.upload import (
     AuditLogEntry,
+    BulkDeleteRequest,
     DashboardSummary,
     PaginatedTransactions,
     PaymentRecordIn,
@@ -21,6 +31,7 @@ from app.schemas.upload import (
     UploadSessionCreate,
     UploadSessionDetail,
     UploadSessionOut,
+    AuditLogCreate,
 )
 
 router = APIRouter(prefix="/uploads", tags=["Uploads"])
@@ -39,6 +50,7 @@ async def create_upload(
         user_id=current_user.id,
         file_name=payload.file_name,
         records=payload.records,
+        on_progress=broadcast_upload_progress,
     )
     await audit_repo.log_action(
         user_id=current_user.id,
@@ -53,23 +65,72 @@ async def create_upload(
     return UploadSessionOut.model_validate(session)
 
 
-@router.get("/latest", response_model=UploadSessionOut)
-async def get_latest_upload(
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
+
+
+@router.post("/file", response_model=UploadSessionOut, status_code=status.HTTP_201_CREATED)
+async def upload_file(
+    file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UploadSessionOut:
-    """Get the most recent upload session across all users (shared company data).
-    First tries the current user's own sessions, then falls back to any user's session."""
+    """
+    Upload an Excel/CSV file for server-side streaming parse.
+
+    The file is parsed row-by-row using openpyxl read-only mode to keep
+    peak memory low (important for 512 MB Render free tier).
+    SSE progress events are broadcast during batch inserts.
+    """
+    import os
+    from app.utils.file_parser import stream_xlsx, stream_csv
+
+    file_name = file.filename or "upload"
+    ext = os.path.splitext(file_name)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+
+    # Read file with size guard
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File exceeds 10 MB limit.",
+        )
+
+    # Stream-parse into records
+    if ext == ".csv":
+        records = list(stream_csv(contents))
+    else:
+        records = list(stream_xlsx(contents))
+
+    if not records:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The uploaded file contains no data rows.",
+        )
+
     repo = UploadRepository(db)
-    # Try current user's sessions first
-    user_sessions = await repo.list_sessions(user_id=current_user.id)
-    if user_sessions:
-        return UploadSessionOut.model_validate(user_sessions[0])
-    # Fallback: most recent session from any user
-    all_sessions = await repo.list_all_sessions(limit=1)
-    if all_sessions:
-        return UploadSessionOut.model_validate(all_sessions[0])
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No upload sessions found.")
+    audit_repo = AuditLogRepository(db)
+    session = await repo.create_session(
+        user_id=current_user.id,
+        file_name=file_name,
+        records=records,
+        on_progress=broadcast_upload_progress,
+    )
+    await audit_repo.log_action(
+        user_id=current_user.id,
+        action="file_upload",
+        file_name=file_name,
+        session_id=session.id,
+        record_count=session.total_records,
+        total_amount=session.total_amount,
+    )
+    await broadcast_new_upload(session.id, session.file_name)
+    return UploadSessionOut.model_validate(session)
 
 
 @router.get("", response_model=list[UploadSessionOut])
@@ -88,9 +149,9 @@ async def get_unified_audit_log(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[UnifiedAuditLogEntry]:
-    """List file actions for the current user (up to 10 entries)."""
+    """List file actions for the current user (up to 50 entries)."""
     audit_repo = AuditLogRepository(db)
-    logs = await audit_repo.list_user_logs(current_user.id, limit=10)
+    logs = await audit_repo.list_user_logs(current_user.id, limit=50)
 
     # Determine which entries can be undone: 3 most recent non-undone entries that have snapshot_data
     undoable_ids: set[str] = set()
@@ -128,26 +189,20 @@ async def get_upload(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UploadSessionDetail:
-    """Get a single upload session with all its records.
-    Any authenticated user can read any session (shared company data)."""
+    """Get a single upload session with all its records."""
     repo = UploadRepository(db)
-    # Try as owner first, then fall back to any-user access
     session = await repo.get_session(session_id=session_id, user_id=current_user.id)
     if not session:
-        session = await repo.get_session_any_user(session_id)
-        if session:
-            # Load with records
-            from sqlalchemy import select
-            from sqlalchemy.orm import selectinload
-            from app.models.upload import UploadSession as UploadSessionModel
-            result = await db.execute(
-                select(UploadSessionModel)
-                .options(selectinload(UploadSessionModel.records))
-                .where(UploadSessionModel.id == session_id)
-            )
-            session = result.scalar_one_or_none()
-    if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
+    # Recompute total from SQL SUM (exact on NUMERIC columns) instead of
+    # relying on the stored value which may have floating-point drift.
+    from sqlalchemy import func as sa_func, select as sa_select
+    from app.models.upload import PaymentRecord
+    agg = await db.execute(
+        sa_select(sa_func.coalesce(sa_func.sum(PaymentRecord.payment_amount), 0))
+        .where(PaymentRecord.session_id == session_id)
+    )
+    session.total_amount = float(agg.scalar_one())
     return UploadSessionDetail.model_validate(session)
 
 
@@ -158,6 +213,8 @@ async def get_transactions(
     touchpoint: str | None = None,
     search: str | None = None,
     payment_date: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     environment: str | None = None,
     page: int = 1,
     page_size: int = 25,
@@ -178,6 +235,8 @@ async def get_transactions(
         touchpoint=touchpoint,
         search=search,
         payment_date=payment_date,
+        date_from=date_from,
+        date_to=date_to,
         environment=environment,
         page=page,
         page_size=page_size,
@@ -197,15 +256,17 @@ async def get_dashboard(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DashboardSummary:
-    """Get aggregated KPI summary for an upload session. Any user can view any session."""
+    """Get aggregated KPI summary for an upload session (cached 5 min)."""
+    cache_key = f"dashboard:{session_id}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return DashboardSummary(**cached)
+
     repo = UploadRepository(db)
-    # Try as owner first, then any user
     summary = await repo.get_dashboard_summary(session_id=session_id, user_id=current_user.id)
     if not summary:
-        # Try as admin (any user)
-        summary = await repo.get_dashboard_summary_any_user(session_id=session_id)
-    if not summary:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
+    cache_set(cache_key, summary, ttl=300)
     return DashboardSummary(**summary)
 
 
@@ -219,18 +280,14 @@ async def delete_upload(
     repo = UploadRepository(db)
     audit_repo = AuditLogRepository(db)
 
-    # Fetch the session before deletion to capture its details for the audit log
-    # Use get_session (which loads records) for both admin and user so we can snapshot
+    # Fetch session metadata only (no records) to avoid OOM on large datasets
     if current_user.is_superuser:
-        # For admin, first check if session exists, then load with records
-        session_check = await repo.get_session_any_user(session_id)
-        if session_check:
-            # Load the full session with records using the owner's user_id
-            session_obj = await repo.get_session(session_id, session_check.user_id)
-        else:
-            session_obj = None
+        session_obj = await repo.get_session_any_user(session_id)
     else:
-        session_obj = await repo.get_session(session_id, current_user.id)
+        # Use a lightweight query — do NOT load records
+        session_obj = await repo.get_session_any_user(session_id)
+        if session_obj and session_obj.user_id != current_user.id:
+            session_obj = None
 
     if not session_obj:
         raise HTTPException(
@@ -238,23 +295,13 @@ async def delete_upload(
             detail="Upload session not found or you are not authorized to delete it.",
         )
 
-    # Build snapshot of the full session + records for undo capability
-    records_snapshot = [
-        {
-            "bank": r.bank,
-            "account": r.account,
-            "touchpoint": r.touchpoint,
-            "payment_date": r.payment_date,
-            "payment_amount": r.payment_amount,
-            "environment": r.environment,
-        }
-        for r in (session_obj.records if hasattr(session_obj, "records") and session_obj.records else [])
-    ]
+    # Lightweight snapshot — metadata only, no individual records (avoids OOM)
     snapshot = json.dumps({
         "user_id": session_obj.user_id,
         "file_name": session_obj.file_name,
-        "records": records_snapshot,
-    })
+        "total_records": session_obj.total_records,
+        "total_amount": session_obj.total_amount,
+    }, cls=_DecimalEncoder)
 
     # Log the deletion before actually deleting
     await audit_repo.log_action(
@@ -271,6 +318,7 @@ async def delete_upload(
         await repo.delete_session_admin(session_id)
     else:
         await repo.delete_session(session_id, current_user.id)
+    cache_invalidate(f"dashboard:{session_id}")
 
 
 @router.post("/{session_id}/transactions", response_model=PaymentRecordOut, status_code=status.HTTP_201_CREATED)
@@ -294,6 +342,33 @@ async def create_transaction(
     )
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
+    # Log creation of a single record
+    audit_repo = AuditLogRepository(db)
+    session_obj = await repo.get_session_metadata(session_id, current_user.id)
+    # compact snapshot of the created record
+    snapshot = json.dumps({
+        "session_id": session_id,
+        "record": {
+            "id": getattr(record, "id", None),
+            "bank": record.bank,
+            "account": record.account,
+            "touchpoint": record.touchpoint,
+            "payment_date": record.payment_date,
+            "payment_amount": record.payment_amount,
+            "environment": record.environment,
+        },
+    }, cls=_DecimalEncoder)
+
+    await audit_repo.log_action(
+        user_id=current_user.id,
+        action="record_create",
+        file_name=session_obj.file_name if session_obj else "unknown",
+        session_id=session_id,
+        record_count=1,
+        details=f"Created record {getattr(record, 'id', 'unknown')}",
+        snapshot_data=snapshot,
+    )
+    cache_invalidate(f"dashboard:{session_id}")
     return PaymentRecordOut.model_validate(record)
 
 
@@ -307,6 +382,20 @@ async def update_transaction(
 ) -> PaymentRecordOut:
     """Update a single transaction record."""
     repo = UploadRepository(db)
+    # Capture existing record snapshot (compact) before update
+    before_record = await repo.get_record(record_id, session_id, current_user.id)
+    before_rec = None
+    if before_record:
+        before_rec = {
+            "id": before_record.id,
+            "bank": before_record.bank,
+            "account": before_record.account,
+            "touchpoint": before_record.touchpoint,
+            "payment_date": before_record.payment_date,
+            "payment_amount": before_record.payment_amount,
+            "environment": before_record.environment,
+        }
+
     updated = await repo.update_transaction(
         record_id=record_id,
         session_id=session_id,
@@ -320,7 +409,88 @@ async def update_transaction(
     )
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found.")
+    # Log update of a single record
+    audit_repo = AuditLogRepository(db)
+    # compact snapshot containing before and after
+    after_rec = {
+        "id": getattr(updated, "id", None),
+        "bank": updated.bank,
+        "account": updated.account,
+        "touchpoint": updated.touchpoint,
+        "payment_date": updated.payment_date,
+        "payment_amount": updated.payment_amount,
+        "environment": updated.environment,
+    }
+    snapshot = json.dumps({"session_id": session_id, "before": before_rec, "after": after_rec}, cls=_DecimalEncoder)
+    session_obj = await repo.get_session_metadata(session_id, current_user.id)
+    await audit_repo.log_action(
+        user_id=current_user.id,
+        action="record_update",
+        file_name=session_obj.file_name if session_obj else "unknown",
+        session_id=session_id,
+        record_count=1,
+        details=f"Updated record {record_id}",
+        snapshot_data=snapshot,
+    )
+    cache_invalidate(f"dashboard:{session_id}")
     return PaymentRecordOut.model_validate(updated)
+
+
+@router.post("/{session_id}/transactions/bulk-delete", status_code=status.HTTP_200_OK)
+async def bulk_delete_transactions(
+    session_id: str,
+    payload: BulkDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Delete multiple transaction records by ID in a single operation."""
+    if not payload.ids:
+        return {"deleted": 0}
+    repo = UploadRepository(db)
+    audit_repo = AuditLogRepository(db)
+
+    # Get session info for audit log
+    session_obj = await repo.get_session_metadata(session_id, current_user.id)
+    if not session_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+
+    # Fetch only the specific records being deleted (not all records)
+    matching_records = await repo.get_records_by_ids(session_id, current_user.id, payload.ids)
+    snapshot = None
+    if matching_records:
+        snapshot = json.dumps({
+            "session_id": session_id,
+            "records": [
+                {
+                    "id": r.id,
+                    "bank": r.bank,
+                    "account": r.account,
+                    "touchpoint": r.touchpoint,
+                    "payment_date": r.payment_date,
+                    "payment_amount": r.payment_amount,
+                    "environment": r.environment,
+                }
+                for r in matching_records
+            ],
+        }, cls=_DecimalEncoder)
+
+    count = await repo.delete_transactions_bulk(
+        session_id=session_id, user_id=current_user.id, record_ids=payload.ids
+    )
+
+    if count > 0:
+        await audit_repo.log_action(
+            user_id=current_user.id,
+            action="record_bulk_delete",
+            file_name=session_obj.file_name,
+            session_id=session_id,
+            record_count=count,
+            details=f"Bulk deleted {count} records by ID",
+            snapshot_data=snapshot,
+        )
+
+    cache_invalidate(f"dashboard:{session_id}")
+    return {"deleted": count}
 
 
 @router.delete("/{session_id}/transactions/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -334,13 +504,12 @@ async def delete_transaction(
     repo = UploadRepository(db)
     audit_repo = AuditLogRepository(db)
 
-    # Get session info and the record data before deleting
-    session_obj = await repo.get_session(session_id, current_user.id)
+    # Fetch only the specific record (not all records)
+    target_record = await repo.get_record(record_id, session_id, current_user.id)
+    session_obj = await repo.get_session_metadata(session_id, current_user.id)
     if not session_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found.")
 
-    # Find the specific record in the loaded records for snapshot
-    target_record = next((r for r in session_obj.records if r.id == record_id), None)
     snapshot = None
     if target_record:
         snapshot = json.dumps({
@@ -353,7 +522,7 @@ async def delete_transaction(
                 "payment_amount": target_record.payment_amount,
                 "environment": target_record.environment,
             },
-        })
+        }, cls=_DecimalEncoder)
 
     deleted = await repo.delete_transaction(record_id=record_id, session_id=session_id, user_id=current_user.id)
     if not deleted:
@@ -368,6 +537,7 @@ async def delete_transaction(
         details=f"Deleted record {record_id}",
         snapshot_data=snapshot,
     )
+    cache_invalidate(f"dashboard:{session_id}")
 
 
 @router.delete("/{session_id}/transactions", status_code=status.HTTP_200_OK)
@@ -384,38 +554,23 @@ async def delete_transactions_by_date_range(
     repo = UploadRepository(db)
     audit_repo = AuditLogRepository(db)
 
-    # Get session info and matching records for snapshot before deleting
-    session_obj = await repo.get_session(session_id, current_user.id)
+    # Lightweight session check (no records loaded)
+    session_obj = await repo.get_session_metadata(session_id, current_user.id)
     if not session_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
 
-    # Build snapshot of records that will be deleted
-    matching_records = [
-        r for r in session_obj.records
-        if r.payment_date and r.payment_date >= date_from and r.payment_date <= date_to
-    ]
-    snapshot = None
-    if matching_records:
-        snapshot = json.dumps({
-            "session_id": session_id,
-            "records": [
-                {
-                    "bank": r.bank,
-                    "account": r.account,
-                    "touchpoint": r.touchpoint,
-                    "payment_date": r.payment_date,
-                    "payment_amount": r.payment_amount,
-                    "environment": r.environment,
-                }
-                for r in matching_records
-            ],
-        })
-
+    # Lightweight snapshot — just metadata about the date range (avoids loading all records)
     count = await repo.delete_transactions_by_date_range(
         session_id=session_id, user_id=current_user.id, date_from=date_from, date_to=date_to
     )
 
     if count > 0:
+        snapshot = json.dumps({
+            "session_id": session_id,
+            "date_from": date_from,
+            "date_to": date_to,
+            "deleted_count": count,
+        }, cls=_DecimalEncoder)
         await audit_repo.log_action(
             user_id=current_user.id,
             action="record_bulk_delete",
@@ -426,7 +581,29 @@ async def delete_transactions_by_date_range(
             snapshot_data=snapshot,
         )
 
+    cache_invalidate(f"dashboard:{session_id}")
     return {"deleted": count}
+
+
+@router.post("/audit", status_code=status.HTTP_201_CREATED)
+async def create_audit_entry(
+    payload: AuditLogCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Create a custom audit log entry for the current user."""
+    audit_repo = AuditLogRepository(db)
+    await audit_repo.log_action(
+        user_id=current_user.id,
+        action=payload.action,
+        file_name=payload.file_name,
+        session_id=payload.session_id,
+        record_count=payload.record_count,
+        total_amount=payload.total_amount,
+        details=payload.details,
+        snapshot_data=payload.snapshot_data,
+    )
+    return {"detail": "logged"}
 
 
 @router.get("/admin/audit-log", response_model=list[AuditLogEntry])
@@ -563,4 +740,8 @@ async def undo_audit_entry(
 
     await audit_repo.mark_undone(entry)
     await db.commit()
+    # Invalidate dashboard cache for the affected session
+    affected_session_id = snapshot.get("session_id") or entry.session_id
+    if affected_session_id:
+        cache_invalidate(f"dashboard:{affected_session_id}")
     return {"detail": f"Successfully undone: {entry.action} — {entry.file_name}"}

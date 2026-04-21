@@ -10,7 +10,6 @@ export interface PaymentRecord {
   account: string; // debtor_id
   touchpoint: string; // TAGGING
   environment?: string;
-  month?: string; // MONTH column (e.g. "JANUARY", "FEBRUARY")
 }
 
 export interface BankAnalytics {
