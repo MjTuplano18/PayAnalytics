@@ -53,6 +53,25 @@ async def create_upload(
     return UploadSessionOut.model_validate(session)
 
 
+@router.get("/latest", response_model=UploadSessionOut)
+async def get_latest_upload(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UploadSessionOut:
+    """Get the most recent upload session across all users (shared company data).
+    First tries the current user's own sessions, then falls back to any user's session."""
+    repo = UploadRepository(db)
+    # Try current user's sessions first
+    user_sessions = await repo.list_sessions(user_id=current_user.id)
+    if user_sessions:
+        return UploadSessionOut.model_validate(user_sessions[0])
+    # Fallback: most recent session from any user
+    all_sessions = await repo.list_all_sessions(limit=1)
+    if all_sessions:
+        return UploadSessionOut.model_validate(all_sessions[0])
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No upload sessions found.")
+
+
 @router.get("", response_model=list[UploadSessionOut])
 async def list_uploads(
     current_user: User = Depends(get_current_user),
@@ -109,9 +128,24 @@ async def get_upload(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UploadSessionDetail:
-    """Get a single upload session with all its records."""
+    """Get a single upload session with all its records.
+    Any authenticated user can read any session (shared company data)."""
     repo = UploadRepository(db)
+    # Try as owner first, then fall back to any-user access
     session = await repo.get_session(session_id=session_id, user_id=current_user.id)
+    if not session:
+        session = await repo.get_session_any_user(session_id)
+        if session:
+            # Load with records
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+            from app.models.upload import UploadSession as UploadSessionModel
+            result = await db.execute(
+                select(UploadSessionModel)
+                .options(selectinload(UploadSessionModel.records))
+                .where(UploadSessionModel.id == session_id)
+            )
+            session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
     return UploadSessionDetail.model_validate(session)
@@ -163,9 +197,13 @@ async def get_dashboard(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DashboardSummary:
-    """Get aggregated KPI summary for an upload session."""
+    """Get aggregated KPI summary for an upload session. Any user can view any session."""
     repo = UploadRepository(db)
+    # Try as owner first, then any user
     summary = await repo.get_dashboard_summary(session_id=session_id, user_id=current_user.id)
+    if not summary:
+        # Try as admin (any user)
+        summary = await repo.get_dashboard_summary_any_user(session_id=session_id)
     if not summary:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
     return DashboardSummary(**summary)

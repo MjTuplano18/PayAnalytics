@@ -326,6 +326,7 @@ export default function TransactionsPage() {
         account: r.account,
         touchpoint: r.touchpoint ?? "",
         environment: r.environment,
+        month: r.month,
       }));
       setData(recalcParsedData(payments));
     } catch {

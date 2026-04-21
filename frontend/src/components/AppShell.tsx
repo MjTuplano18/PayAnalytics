@@ -12,16 +12,15 @@ import { Sidebar } from "@/components/Sidebar";
 import { MainContent } from "@/components/MainContent";
 import { Toaster } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getUpload, listUploads, type UploadSessionDetail } from "@/lib/api";
+import { getUpload, getLatestUpload, type UploadSessionDetail } from "@/lib/api";
 import { ParsedData } from "@/types/data";
 import { useUploadEvents } from "@/lib/useUploadEvents";
 
-/** Silently restores session data from backend on page refresh */
+/** Silently restores session data from backend on page refresh / login */
 function SessionRestorer() {
   const { token } = useAuth();
   const { sessionId, setSessionId, data, setData, setFileName } = useData();
-  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoPickedRef = useRef(false);
+  const restoringRef = useRef(false);
 
   // Helper: build ParsedData from upload detail records
   const hydrateFromDetail = (detail: UploadSessionDetail) => {
@@ -32,6 +31,7 @@ function SessionRestorer() {
       account: r.account,
       touchpoint: r.touchpoint ?? "",
       environment: r.environment,
+      month: (r as any).month,
     }));
 
     const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
@@ -61,57 +61,49 @@ function SessionRestorer() {
     return { payments, bankAnalytics, touchpointAnalytics, totalAccounts: allAccounts.size, totalAmount, totalPayments: payments.length, raw: [] } as ParsedData;
   };
 
-  // Restore existing sessionId
   useEffect(() => {
-    if (!sessionId || !token || data) return;
+    // Don't run if already have data, no token, or already restoring
+    if (!token || data || restoringRef.current) return;
+    restoringRef.current = true;
 
-    let cancelled = false;
+    const restore = async () => {
+      try {
+        // Step 1: If we have a sessionId in localStorage, try to load it
+        if (sessionId) {
+          try {
+            const detail = await getUpload(token, sessionId);
+            setData(hydrateFromDetail(detail));
+            setFileName(detail.file_name);
+            return;
+          } catch (err) {
+            const is404 = err instanceof Error && err.message.includes("404");
+            if (is404) {
+              // Session no longer exists — clear it and fall through
+              setSessionId(null);
+            } else {
+              // Network error — don't clear, just fail silently
+              return;
+            }
+          }
+        }
 
-    const restore = (attempt: number) => {
-      getUpload(token, sessionId).then((detail) => {
-        if (cancelled) return;
-        setData(hydrateFromDetail(detail));
-        setFileName(detail.file_name);
-      }).catch((err: unknown) => {
-        if (cancelled) return;
-        const is404 = err instanceof Error && err.message.includes("404");
-        if (is404) {
-          setSessionId(null);
-          return;
+        // Step 2: No valid sessionId — fetch the latest session (own first, then company-wide)
+        try {
+          const latest = await getLatestUpload(token);
+          const detail = await getUpload(token, latest.id);
+          setData(hydrateFromDetail(detail));
+          setFileName(detail.file_name);
+          setSessionId(latest.id);
+        } catch {
+          // No sessions exist at all — user needs to upload
         }
-        if (attempt < 3) {
-          retryRef.current = setTimeout(() => restore(attempt + 1), 1500 * (attempt + 1));
-        }
-      });
+      } finally {
+        restoringRef.current = false;
+      }
     };
 
-    restore(0);
-
-    return () => {
-      cancelled = true;
-      if (retryRef.current) clearTimeout(retryRef.current);
-    };
-  }, [sessionId, token, data]);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-pick the most recent upload if no sessionId is set
-  useEffect(() => {
-    if (sessionId || !token || data || autoPickedRef.current) return;
-    autoPickedRef.current = true;
-
-    listUploads(token).then((sessions) => {
-      if (sessions.length === 0) return;
-      // Sort by uploaded_at descending, pick the most recent
-      const sorted = [...sessions].sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
-      const latest = sorted[0];
-      return getUpload(token, latest.id).then((detail) => {
-        setData(hydrateFromDetail(detail));
-        setFileName(detail.file_name);
-        setSessionId(detail.id);
-      });
-    }).catch(() => {
-      // Silently fail — user can upload manually
-    });
-  }, [sessionId, token, data]);  // eslint-disable-line react-hooks/exhaustive-deps
+    restore();
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
 }

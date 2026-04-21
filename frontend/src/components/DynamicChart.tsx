@@ -99,7 +99,7 @@ export function DynamicChart({
     if (!data || data.length === 0) return [];
     return data.map((item, index) => ({
       ...item,
-      _shortName: truncateAxis(String(item[xAxisKey] ?? ""), 10),
+      _shortName: truncateAxis(String(item[xAxisKey] ?? ""), 18),
       _uniqueId: `${xAxisKey}-${item[xAxisKey]}-${index}`,
     }));
   }, [data, xAxisKey]);
@@ -182,7 +182,7 @@ export function DynamicChart({
           <BarChart
             data={processedData}
             layout="vertical"
-            margin={{ left: 30, right: 30, top: 5, bottom: 5 }}
+            margin={{ left: 10, right: 30, top: 5, bottom: 5 }}
           >
             <defs>
               <linearGradient id="barhGradient" x1="0" y1="0" x2="0" y2="1">
@@ -201,8 +201,8 @@ export function DynamicChart({
               type="category"
               dataKey="_shortName"
               className="text-muted-foreground"
-              tick={{ fontSize: 11 }}
-              width={40}
+              tick={{ fontSize: 10 }}
+              width={110}
             />
             <Tooltip
               contentStyle={tooltipStyle}

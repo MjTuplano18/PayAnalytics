@@ -315,6 +315,7 @@ export default function UploadPage() {
         account: r.account,
         touchpoint: r.touchpoint ?? "",
         environment: r.environment,
+        month: r.month,
       }));
 
       const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();

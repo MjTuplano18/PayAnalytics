@@ -306,6 +306,18 @@ class UploadRepository:
         result = await self.session.execute(query)
         return total, float(total_amount), list(result.scalars().all())
 
+    async def get_dashboard_summary_any_user(self, session_id: str) -> dict | None:
+        """Get dashboard summary for any session regardless of owner (shared data model)."""
+        # Verify session exists
+        result = await self.session.execute(
+            select(UploadSession).where(UploadSession.id == session_id)
+        )
+        upload = result.scalar_one_or_none()
+        if not upload:
+            return None
+        # Reuse the same logic but with a dummy user_id that matches the actual owner
+        return await self.get_dashboard_summary(session_id=session_id, user_id=upload.user_id)
+
     async def get_dashboard_summary(self, session_id: str, user_id: str) -> dict | None:
         # Verify session ownership
         session_check = await self.session.execute(
