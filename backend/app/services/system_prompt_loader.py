@@ -186,119 +186,95 @@ class SystemPromptLoader:
         logger.debug("System prompt validation passed")
 
     def _format_prompt(self) -> str:
-        """Format the prompt data into a text string for AI API calls.
+        """Format the prompt data into a compact text string for AI API calls.
+        
+        Keeps the prompt as short as possible to minimize token usage.
         
         Returns:
             Formatted prompt string
         """
         sections = []
         
-        # Role section
+        # Role — keep it short
         if "role" in self._prompt_data:
-            sections.append("# Your Role")
             sections.append(self._prompt_data["role"].strip())
             sections.append("")
         
-        # Domain section
-        if "domain" in self._prompt_data:
-            sections.append("# Domain Expertise")
-            sections.append(self._prompt_data["domain"].strip())
-            sections.append("")
-        
-        # Database schema section
+        # Database schema — compact format, no verbose headers
         if "database_schema" in self._prompt_data:
-            sections.append("# Database Schema")
-            sections.append("")
+            sections.append("## Database Schema")
             schema = self._prompt_data["database_schema"]
             
             for table_name, table_info in schema.items():
-                sections.append(f"## Table: {table_name}")
-                if "description" in table_info:
-                    sections.append(f"Description: {table_info['description']}")
-                sections.append("")
-                sections.append("Columns:")
-                
+                col_lines = []
                 for column in table_info.get("columns", []):
                     col_name = column.get("name", "")
-                    col_type = column.get("type", "")
                     col_desc = column.get("description", "")
-                    indexed = " (indexed)" if column.get("indexed", False) else ""
-                    sections.append(f"  - {col_name} ({col_type}){indexed}: {col_desc}")
-                
+                    col_lines.append(f"  {col_name}: {col_desc}")
+                sections.append(f"Table `{table_name}`:")
+                sections.extend(col_lines)
                 sections.append("")
         
-        # Example queries section
+        # Example queries — only first 3 to save tokens
         if "example_queries" in self._prompt_data:
-            sections.append("# Example Queries")
-            sections.append("")
-            
-            for i, example in enumerate(self._prompt_data["example_queries"], 1):
-                sections.append(f"## Example {i}")
-                sections.append(f"Question: {example.get('question', '')}")
-                sections.append("")
-                sections.append("SQL:")
+            examples = self._prompt_data["example_queries"][:3]
+            sections.append("## Example SQL Queries")
+            for example in examples:
+                sections.append(f"Q: {example.get('question', '')}")
                 sections.append("```sql")
                 sections.append(example.get("sql", "").strip())
                 sections.append("```")
                 sections.append("")
-                sections.append("Response:")
-                sections.append(example.get("response", "").strip())
-                sections.append("")
         
-        # Guardrails section
+        # Guardrails — flatten to bullet list, skip verbose headers
         if "guardrails" in self._prompt_data:
-            sections.append("# Guardrails and Constraints")
-            sections.append("")
+            sections.append("## Rules")
             guardrails = self._prompt_data["guardrails"]
-            
             for category, rules in guardrails.items():
-                # Format category name (e.g., "prompt_injection" -> "Prompt Injection")
-                category_title = category.replace("_", " ").title()
-                sections.append(f"## {category_title}")
-                
                 if isinstance(rules, list):
                     for rule in rules:
                         sections.append(f"- {rule}")
-                elif isinstance(rules, dict):
-                    for key, value in rules.items():
-                        sections.append(f"### {key.replace('_', ' ').title()}")
-                        if isinstance(value, list):
-                            for item in value:
-                                sections.append(f"- {item}")
-                        else:
-                            sections.append(f"- {value}")
-                else:
-                    sections.append(f"- {rules}")
-                
-                sections.append("")
-        
-        # Conversation context section
-        if "conversation_context" in self._prompt_data:
-            sections.append("# Conversation Context")
-            sections.append("")
-            context_rules = self._prompt_data["conversation_context"]
-            
-            if isinstance(context_rules, list):
-                for rule in context_rules:
-                    sections.append(f"- {rule}")
-            
             sections.append("")
         
-        # Visualization hints section
-        if "visualization_hints" in self._prompt_data:
-            sections.append("# Visualization Hints")
+        return "\n".join(sections)
+
+    def get_compact_sql_prompt(self) -> str:
+        """Get a minimal prompt for SQL generation only.
+        
+        Used when we only need the schema and SQL rules — not the full prompt.
+        Saves ~400 tokens per SQL generation call.
+        
+        Returns:
+            Compact prompt string for SQL generation
+        """
+        self.reload_if_changed()
+        sections = []
+        
+        # Role one-liner
+        sections.append("You are a SQL generator for a payment analytics admin dashboard.")
+        sections.append("")
+        
+        # Schema — only the two main tables, compact
+        schema = self._prompt_data.get("database_schema", {})
+        for table_name in ["payment_records", "upload_sessions"]:
+            if table_name not in schema:
+                continue
+            table_info = schema[table_name]
+            col_lines = []
+            for col in table_info.get("columns", []):
+                col_lines.append(f"  {col['name']}: {col.get('description', '')}")
+            sections.append(f"Table `{table_name}`:")
+            sections.extend(col_lines)
             sections.append("")
-            viz_hints = self._prompt_data["visualization_hints"]
-            
-            for chart_type, hints in viz_hints.items():
-                chart_title = chart_type.replace("_", " ").title()
-                sections.append(f"## {chart_title}")
-                
-                if isinstance(hints, list):
-                    for hint in hints:
-                        sections.append(f"- {hint}")
-                
-                sections.append("")
+        
+        # SQL rules only
+        guardrails = self._prompt_data.get("guardrails", {})
+        sql_rules = guardrails.get("sql_generation", [])
+        if sql_rules:
+            sections.append("SQL Rules:")
+            for rule in sql_rules:
+                sections.append(f"- {rule}")
+            sections.append("")
         
         return "\n".join(sections)
 

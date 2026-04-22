@@ -579,24 +579,11 @@ class QueryProcessor:
             # Step 6: Stream AI response
             results_summary = self._summarize_results(query_results)
             
-            prompt = f"""The user asked: "{query}"
-
-I executed this SQL query:
-```sql
-{sql_query}
-```
-
+            prompt = f"""Q: {query}
 Results ({len(query_results)} rows):
 {results_summary}
 
-Please provide a clear, concise summary of these results for the user. Follow these formatting rules:
-- Currency is Philippine Peso. Use ₱ symbol (e.g., ₱1,234,567.89), NOT $ or USD.
-- Use numbered lists (1. 2. 3.) for ranked results.
-- Use bullet points (-) for key insights or statistics.
-- Use **bold** only for bank names, key figures, or section headers — not for every value.
-- Keep the response conversational and easy to read.
-- Do not use excessive asterisks or markdown symbols in plain prose sentences.
-- Include relevant statistics and insights."""
+Summarize these results. Use ₱ for currency. Numbered list for rankings. Bold key figures."""
             
             # Add to conversation context
             messages = conversation_context + [
@@ -880,24 +867,11 @@ Please provide a clear, concise summary of these results for the user. Follow th
         # Build prompt for AI to format results
         results_summary = self._summarize_results(query_results)
         
-        prompt = f"""The user asked: "{query}"
-
-I executed this SQL query:
-```sql
-{sql_query}
-```
-
+        prompt = f"""Q: {query}
 Results ({len(query_results)} rows):
 {results_summary}
 
-Please provide a clear, concise summary of these results for the user. Follow these formatting rules:
-- Currency is Philippine Peso. Use ₱ symbol (e.g., ₱1,234,567.89), NOT $ or USD.
-- Use numbered lists (1. 2. 3.) for ranked results.
-- Use bullet points (-) for key insights or statistics.
-- Use **bold** only for bank names, key figures, or section headers — not for every value.
-- Keep the response conversational and easy to read.
-- Do not use excessive asterisks or markdown symbols in plain prose sentences.
-- Include relevant statistics and insights."""
+Summarize these results. Use ₱ for currency. Numbered list for rankings. Bold key figures."""
         
         # Add to conversation context
         messages = conversation_context + [

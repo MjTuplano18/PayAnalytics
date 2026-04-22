@@ -15,24 +15,16 @@ class GroqClient(AIAPIClient):
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "llama-3.3-70b-versatile",
+        model: str | None = None,
         timeout: int = 30,
         max_retries: int = 2,
     ):
-        """
-        Initialize Groq client.
-        
-        Args:
-            api_key: Groq API key (defaults to GROQ_API_KEY env var)
-            model: Model to use for completions
-            timeout: Request timeout in seconds
-            max_retries: Number of retry attempts
-        """
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
         if not self.api_key:
             raise ValueError("GROQ_API_KEY must be provided or set in environment")
         
-        self.model = model
+        # Read model from env, fall back to a high-limit model
+        self.model = model or os.getenv("GROQ_MODEL", "llama3-8b-8192")
         self.timeout = timeout
         self.max_retries = max_retries
         

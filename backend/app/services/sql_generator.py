@@ -105,7 +105,7 @@ class SQLGenerator:
             
             ai_response = await self.ai_client.generate_response(
                 messages=messages,
-                max_tokens=1000,
+                max_tokens=500,   # SQL queries are short — 500 is plenty
                 temperature=0.3,  # Lower temperature for more deterministic SQL
             )
             
@@ -173,113 +173,37 @@ class SQLGenerator:
         return self.security_guard.validate_sql(sql)
 
     def _build_sql_generation_prompt(self) -> str:
-        """Build the system prompt for SQL generation.
+        """Build a compact system prompt for SQL generation.
         
-        Includes database schema and SQL generation guidelines.
+        Uses the minimal schema-only prompt to save tokens.
         
         Returns:
             Formatted system prompt string
         """
-        # Get the full system prompt
-        base_prompt = self.system_prompt_loader.get_prompt()
+        # Use compact prompt — saves ~400 tokens vs full prompt
+        base_prompt = self.system_prompt_loader.get_compact_sql_prompt()
         
-        # Get current date for context
         now = datetime.now(timezone.utc)
         current_date_str = now.strftime("%Y-%m-%d")
-        current_month_str = now.strftime("%Y-%m")
-        current_year = now.year
         
-        # Add specific SQL generation instructions
         sql_instructions = f"""
+Today: {current_date_str}
 
-# SQL Generation Instructions
+CRITICAL RULES:
+- month column = uppercase English names: 'JANUARY', 'FEBRUARY' — NEVER '2026-01'
+- Use SUM(payment_amount) for totals/rankings, not MAX
+- MAX(payment_amount) only for "single largest transaction" queries
+- Always include LIMIT (max 5000)
+- Only SELECT queries allowed
 
-**CRITICAL: month Column Format**
-The `month` column stores PLAIN ENGLISH MONTH NAMES in uppercase (e.g., 'JANUARY', 'FEBRUARY', 'MARCH').
-It does NOT use YYYY-MM format. Always filter like: WHERE month = 'JANUARY'
-For year-aware filtering, use the `payment_date` column (ISO format: YYYY-MM-DD).
+Aggregation guide:
+- top banks/accounts → GROUP BY x, SUM(payment_amount) DESC
+- largest single payment → ORDER BY payment_amount DESC LIMIT 1
+- trends → GROUP BY month, SUM(payment_amount)
+- by touchpoint/environment → GROUP BY x, SUM(payment_amount)
 
-**Today's date: {current_date_str}**
-
-**CRITICAL: Aggregation Rules — Always use SUM, never MAX for totals**
-- "Highest payment account" = account with the highest TOTAL (SUM) of all their payments
-- "Top accounts by payment" = GROUP BY account, ORDER BY SUM(payment_amount) DESC
-- NEVER use MAX(payment_amount) when the user asks about top/highest accounts or banks — that only finds the single largest transaction, not the total
-- Use MAX(payment_amount) ONLY when the user explicitly asks for "the single largest transaction" or "biggest individual payment"
-- The `account` column contains account identifiers (numbers/codes). It is safe to include in GROUP BY and SELECT for analytics.
-
-**Aggregation Decision Guide:**
-- "top banks by collection" → GROUP BY bank, SUM(payment_amount), ORDER BY SUM DESC
-- "highest paying account" → GROUP BY account, SUM(payment_amount), ORDER BY SUM DESC
-- "which account paid the most" → GROUP BY account, SUM(payment_amount), ORDER BY SUM DESC
-- "largest single payment" → ORDER BY payment_amount DESC LIMIT 1 (no GROUP BY)
-- "average payment per bank" → GROUP BY bank, AVG(payment_amount)
-- "payment count by touchpoint" → GROUP BY touchpoint, COUNT(*)
-
-When generating SQL queries:
-
-1. **Month Filtering**:
-   - Use uppercase English names: WHERE month = 'JANUARY'
-   - Multiple months: WHERE month IN ('JANUARY', 'FEBRUARY')
-   - NEVER use: WHERE month = '2026-01' or WHERE month = '01' — these return 0 results
-   - For year-specific filtering: WHERE payment_date >= '2026-01-01' AND payment_date < '2026-02-01'
-
-2. **Query Structure**:
-   - ALWAYS start with SELECT
-   - Use SUM(payment_amount) for totals — not MAX unless asking for a single largest transaction
-   - Include GROUP BY when using aggregations
-   - Use ORDER BY to sort results meaningfully (DESC for top-N)
-   - ALWAYS include a LIMIT clause (maximum 1000)
-
-3. **Security**:
-   - ONLY generate SELECT queries
-   - NEVER use INSERT, UPDATE, DELETE, DROP, ALTER, CREATE
-   - Only query authorized tables: payment_records, upload_sessions
-
-4. **Response Format**:
-   - Return ONLY the SQL query wrapped in ```sql code blocks
-   - Optionally include a brief explanation before the SQL
-
-5. **Example — Top 5 accounts by total payment across January and February**:
-   ```sql
-   SELECT account, SUM(payment_amount) as total_amount, COUNT(*) as payment_count
-   FROM payment_records
-   WHERE month IN ('JANUARY', 'FEBRUARY')
-   GROUP BY account
-   ORDER BY total_amount DESC
-   LIMIT 5;
-   ```
-
-6. **Example — Top 5 banks for January**:
-   ```sql
-   SELECT bank, SUM(payment_amount) as total_amount, COUNT(*) as payment_count
-   FROM payment_records
-   WHERE month = 'JANUARY'
-   GROUP BY bank
-   ORDER BY total_amount DESC
-   LIMIT 5;
-   ```
-
-7. **Example — Largest single transaction (not total)**:
-   ```sql
-   SELECT account, bank, payment_amount, payment_date, touchpoint
-   FROM payment_records
-   WHERE month IN ('JANUARY', 'FEBRUARY')
-   ORDER BY payment_amount DESC
-   LIMIT 1;
-   ```
-
-8. **Example — Trend across available months**:
-   ```sql
-   SELECT month, SUM(payment_amount) as total_amount, COUNT(*) as payment_count
-   FROM payment_records
-   GROUP BY month
-   ORDER BY total_amount DESC
-   LIMIT 1000;
-   ```
-
+Return SQL in ```sql blocks only.
 """
-        
         return base_prompt + sql_instructions
 
     def _format_sql_request(self, user_query: str) -> str:
