@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -26,6 +26,11 @@ class User(Base):
         server_default=func.now(),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
+    )
+
+    # Relationships
+    conversations: Mapped[list["Conversation"]] = relationship(  # type: ignore[name-defined]
+        "Conversation", back_populates="user", lazy="select"
     )
 
     def __repr__(self) -> str:

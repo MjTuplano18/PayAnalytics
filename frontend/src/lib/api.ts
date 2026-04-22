@@ -387,3 +387,116 @@ export async function uploadFile(
   }
   return res.json() as Promise<UploadSessionOut>;
 }
+
+// ─── Chat API ────────────────────────────────────────────────────────────────
+
+export interface ChatQueryRequest {
+  query: string;
+  conversation_id?: string | null;
+  stream?: boolean;
+}
+
+export interface ChartMetadata {
+  type: 'bar' | 'line' | 'pie';
+  data: number[];
+  labels: string[];
+  title?: string;
+  x_axis_label?: string;
+  y_axis_label?: string;
+}
+
+export interface ChatQueryResponse {
+  message_id: string;
+  conversation_id: string;
+  role: 'assistant';
+  content: string;
+  chart_metadata?: ChartMetadata | null;
+  tokens_used: number;
+  processing_time_ms: number;
+  cached?: boolean;
+}
+
+export interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+  metadata?: {
+    chart_metadata?: ChartMetadata;
+    tokens_used?: number;
+    cached?: boolean;
+    partial?: boolean;
+  };
+}
+
+export interface Conversation {
+  id: string;
+  title: string | null;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationListResponse {
+  conversations: Conversation[];
+  total: number;
+}
+
+export interface ConversationHistoryResponse {
+  conversation_id: string;
+  messages: Message[];
+  total: number;
+}
+
+export function sendChatQuery(token: string, payload: ChatQueryRequest) {
+  return apiFetch<ChatQueryResponse>("/api/v1/chat/query", {
+    method: "POST",
+    token,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function listConversations(token: string) {
+  return apiFetch<ConversationListResponse>("/api/v1/chat/conversations", { token });
+}
+
+export function getConversationHistory(token: string, conversationId: string) {
+  return apiFetch<ConversationHistoryResponse>(`/api/v1/chat/conversations/${conversationId}/history`, { token });
+}
+
+export function deleteConversation(token: string, conversationId: string) {
+  return apiFetch<void>(`/api/v1/chat/conversations/${conversationId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function createConversation(token: string, title?: string) {
+  return apiFetch<Conversation>("/api/v1/chat/conversations", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ title }),
+  });
+}
+
+export interface QuickActionTemplate {
+  id: string;
+  label: string;
+  query: string;
+  icon?: string;
+}
+
+export interface QuickActionsResponse {
+  templates: QuickActionTemplate[];
+}
+
+export function getQuickActions(token: string) {
+  return apiFetch<QuickActionsResponse>("/api/v1/chat/quick-actions", { token });
+}
+
+export function executeQuickAction(token: string, templateId: string) {
+  return apiFetch<ChatQueryResponse>(`/api/v1/chat/quick-actions/${templateId}`, {
+    method: "POST",
+    token,
+  });
+}

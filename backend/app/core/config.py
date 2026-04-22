@@ -32,5 +32,13 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 10
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
 
+    # AI Chat Assistant Configuration
+    AI_PROVIDER: str = "openai"  # Options: 'openai', 'anthropic', or 'groq'
+    OPENAI_API_KEY: str = ""  # OpenAI API key for GPT-4
+    ANTHROPIC_API_KEY: str = ""  # Anthropic API key for Claude
+    GROQ_API_KEY: str = ""  # Groq API key for Llama models
+    AI_MAX_TOKENS: int = 2000  # Maximum tokens to generate per request
+    AI_TEMPERATURE: float = 0.7  # Temperature for AI response generation (0.0-1.0)
+
 
 settings = Settings()  # type: ignore[call-arg]

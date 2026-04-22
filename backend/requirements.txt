@@ -15,6 +15,11 @@ python-jose[cryptography]
 passlib[bcrypt]
 bcrypt==4.0.1
 
+# AI Integration
+openai
+anthropic
+groq
+
 # File parsing (streaming)
 openpyxl
 
@@ -22,3 +27,4 @@ openpyxl
 pytest
 pytest-asyncio
 httpx
+aiosqlite

@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/context/AuthContext";
 import { AppShell } from "@/components/AppShell";
 import { QueryProvider } from "@/context/QueryProvider";
+import { ChatProvider } from "@/context/ChatContext";
 
 /** Jeko → Plus Jakarta Sans  (clean geometric sans — used site-wide) */
 const jeko = Plus_Jakarta_Sans({
@@ -31,7 +32,9 @@ export default function RootLayout({
         <ThemeProvider>
           <QueryProvider>
             <AuthProvider>
-              <AppShell>{children}</AppShell>
+              <ChatProvider>
+                <AppShell>{children}</AppShell>
+              </ChatProvider>
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>

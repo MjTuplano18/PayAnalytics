@@ -8,10 +8,14 @@ import { useAuth } from "@/context/AuthContext";
 import { DataProvider } from "@/context/DataContext";
 import { useData } from "@/context/DataContext";
 import { SidebarProvider } from "@/context/SidebarContext";
+import { useChat } from "@/context/ChatContext";
 import { Sidebar } from "@/components/Sidebar";
 import { MainContent } from "@/components/MainContent";
+import { ChatInterface } from "@/components/chat/ChatInterface";
 import { Toaster } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { MessageSquare } from "lucide-react";
 import { getUpload, listUploads, type UploadSessionDetail } from "@/lib/api";
 import { ParsedData } from "@/types/data";
 import { useUploadEvents } from "@/lib/useUploadEvents";
@@ -234,8 +238,52 @@ function UploadEventListener() {
           <Sidebar />
           <MainContent>{children}</MainContent>
         </div>
+        
+        {/* Floating Chat Toggle Button */}
+        <ChatToggleButton />
+        
+        {/* Chat Interface */}
+        <ChatInterfaceWrapper />
+        
         <Toaster position="bottom-right" />
       </SidebarProvider>
     </DataProvider>
   );
+}
+
+/** Floating chat toggle button (bottom-right corner) */
+function ChatToggleButton() {
+  const { isChatOpen, toggleChat } = useChat();
+  const pathname = usePathname();
+  
+  // Hide on login page
+  if (pathname === "/login") return null;
+  
+  // Hide when chat is open (button is redundant)
+  if (isChatOpen) return null;
+  
+  return (
+    <button
+      onClick={toggleChat}
+      className="fixed bottom-6 right-6 z-[9999] w-14 h-14 sm:w-16 sm:h-16 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 flex items-center justify-center ring-2 ring-white/20"
+      style={{
+        background: "linear-gradient(135deg, #5B66E2 0%, #7278e8 100%)",
+      }}
+      title="Open AI Assistant"
+    >
+      <MessageSquare className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+    </button>
+  );
+}
+
+/** Wrapper for ChatInterface with auth check */
+function ChatInterfaceWrapper() {
+  const { isChatOpen, toggleChat } = useChat();
+  const { user } = useAuth();
+  const pathname = usePathname();
+  
+  // Don't render on login page or when not authenticated
+  if (pathname === "/login" || !user) return null;
+  
+  return <ChatInterface isOpen={isChatOpen} onToggle={toggleChat} />;
 }

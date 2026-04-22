@@ -449,7 +449,7 @@ export default function DashboardPage() {
                 {availableMonths.map((m) => (
                   <button
                     key={m}
-                    onClick={() => { setMonthFilter(m); setMonthDropdownOpen(false); }}
+                    onClick={() => { setMonthFilter(m ?? "all"); setMonthDropdownOpen(false); }}
                     className={`w-full flex items-center justify-between px-3 py-2 text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
                       monthFilter === m
                         ? "bg-[#5B66E2] text-white hover:bg-[#4a55d1] dark:hover:bg-[#4a55d1]"
@@ -546,7 +546,7 @@ export default function DashboardPage() {
               <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Touchpoint Mix (Top 8)</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Distribution of transactions across the top 8 touchpoints by count</p>
               {apiLoading ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (
-                <DynamicChart data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({ touchpoint: t.touchpoint, count: t.count }))} type="donut" dataKey="count" xAxisKey="touchpoint" height={320} valueType="count" />
+                <DynamicChart data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({ touchpoint: t.touchpoint, count: t.count }))} type="donut" dataKey="count" xAxisKey="touchpoint" height={320} />
               )}
             </Card>
           </div>
@@ -609,7 +609,7 @@ export default function DashboardPage() {
               <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Transaction Count by Bank</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Number of payment transactions per bank — high count means high volume, not necessarily high value</p>
               {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
-                <DynamicChart data={[...portfolioAnalytics.bankAnalytics].sort((a, b) => b.paymentCount - a.paymentCount).slice(0, 10).sort((a, b) => a.paymentCount - b.paymentCount).map((a) => ({ bank: a.bank, transactions: a.paymentCount }))} type="barh" dataKey="transactions" xAxisKey="bank" height={280} valueType="count" />
+                <DynamicChart data={[...portfolioAnalytics.bankAnalytics].sort((a, b) => b.paymentCount - a.paymentCount).slice(0, 10).sort((a, b) => a.paymentCount - b.paymentCount).map((a) => ({ bank: a.bank, transactions: a.paymentCount }))} type="barh" dataKey="transactions" xAxisKey="bank" height={280} />
               )}
             </Card>
             <Card className="p-6 bg-card border-border">
@@ -702,7 +702,7 @@ export default function DashboardPage() {
               <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Touchpoint Type Performance</h3>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Inbound (IB) vs Outbound (OB) vs With Touchpoint vs Ghost Payment vs No Touchpoint — transaction count</p>
               {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
-                <DynamicChart data={channelGroupData.map((g) => ({ group: g.group, count: g.count }))} type="bar" dataKey="count" xAxisKey="group" height={280} valueType="count" />
+                <DynamicChart data={channelGroupData.map((g) => ({ group: g.group, count: g.count }))} type="bar" dataKey="count" xAxisKey="group" height={280} />
               )}
             </Card>
             <Card className="p-6 bg-card border-border">
