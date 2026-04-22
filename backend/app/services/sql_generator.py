@@ -41,7 +41,7 @@ class SQLGenerator:
     """
 
     MAX_SQL_LENGTH = 5000
-    DEFAULT_LIMIT = 1000
+    DEFAULT_LIMIT = 5000  # Admin can see more data
 
     def __init__(
         self,

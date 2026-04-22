@@ -1,7 +1,9 @@
 """Security Guard Service for AI Chat Assistant.
 
-This module provides security validation and sanitization for AI chat interactions,
-including prompt injection detection, SQL validation, output sanitization, and topic filtering.
+This module provides security validation and sanitization for AI chat interactions.
+Since this system is admin-only, topic filtering is minimal — the admin has full
+access to all payment analytics data. Security focuses on preventing SQL injection
+and prompt injection only.
 """
 
 import logging
@@ -12,6 +14,312 @@ from typing import Any
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class ValidationResult:
+    """Result of a security validation check."""
+
+    is_valid: bool
+    error_message: str | None = None
+    details: dict[str, Any] | None = None
+
+
+class SecurityGuard:
+    """Security validation and sanitization service for AI chat interactions.
+    
+    Admin-only system: topic filtering is relaxed. The admin can ask anything
+    about their payment data. Security focuses on:
+    - Preventing SQL injection in generated queries
+    - Preventing prompt injection attacks
+    - Keeping responses XSS-safe for the frontend
+    """
+
+    # Prompt injection patterns — still important even for admin
+    PROMPT_INJECTION_PATTERNS = [
+        # Direct instruction overrides
+        r"ignore\s+(?:all\s+)?previous\s+instructions?",
+        r"ignore\s+(?:all\s+)?prior\s+instructions?",
+        r"disregard\s+(?:all\s+)?previous\s+instructions?",
+        r"forget\s+(?:all\s+)?previous\s+instructions?",
+        r"ignore\s+(?:your\s+)?system\s+prompt",
+        r"override\s+(?:your\s+)?instructions?",
+        r"bypass\s+(?:your\s+)?instructions?",
+        # Role manipulation
+        r"you\s+are\s+now\s+(?:a|an)\s+\w+",
+        r"pretend\s+(?:to\s+be|you\s+are)\s+(?:a|an)\s+\w+",
+        r"roleplay\s+as\s+(?:a|an)\s+\w+",
+        r"from\s+now\s+on,?\s+you\s+are",
+        # Prompt leaking
+        r"reveal\s+(?:your\s+)?(?:system\s+)?prompt",
+        r"show\s+(?:me\s+)?(?:your\s+)?system\s+prompt",
+        # Developer/jailbreak modes
+        r"jailbreak",
+        r"DAN\s+mode",
+        # Encoding obfuscation
+        r"base64\s*:",
+        r"rot13\s*:",
+    ]
+
+    # Query length constraints
+    MIN_QUERY_LENGTH = 1
+    MAX_QUERY_LENGTH = 2000  # Increased for admin — complex queries are fine
+
+    def __init__(self) -> None:
+        """Initialize the SecurityGuard with compiled regex patterns."""
+        self._compiled_patterns = [
+            re.compile(pattern, re.IGNORECASE) for pattern in self.PROMPT_INJECTION_PATTERNS
+        ]
+        logger.info(f"SecurityGuard initialized with {len(self._compiled_patterns)} prompt injection patterns")
+
+    def validate_input(self, query: str) -> ValidationResult:
+        """Validate user input for security threats.
+
+        Checks for:
+        - Query length constraints
+        - Prompt injection patterns
+
+        Args:
+            query: The user's natural language query
+
+        Returns:
+            ValidationResult indicating if the input is valid
+        """
+        if not query or not query.strip():
+            return ValidationResult(
+                is_valid=False,
+                error_message="Query cannot be empty.",
+                details={"validation_type": "empty_query"}
+            )
+
+        query_length = len(query)
+        if query_length > self.MAX_QUERY_LENGTH:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Query is too long. Maximum length is {self.MAX_QUERY_LENGTH} characters.",
+                details={"validation_type": "length", "length": query_length}
+            )
+
+        # Check for prompt injection patterns
+        for pattern in self._compiled_patterns:
+            match = pattern.search(query)
+            if match:
+                matched_text = match.group(0)
+                logger.warning(f"Prompt injection attempt detected: '{matched_text}'")
+                return ValidationResult(
+                    is_valid=False,
+                    error_message="Your query contains potentially unsafe content. Please rephrase your question.",
+                    details={"validation_type": "prompt_injection", "matched_pattern": matched_text}
+                )
+
+        return ValidationResult(is_valid=True)
+
+    def validate_sql(self, sql: str) -> ValidationResult:
+        """Validate generated SQL meets security constraints.
+
+        Checks for:
+        - Only SELECT statements allowed
+        - LIMIT clause exists
+        - No SQL injection patterns
+
+        Args:
+            sql: The generated SQL query
+
+        Returns:
+            ValidationResult indicating if the SQL is valid
+        """
+        if not sql or not sql.strip():
+            return ValidationResult(
+                is_valid=False,
+                error_message="SQL query cannot be empty.",
+                details={"validation_type": "empty_sql"}
+            )
+
+        sql_normalized = " ".join(sql.lower().split())
+
+        # Check 1: Only SELECT statements allowed
+        dangerous_keywords = [
+            "insert", "update", "delete", "drop", "alter", "create",
+            "truncate", "replace", "merge", "grant", "revoke"
+        ]
+        for keyword in dangerous_keywords:
+            pattern = r"\b" + keyword + r"\b"
+            if re.search(pattern, sql_normalized):
+                logger.warning(f"Dangerous SQL keyword detected: {keyword}")
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=f"SQL query contains unauthorized operation: {keyword.upper()}",
+                    details={"validation_type": "dangerous_keyword", "keyword": keyword}
+                )
+
+        # Check 2: Must be a SELECT statement
+        if not sql_normalized.strip().startswith("select"):
+            return ValidationResult(
+                is_valid=False,
+                error_message="Only SELECT queries are allowed.",
+                details={"validation_type": "not_select"}
+            )
+
+        # Check 3: LIMIT clause must exist
+        if "limit" not in sql_normalized:
+            return ValidationResult(
+                is_valid=False,
+                error_message="SQL query must include a LIMIT clause.",
+                details={"validation_type": "missing_limit"}
+            )
+
+        # Check 4: LIMIT value must be <= 5000 (admin can request more data)
+        limit_match = re.search(r"\blimit\s+(\d+)", sql_normalized)
+        if limit_match:
+            limit_value = int(limit_match.group(1))
+            if limit_value > 5000:
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=f"LIMIT value {limit_value} exceeds maximum allowed (5000).",
+                    details={"validation_type": "limit_exceeded", "limit_value": limit_value}
+                )
+
+        # Check 5: SQL injection patterns
+        sql_injection_patterns = [
+            r";\s*--",
+            r";\s*drop",
+            r";\s*delete",
+            r";\s*insert",
+            r";\s*update",
+            r"'\s*or\s+'1'\s*=\s*'1",
+            r"'\s*or\s+1\s*=\s*1",
+            r"xp_cmdshell",
+            r"exec\s*\(",
+            r"execute\s*\(",
+        ]
+        for pattern in sql_injection_patterns:
+            if re.search(pattern, sql_normalized):
+                logger.warning(f"SQL injection pattern detected: {pattern}")
+                return ValidationResult(
+                    is_valid=False,
+                    error_message="SQL query contains potentially malicious patterns.",
+                    details={"validation_type": "sql_injection", "pattern": pattern}
+                )
+
+        # Check 6: Authorized tables only
+        authorized_tables = [
+            "payment_records",
+            "upload_sessions",   # correct table name
+            "uploads",           # alias used in some queries
+            "users",
+            "reference_data",
+            "conversations",
+            "chat_messages",
+            "ai_audit_logs",
+            "token_usage",
+        ]
+        from_pattern = r"\bfrom\s+([a-z_][a-z0-9_]*)"
+        join_pattern = r"\bjoin\s+([a-z_][a-z0-9_]*)"
+        table_matches = re.findall(from_pattern, sql_normalized) + re.findall(join_pattern, sql_normalized)
+        for table_name in table_matches:
+            if table_name not in authorized_tables:
+                logger.warning(f"Unauthorized table access: {table_name}")
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=f"Access to table '{table_name}' is not authorized.",
+                    details={"validation_type": "unauthorized_table", "table_name": table_name}
+                )
+
+        return ValidationResult(is_valid=True)
+
+    def sanitize_output(self, ai_response: str) -> str:
+        """Sanitize AI response before sending to frontend.
+
+        Only removes genuinely dangerous content (script tags, event handlers).
+        Does NOT escape normal text characters like <, >, &, /, ' — these are
+        needed for markdown formatting and currency symbols to render correctly.
+
+        Args:
+            ai_response: The raw AI response text
+
+        Returns:
+            Sanitized response text safe for frontend display
+        """
+        if not ai_response:
+            return ""
+
+        sanitized = ai_response
+
+        # Remove script tags and executable content
+        sanitized = re.sub(r"<script[^>]*>.*?</script>", "", sanitized, flags=re.IGNORECASE | re.DOTALL)
+
+        # Remove dangerous HTML tags
+        for tag_pattern in [
+            r"<iframe[^>]*>.*?</iframe>",
+            r"<object[^>]*>.*?</object>",
+            r"<embed[^>]*>.*?</embed>",
+            r"<style[^>]*>.*?</style>",
+        ]:
+            sanitized = re.sub(tag_pattern, "", sanitized, flags=re.IGNORECASE | re.DOTALL)
+
+        # Remove event handlers
+        sanitized = re.sub(r'\bon\w+\s*=\s*["\'][^"\']*["\']', "", sanitized, flags=re.IGNORECASE)
+
+        # Remove javascript: URLs
+        sanitized = re.sub(r'javascript:[^\s\)]+', "[removed]", sanitized, flags=re.IGNORECASE)
+
+        # Increase response length limit for admin — detailed reports need space
+        max_length = 10000
+        if len(sanitized) > max_length:
+            sanitized = sanitized[:max_length] + "\n\n[Response truncated — use a more specific query for full details]"
+            logger.warning(f"Truncated AI response to {max_length} characters")
+
+        return sanitized
+
+    # Greetings that should get a friendly response
+    GREETING_PATTERNS = [
+        r"^(good\s+)?(morning|afternoon|evening|night|day)[\s!.]*$",
+        r"^(hi|hello|hey|howdy|greetings)[\s!.]*$",
+        r"^how are you[\s!.?]*$",
+        r"^(thanks|thank you|thx|ty)[\s!.]*$",
+    ]
+
+    # Only block genuinely off-topic or harmful requests
+    BLOCKED_KEYWORDS = [
+        "password", "credential", "api key", "private key",
+        "weather", "sports", "movie", "music", "game",
+        "recipe", "medical diagnosis", "legal advice",
+    ]
+
+    def check_topic(self, user_query: str, ai_client=None) -> ValidationResult:
+        """Check if query is appropriate. Admin-only system — very permissive."""
+        query_lower = user_query.lower().strip()
+
+        for pattern in self.GREETING_PATTERNS:
+            if re.match(pattern, query_lower, re.IGNORECASE):
+                return ValidationResult(
+                    is_valid=False,
+                    error_message=(
+                        "Hello! I'm your payment analytics assistant. "
+                        "Ask me anything about your payment data — banks, collections, "
+                        "touchpoints, accounts, environments, or upload history."
+                    ),
+                    details={"validation_type": "greeting"}
+                )
+
+        for keyword in self.BLOCKED_KEYWORDS:
+            if keyword in query_lower:
+                return ValidationResult(
+                    is_valid=False,
+                    error_message="I can only help with payment analytics questions.",
+                    details={"validation_type": "blocked_topic", "matched_keyword": keyword}
+                )
+
+        return ValidationResult(is_valid=True)
+
+    async def check_topic_async(
+        self,
+        user_query: str,
+        ai_client=None,
+        has_conversation_context: bool = False,
+    ) -> ValidationResult:
+        """Async topic check. Admin-only — passes almost everything through."""
+        return self.check_topic(user_query, ai_client)
 
 
 @dataclass
