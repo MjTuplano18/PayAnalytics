@@ -225,27 +225,34 @@ export function DynamicChart({
         );
       case "line":
         return (
-          <LineChart data={processedData}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+          <LineChart data={processedData} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
             <XAxis
               dataKey={xAxisKey}
               className="text-muted-foreground"
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
             />
             <YAxis
               className="text-muted-foreground"
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 11 }}
               tickFormatter={formatAxisTick}
+              axisLine={false}
+              tickLine={false}
             />
-            <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={formatTooltipValue} />
-            <Legend />
+            <Tooltip 
+              contentStyle={tooltipStyle} 
+              formatter={formatTooltipValue}
+              cursor={{ stroke: "#5B66E2", strokeWidth: 1, strokeDasharray: "4 4" }}
+            />
             <Line
               type="monotone"
-                dataKey={dataKey}
-              stroke={BRAND}
-              strokeWidth={2}
-              dot={{ fill: BRAND, r: 4 }}
-              activeDot={{ r: 6, fill: BRAND }}
+              dataKey={dataKey}
+              stroke="#5B66E2"
+              strokeWidth={2.5}
+              dot={{ fill: "#5B66E2", r: 5, strokeWidth: 2, stroke: "#fff" }}
+              activeDot={{ r: 7, fill: "#5B66E2", stroke: "#fff", strokeWidth: 2 }}
             />
           </LineChart>
         );
@@ -288,19 +295,30 @@ export function DynamicChart({
           </AreaChart>
         );
       
-      case "pie": {
+      case "pie":
+      case "donut": {
         const isNarrow = containerWidth < 380;
+        const isDonut = type === "donut";
         const outerR = Math.min(height * 0.38, isNarrow ? 90 : 140);
+        const innerR = isDonut ? outerR * 0.6 : 0; // Donut has inner radius
         const RADIAN = Math.PI / 180;
 
-        // Custom label renderer that places labels outside the pie along leader lines.
+        // Calculate total for percentages
+        const total = processedData.reduce((sum, item) => sum + Number(item[dataKey] || 0), 0);
+
+        // Custom label renderer that shows name outside the pie for ALL slices
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const renderOuterLabel = (props: any) => {
-          const { cx = 0, cy = 0, midAngle = 0, outerRadius: oR = 0, percent = 0 } = props;
-          if (percent < 0.003) return null; // skip < 0.3%
-          const radius = oR + 32;
+          const { cx = 0, cy = 0, midAngle = 0, outerRadius: oR = 0, name = "" } = props;
+          
+          // Position label outside the pie
+          const radius = oR + 30;
           const x = cx + radius * Math.cos(-midAngle * RADIAN);
           const y = cy + radius * Math.sin(-midAngle * RADIAN);
+          
+          // Truncate long names
+          const displayName = name.length > 15 ? name.substring(0, 15) + "..." : name;
+          
           return (
             <text
               x={x}
@@ -309,24 +327,60 @@ export function DynamicChart({
               textAnchor={x > cx ? "start" : "end"}
               dominantBaseline="central"
               className="text-gray-700 dark:text-gray-300"
-              fontSize={16}
+              fontSize={10}
               fontWeight={600}
             >
-              {`${(percent * 100).toFixed(2)}%`}
+              {displayName}
             </text>
           );
         };
 
+        // Custom tooltip that shows percentage
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const CustomTooltip = ({ active, payload }: any) => {
+          if (!active || !payload || !payload.length) return null;
+          const data = payload[0];
+          const value = Number(data.value || 0);
+          const percentage = total > 0 ? ((value / total) * 100).toFixed(2) : "0.00";
+          
+          return (
+            <div style={tooltipStyle} className="px-3 py-2">
+              <p className="font-semibold mb-1" style={{ color: "#ffffff" }}>
+                {data.name}
+              </p>
+              <p style={{ color: "#ffffff" }}>
+                {formatTooltipValue(value)}
+              </p>
+              <p className="text-sm mt-1" style={{ color: "#a0aec0" }}>
+                {percentage}% of total
+              </p>
+            </div>
+          );
+        };
+
+        // Enhanced legend formatter that shows name + percentage
+        const legendFormatter = (value: string, entry: any) => {
+          const itemValue = Number(entry.payload[dataKey] || 0);
+          const percentage = total > 0 ? ((itemValue / total) * 100).toFixed(1) : "0.0";
+          const truncatedName = isNarrow ? truncate(value, 12) : truncate(value, 18);
+          return `${truncatedName} (${percentage}%)`;
+        };
+
         return (
-          <PieChart margin={{ top: 40, bottom: 40, left: 10, right: 0 }} style={{ overflow: 'visible' }}>            <Pie
+          <PieChart margin={{ top: 30, bottom: 30, left: 20, right: 20 }}>
+            <Pie
               data={processedData}
               cx={isNarrow ? "50%" : "38%"}
               cy={isNarrow ? "50%" : "50%"}
-              labelLine
-              label={renderOuterLabel}
               outerRadius={outerR}
+              innerRadius={innerR}
               dataKey={dataKey}
               nameKey={xAxisKey}
+              label={renderOuterLabel}
+              labelLine={{
+                stroke: "#94a3b8",
+                strokeWidth: 1,
+              }}
             >
               {processedData.map((entry, index) => (
                 <Cell
@@ -337,22 +391,22 @@ export function DynamicChart({
                 />
               ))}
             </Pie>
-            <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} formatter={formatTooltipValue} />
+            <Tooltip content={<CustomTooltip />} />
             {isNarrow ? (
               <Legend
                 layout="horizontal"
                 align="center"
                 verticalAlign="bottom"
                 wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                formatter={(value: string) => truncate(value, 15)}
+                formatter={legendFormatter}
               />
             ) : (
               <Legend
                 layout="vertical"
                 align="right"
                 verticalAlign="middle"
-                wrapperStyle={{ fontSize: 14, maxHeight: height, overflow: "auto", paddingLeft: 8, lineHeight: "2" }}
-                formatter={(value: string) => truncate(value, 22)}
+                wrapperStyle={{ fontSize: 12, maxHeight: height, overflow: "auto", paddingLeft: 8, lineHeight: "1.8" }}
+                formatter={legendFormatter}
               />
             )}
           </PieChart>

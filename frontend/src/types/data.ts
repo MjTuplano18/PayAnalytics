@@ -10,6 +10,7 @@ export interface PaymentRecord {
   account: string; // debtor_id
   touchpoint: string; // TAGGING
   environment?: string;
+  month?: string; // Month header from Excel (e.g., "JANUARY", "FEBRUARY")
 }
 
 export interface BankAnalytics {
@@ -38,7 +39,7 @@ export interface ParsedData {
   raw: DataRow[];
 }
 
-export type ChartType = "bar" | "line" | "pie" | "area" | "barh";
+export type ChartType = "bar" | "line" | "pie" | "area" | "barh" | "donut" | "stackedBar";
 
 export interface FilterOptions {
   startDate?: string;

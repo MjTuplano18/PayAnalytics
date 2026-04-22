@@ -204,21 +204,27 @@ export function filterByDateRange<T>(
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   let start: Date;
+  let end: Date | null = null;
+  
   switch (range) {
     case "today":
       start = today;
+      end = today;
       break;
     case "week": {
       const day = today.getDay();
       start = new Date(today);
       start.setDate(today.getDate() - day);
+      end = today;
       break;
     }
     case "month":
       start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = today;
       break;
     case "year":
       start = new Date(today.getFullYear(), 0, 1);
+      end = today;
       break;
     default:
       return items;
@@ -226,7 +232,11 @@ export function filterByDateRange<T>(
 
   return items.filter((item) => {
     const d = parseLocal(getDate(item));
-    return d !== null && d >= start;
+    if (d === null) return false;
+    if (end) {
+      return d >= start && d <= end;
+    }
+    return d >= start;
   });
 }
 
@@ -254,12 +264,12 @@ export function dateRangeToBounds(
       const day = today.getDay();
       const start = new Date(today);
       start.setDate(today.getDate() - day);
-      return { date_from: fmt(start) };
+      return { date_from: fmt(start), date_to: fmt(today) };
     }
     case "month":
-      return { date_from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)) };
+      return { date_from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), date_to: fmt(today) };
     case "year":
-      return { date_from: fmt(new Date(today.getFullYear(), 0, 1)) };
+      return { date_from: fmt(new Date(today.getFullYear(), 0, 1)), date_to: fmt(today) };
     default:
       return {};
   }

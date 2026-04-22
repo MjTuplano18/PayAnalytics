@@ -51,6 +51,7 @@ class UploadRepository:
                         "payment_date": r.payment_date,
                         "payment_amount": r.payment_amount,
                         "environment": r.environment,
+                        "month": r.month,
                     }
                     for r in batch
                 ],
@@ -200,7 +201,7 @@ class UploadRepository:
         self, session_id: str, user_id: str,
         bank: str, account: str, payment_amount: float,
         touchpoint: str | None = None, payment_date: str | None = None,
-        environment: str | None = None,
+        environment: str | None = None, month: str | None = None,
     ) -> PaymentRecord | None:
         """Add a single payment record to an existing session. Returns the new record or None."""
         session_check = await self.session.execute(
@@ -219,6 +220,7 @@ class UploadRepository:
             touchpoint=touchpoint,
             payment_date=payment_date,
             environment=environment,
+            month=month,
         )
         self.session.add(record)
         await self._update_session_totals(session_id)
@@ -230,7 +232,7 @@ class UploadRepository:
         self, record_id: str, session_id: str, user_id: str,
         bank: str, account: str, payment_amount: float,
         touchpoint: str | None = None, payment_date: str | None = None,
-        environment: str | None = None,
+        environment: str | None = None, month: str | None = None,
     ) -> PaymentRecord | None:
         """Update fields on a single payment record. Returns updated record or None."""
         session_check = await self.session.execute(
@@ -256,6 +258,7 @@ class UploadRepository:
         record.touchpoint = touchpoint
         record.payment_date = payment_date
         record.environment = environment
+        record.month = month
         await self._update_session_totals(session_id)
         await self.session.commit()
         return record

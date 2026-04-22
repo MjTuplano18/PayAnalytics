@@ -17,9 +17,10 @@ _COL_PATTERNS: dict[str, list[str]] = {
     "bank": ["bank"],
     "account": ["debtor_id", "account", "debtor"],
     "touchpoint": ["tagging", "touchpoint", "tag"],
-    "payment_date": ["leads_result_edate", "payment date", "edate", "date"],
+    "payment_date": ["date_created", "leads_result_edate", "payment date", "edate"],
     "payment_amount": ["leads_result_amount", "payment amount", "amount"],
     "environment": ["environment", "env"],
+    "month": ["month"],
 }
 
 
@@ -48,7 +49,37 @@ def _format_date(value: object) -> str:
 
     if isinstance(value, (datetime, date)):
         return value.strftime("%Y-%m-%d")
+    
     s = str(value).strip()
+    
+    # Try to parse common date formats
+    # Format: MM/DD/YYYY or M/D/YYYY (e.g., "01/12/2026" or "1/12/2026")
+    if "/" in s:
+        try:
+            parts = s.split("/")
+            if len(parts) == 3:
+                month, day, year = parts
+                # Handle 2-digit or 4-digit year
+                if len(year) == 2:
+                    year = "20" + year
+                dt = datetime(int(year), int(month), int(day))
+                return dt.strftime("%Y-%m-%d")
+        except (ValueError, IndexError):
+            pass
+    
+    # Format: DD-MM-YYYY or D-M-YYYY
+    if "-" in s and not re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+        try:
+            parts = s.split("-")
+            if len(parts) == 3:
+                day, month, year = parts
+                if len(year) == 2:
+                    year = "20" + year
+                dt = datetime(int(year), int(month), int(day))
+                return dt.strftime("%Y-%m-%d")
+        except (ValueError, IndexError):
+            pass
+    
     # Excel serial number (integer between 30000 and 100000)
     if re.match(r"^\d+$", s):
         num = int(s)
@@ -58,6 +89,12 @@ def _format_date(value: object) -> str:
             epoch = datetime(1899, 12, 30)
             dt = epoch + timedelta(days=num)
             return dt.strftime("%Y-%m-%d")
+    
+    # Already in YYYY-MM-DD format
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+        return s
+    
+    # If all parsing fails, return the original string
     return s
 
 
@@ -85,6 +122,7 @@ def _row_to_record(
         payment_date=_format_date(_get("payment_date")),
         payment_amount=_safe_float(_get("payment_amount")),
         environment=str(_get("environment") or "") if _get("environment") else None,
+        month=str(_get("month") or "") if _get("month") else None,
     )
 
 

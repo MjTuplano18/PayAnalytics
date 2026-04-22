@@ -339,6 +339,7 @@ async def create_transaction(
         touchpoint=payload.touchpoint,
         payment_date=payload.payment_date,
         environment=payload.environment,
+        month=payload.month,
     )
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
@@ -394,6 +395,7 @@ async def update_transaction(
             "payment_date": before_record.payment_date,
             "payment_amount": before_record.payment_amount,
             "environment": before_record.environment,
+            "month": before_record.month,
         }
 
     updated = await repo.update_transaction(
@@ -406,6 +408,7 @@ async def update_transaction(
         touchpoint=payload.touchpoint,
         payment_date=payload.payment_date,
         environment=payload.environment,
+        month=payload.month,
     )
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found.")
@@ -420,6 +423,7 @@ async def update_transaction(
         "payment_date": updated.payment_date,
         "payment_amount": updated.payment_amount,
         "environment": updated.environment,
+        "month": updated.month,
     }
     snapshot = json.dumps({"session_id": session_id, "before": before_rec, "after": after_rec}, cls=_DecimalEncoder)
     session_obj = await repo.get_session_metadata(session_id, current_user.id)
@@ -687,6 +691,7 @@ async def undo_audit_entry(
                 payment_date=rec.get("payment_date", ""),
                 payment_amount=rec.get("payment_amount", 0.0),
                 environment=rec.get("environment", ""),
+                month=rec.get("month", ""),
             )
             db.add(record)
 
@@ -702,6 +707,7 @@ async def undo_audit_entry(
             payment_date=record_data.get("payment_date", ""),
             payment_amount=record_data.get("payment_amount", 0.0),
             environment=record_data.get("environment", ""),
+            month=record_data.get("month", ""),
         )
         db.add(record)
         await db.flush()
@@ -722,6 +728,7 @@ async def undo_audit_entry(
                 payment_date=rec.get("payment_date", ""),
                 payment_amount=rec.get("payment_amount", 0.0),
                 environment=rec.get("environment", ""),
+                month=rec.get("month", ""),
             )
             db.add(record)
         await db.flush()

@@ -33,6 +33,7 @@ function SessionRestorer() {
       account: r.account,
       touchpoint: r.touchpoint ?? "",
       environment: r.environment,
+      month: r.month,
     }));
 
     // Use integer-cents accumulation to avoid floating-point drift
