@@ -34,11 +34,12 @@ class Settings(BaseSettings):
 
     # AI Chat Assistant Configuration
     AI_PROVIDER: str = "openai"  # Options: 'openai', 'anthropic', or 'groq'
-    OPENAI_API_KEY: str = ""  # OpenAI API key for GPT-4
-    ANTHROPIC_API_KEY: str = ""  # Anthropic API key for Claude
-    GROQ_API_KEY: str = ""  # Groq API key for Llama models
-    AI_MAX_TOKENS: int = 2000  # Maximum tokens to generate per request
-    AI_TEMPERATURE: float = 0.7  # Temperature for AI response generation (0.0-1.0)
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama3-8b-8192"  # llama3-8b-8192 = 500K TPD free; llama-3.3-70b-versatile = 100K TPD
+    AI_MAX_TOKENS: int = 1000
+    AI_TEMPERATURE: float = 0.7
 
 
 settings = Settings()  # type: ignore[call-arg]

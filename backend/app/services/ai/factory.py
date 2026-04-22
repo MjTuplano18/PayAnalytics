@@ -23,6 +23,7 @@ def create_ai_client() -> AIAPIClient:
         
         return GroqClient(
             api_key=settings.GROQ_API_KEY,
+            model=settings.GROQ_MODEL,
             timeout=30,
             max_retries=2,
         )
