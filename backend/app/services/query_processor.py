@@ -761,23 +761,30 @@ Summarize these results. Use ₱ for currency. Numbered list for rankings. Bold 
             min_date = data_context.get("min_payment_date", "unknown")
             max_date = data_context.get("max_payment_date", "unknown")
             months_list = ", ".join(months)
+            # Extract year from payment_date for "this year" queries
+            year_str = str(min_date)[:4] if min_date and min_date != "unknown" else "unknown"
             enriched_context = [
                 {
                     "role": "system",
                     "content": (
                         f"CRITICAL DATA CONTEXT — READ CAREFULLY BEFORE GENERATING SQL:\n"
                         f"The payment_records table has {total:,} records.\n"
-                        f"The `month` column contains PLAIN ENGLISH MONTH NAMES (uppercase), NOT YYYY-MM format.\n"
-                        f"Available month values in the database: {months_list}\n"
-                        f"The payment_date column contains ISO dates ranging from {min_date} to {max_date}.\n\n"
-                        f"RULES FOR FILTERING BY MONTH:\n"
-                        f"- Use: WHERE month = 'JANUARY'  (NOT '2026-01' or '01')\n"
-                        f"- Use: WHERE month IN ('JANUARY', 'FEBRUARY')\n"
-                        f"- For date range filtering, use payment_date column: WHERE payment_date >= '2026-01-01'\n"
-                        f"- When user says 'this month' or 'January', use: WHERE month = 'JANUARY'\n"
-                        f"- When user says 'February', use: WHERE month = 'FEBRUARY'\n"
-                        f"- NEVER use month = '2026-01' or similar YYYY-MM format — it will return 0 results.\n"
-                        f"- If user asks for a month not in [{months_list}], tell them no data is available for that month."
+                        f"Available month values (month column): {months_list}\n"
+                        f"payment_date range: {min_date} to {max_date}\n"
+                        f"Data year: {year_str}\n\n"
+                        f"MONTH COLUMN RULES:\n"
+                        f"- month column = uppercase English names: 'JANUARY', 'FEBRUARY' — NEVER '2026-01'\n"
+                        f"- Filter by month: WHERE month = 'JANUARY'\n"
+                        f"- Filter multiple: WHERE month IN ('JANUARY', 'FEBRUARY')\n\n"
+                        f"YEAR/DATE QUERIES:\n"
+                        f"- 'this year' or 'for the year' = all available months: WHERE month IN ({', '.join(repr(m) for m in months)})\n"
+                        f"- OR use payment_date: WHERE payment_date >= '{year_str}-01-01' AND payment_date <= '{year_str}-12-31'\n"
+                        f"- NEVER use YEAR() function — it does NOT exist in PostgreSQL, will cause an error\n"
+                        f"- NEVER use month LIKE '2026%' — month column has names like JANUARY, not dates\n"
+                        f"- 'total amount for this year' = SUM(payment_amount) with no WHERE filter (all data IS from {year_str})\n\n"
+                        f"AGGREGATION:\n"
+                        f"- totals/rankings: SUM(payment_amount), not MAX\n"
+                        f"- single largest transaction: ORDER BY payment_amount DESC LIMIT 1"
                     )
                 }
             ] + enriched_context
@@ -843,6 +850,11 @@ Summarize these results. Use ₱ for currency. Numbered list for rankings. Bold 
             return results
             
         except Exception as e:
+            # Rollback so the transaction doesn't stay aborted for subsequent queries
+            try:
+                await self.db.rollback()
+            except Exception:
+                pass
             logger.error(f"SQL execution failed: {e}", exc_info=True)
             raise
 
@@ -894,39 +906,52 @@ Summarize these results. Use ₱ for currency. Numbered list for rankings. Bold 
             # Fallback: return simple summary
             return self._generate_fallback_response(query_results)
 
-    def _summarize_results(self, results: list[dict], max_rows: int = 10) -> str:
+    def _summarize_results(self, results: list[dict], max_rows: int = 50) -> str:
         """Summarize query results for AI context.
         
-        Args:
-            results: Query results
-            max_rows: Maximum rows to include
-            
-        Returns:
-            Formatted results summary
+        For small result sets, sends all rows.
+        For large result sets, sends the first max_rows rows plus aggregate stats
+        so the AI has accurate totals rather than summing a partial list.
         """
         if not results:
             return "No results found."
-        
-        # Limit rows
-        limited_results = results[:max_rows]
-        
-        # Format as table
+
+        headers = list(results[0].keys())
+        total_rows = len(results)
+
+        # Identify numeric columns for aggregate stats
+        numeric_cols = [
+            col for col in headers
+            if isinstance(results[0].get(col), (int, float)) and results[0].get(col) is not None
+        ]
+
+        # Build aggregate summary for numeric columns across ALL rows (not just the sample)
+        agg_lines = []
+        if numeric_cols and total_rows > max_rows:
+            agg_lines.append(f"[Aggregate stats across ALL {total_rows:,} rows:]")
+            for col in numeric_cols:
+                values = [float(r[col]) for r in results if r.get(col) is not None]
+                if values:
+                    agg_lines.append(
+                        f"  {col}: total={sum(values):,.2f}, avg={sum(values)/len(values):,.2f}, "
+                        f"min={min(values):,.2f}, max={max(values):,.2f}, count={len(values):,}"
+                    )
+
+        # Format sample rows as table
+        sample = results[:max_rows]
         lines = []
-        
-        # Header
-        if limited_results:
-            headers = list(limited_results[0].keys())
-            lines.append(" | ".join(headers))
-            lines.append("-" * 50)
-        
-        # Rows
-        for row in limited_results:
-            values = [str(v) for v in row.values()]
+        lines.append(" | ".join(headers))
+        lines.append("-" * 60)
+        for row in sample:
+            values = [str(v) if v is not None else "NULL" for v in row.values()]
             lines.append(" | ".join(values))
-        
-        if len(results) > max_rows:
-            lines.append(f"... and {len(results) - max_rows} more rows")
-        
+
+        if total_rows > max_rows:
+            lines.append(f"[Showing {max_rows} of {total_rows:,} total rows]")
+
+        if agg_lines:
+            lines.extend(agg_lines)
+
         return "\n".join(lines)
 
     def _generate_fallback_response(self, results: list[dict]) -> str:

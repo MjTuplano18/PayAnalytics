@@ -5,9 +5,39 @@ import ReactMarkdown from "react-markdown";
 import { Message } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Loader2 } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { format } from "date-fns";
 import { ChartRenderer } from "./ChartRenderer";
+
+/** Three-dot typing animation — each dot bounces in sequence */
+function TypingDots() {
+  return (
+    <>
+      <style>{`
+        @keyframes typingBounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-6px); opacity: 1; }
+        }
+        .typing-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: currentColor;
+          display: inline-block;
+          animation: typingBounce 1.2s ease-in-out infinite;
+        }
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+      `}</style>
+      <div className="flex items-center gap-1.5">
+        <span className="typing-dot" />
+        <span className="typing-dot" />
+        <span className="typing-dot" />
+      </div>
+    </>
+  );
+}
 
 interface MessageListProps {
   messages: Message[];
@@ -26,7 +56,6 @@ export function MessageList({
 }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to latest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, streamingContent]);
@@ -40,27 +69,30 @@ export function MessageList({
           onCopy={onCopyMessage}
         />
       ))}
+
+      {/* Streaming: show content as it arrives with dots below */}
       {isStreaming && streamingContent && (
         <div className="flex justify-start">
           <div className="group relative max-w-[80%] rounded-2xl bg-accent px-4 py-3 text-accent-foreground">
             <div className="space-y-2">
               <MarkdownContent content={streamingContent} />
             </div>
-            <div className="mt-2 flex items-center gap-2 text-xs opacity-60">
-              <Loader2 className="size-3 animate-spin" />
-              <span>Streaming...</span>
+            <div className="mt-2">
+              <TypingDots />
             </div>
           </div>
         </div>
       )}
-      {isLoading && !isStreaming && (
+
+      {/* Loading: show dots bubble before first chunk arrives */}
+      {(isLoading || (isStreaming && !streamingContent)) && (
         <div className="flex justify-start">
-          <div className="flex items-center gap-2 rounded-2xl bg-accent px-4 py-3 text-accent-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            <span className="text-sm">Thinking...</span>
+          <div className="rounded-2xl bg-accent px-5 py-4 text-accent-foreground">
+            <TypingDots />
           </div>
         </div>
       )}
+
       <div ref={messagesEndRef} />
     </div>
   );

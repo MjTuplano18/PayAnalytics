@@ -431,7 +431,7 @@ export function ChatInterface({ isOpen, onToggle }: ChatInterfaceProps) {
         handleError(error);
       }
     }
-  }, [token, state.activeConversationId, state.streamingContent, loadConversations, handleError]);
+  }, [token, state.activeConversationId, loadConversations, handleError]);
 
   const sendQuery = useCallback(async () => {
     if (!token || !query.trim()) return;

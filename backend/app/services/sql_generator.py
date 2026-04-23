@@ -195,12 +195,22 @@ CRITICAL RULES:
 - MAX(payment_amount) only for "single largest transaction" queries
 - Always include LIMIT (max 5000)
 - Only SELECT queries allowed
+- Database is PostgreSQL — do NOT use MySQL functions
+
+POSTGRESQL DATE RULES (very important):
+- NEVER use YEAR(payment_date) — this function does NOT exist in PostgreSQL
+- For year filtering use: WHERE payment_date >= '2026-01-01' AND payment_date <= '2026-12-31'
+- For month+year: WHERE payment_date >= '2026-01-01' AND payment_date < '2026-02-01'
+- For EXTRACT: WHERE EXTRACT(YEAR FROM payment_date::date) = 2026 (only if needed)
+- For "this year" or "total this year": use WHERE month IN ('JANUARY', 'FEBRUARY') — these are ALL available months
+- For "total amount" with no filter: SELECT SUM(payment_amount) FROM payment_records LIMIT 1
 
 Aggregation guide:
 - top banks/accounts → GROUP BY x, SUM(payment_amount) DESC
 - largest single payment → ORDER BY payment_amount DESC LIMIT 1
 - trends → GROUP BY month, SUM(payment_amount)
 - by touchpoint/environment → GROUP BY x, SUM(payment_amount)
+- total all data → SELECT SUM(payment_amount) FROM payment_records LIMIT 1
 
 Return SQL in ```sql blocks only.
 """

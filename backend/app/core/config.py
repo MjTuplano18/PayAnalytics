@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama3-8b-8192"  # llama3-8b-8192 = 500K TPD free; llama-3.3-70b-versatile = 100K TPD
+    GROQ_MODEL: str = "llama-3.1-8b-instant"  # Fast 8B model, high free tier limits
     AI_MAX_TOKENS: int = 1000
     AI_TEMPERATURE: float = 0.7
 
