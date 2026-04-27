@@ -85,12 +85,17 @@ function SessionRestorer() {
       }).catch((err: unknown) => {
         if (cancelled) return;
         const is404 = err instanceof Error && err.message.includes("404");
-        if (is404) {
+        // Also treat CORS/network errors as unrecoverable (session likely gone)
+        const isNetworkError = err instanceof TypeError && err.message.includes("fetch");
+        if (is404 || isNetworkError) {
           setSessionId(null);
           return;
         }
         if (attempt < 3) {
           retryRef.current = setTimeout(() => restore(attempt + 1), 1500 * (attempt + 1));
+        } else {
+          // Exhausted retries — clear stale session
+          setSessionId(null);
         }
       });
     };
