@@ -28,6 +28,7 @@ interface DynamicChartProps {
   xAxisKey: string;
   height?: number;
   title?: string;
+  valueType?: string;
   
 }
 
