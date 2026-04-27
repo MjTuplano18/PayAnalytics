@@ -305,7 +305,7 @@ export function DynamicChart({
         const RADIAN = Math.PI / 180;
 
         // Calculate total for percentages
-        const total = processedData.reduce((sum, item) => sum + Number(item[dataKey] || 0), 0);
+        const total = processedData.reduce((sum, item) => sum + Number((item as Record<string, unknown>)[dataKey] || 0), 0);
 
         // Custom label renderer that shows name outside the pie for ALL slices
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
