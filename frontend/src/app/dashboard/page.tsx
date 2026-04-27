@@ -100,8 +100,7 @@ export default function DashboardPage() {
       return apiSummary.months;
     }
     if (!data) return [];
-    const months = [...new Set(data.payments.map((p) => p.month).filter(Boolean))].sort();
-    return months;
+    return [...new Set(data.payments.map((p) => p.month).filter((m): m is string => Boolean(m)))].sort();
   }, [apiSummary, data]);
 
   const isFiltered = dateRange !== "all" || monthFilter !== "all";
