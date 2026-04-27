@@ -37,7 +37,7 @@ export function DateFilter({ value, onChange, customRange, dataStartDate }: Date
   const [selected, setSelected] = useState<DayPickerRange | undefined>(
     customRange ? { from: customRange.from, to: customRange.to } : undefined
   );
-  const defaultMonth = customRange?.from ?? dataStartDate ?? new Date();
+  const defaultMonth = customRange?.from ?? new Date();
   const [calendarMonth, setCalendarMonth] = useState<Date>(defaultMonth);
 
   // Close dropdown on outside click
@@ -54,7 +54,7 @@ export function DateFilter({ value, onChange, customRange, dataStartDate }: Date
   useEffect(() => {
     if (calendarOpen) {
       setSelected(customRange ? { from: customRange.from, to: customRange.to } : undefined);
-      setCalendarMonth(customRange?.from ?? dataStartDate ?? new Date());
+      setCalendarMonth(customRange?.from ?? new Date());
     }
   }, [calendarOpen]);
 

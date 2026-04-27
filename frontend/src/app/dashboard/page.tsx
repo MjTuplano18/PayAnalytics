@@ -36,7 +36,6 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<"summary" | "portfolio" | "channels">("summary");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
-  const [monthFilter, setMonthFilter] = useState("all");
   const { data: apiSummary, isLoading: apiLoading, error: apiError } = useDashboard(token, sessionId);
 
   // Auto-clear stale session on 404 or 500 (e.g. after DB migration / new database)
@@ -63,15 +62,11 @@ export default function DashboardPage() {
 
   const bankRowsPerPage = 15;
 
-  const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
-  const monthDropdownRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (tpDropdownRef.current && !tpDropdownRef.current.contains(e.target as Node)) setTpDropdownOpen(false);
       if (envDropdownRef.current && !envDropdownRef.current.contains(e.target as Node)) setEnvDropdownOpen(false);
       if (bankDropdownRef.current && !bankDropdownRef.current.contains(e.target as Node)) setBankDropdownOpen(false);
-      if (monthDropdownRef.current && !monthDropdownRef.current.contains(e.target as Node)) setMonthDropdownOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -80,11 +75,8 @@ export default function DashboardPage() {
   // Base filtered payments (date filter applies to all tabs)
   const payments = useMemo(() => {
     if (!data) return [];
-    const dateFiltered = filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
-    // Apply month filter
-    if (monthFilter === "all") return dateFiltered;
-    return dateFiltered.filter((p) => p.month === monthFilter);
-  }, [data, dateRange, customRange, monthFilter]);
+    return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
+  }, [data, dateRange, customRange]);
 
   const dataStartDate = useMemo(() => {
     if (!data || data.payments.length === 0) return undefined;
@@ -94,16 +86,7 @@ export default function DashboardPage() {
     return new Date(y, m - 1, d);
   }, [data]);
 
-  const availableMonths = useMemo(() => {
-    // Try API summary first, but fall back to local data if months array is empty
-    if (apiSummary && apiSummary.months && apiSummary.months.length > 0) {
-      return apiSummary.months;
-    }
-    if (!data) return [];
-    return [...new Set(data.payments.map((p) => p.month).filter((m): m is string => Boolean(m)))].sort();
-  }, [apiSummary, data]);
-
-  const isFiltered = dateRange !== "all" || monthFilter !== "all";
+  const isFiltered = dateRange !== "all";
 
   // ── Core analytics (used by Summary + Portfolio) ──
   const rawFa = useMemo(() => {
@@ -422,45 +405,6 @@ export default function DashboardPage() {
             </div>
           )}
           <DateFilter value={dateRange} onChange={(r, c) => { setDateRange(r); setCustomRange(c); }} customRange={customRange} dataStartDate={dataStartDate} />
-          
-          {/* Month Header Filter */}
-          <div ref={monthDropdownRef} className="relative">
-            <button
-              onClick={() => setMonthDropdownOpen((v) => !v)}
-              className="h-8 min-w-[140px] flex items-center justify-between gap-1.5 px-3 rounded-full border border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            >
-              <span className="truncate">{monthFilter === "all" ? "All Months" : monthFilter}</span>
-              <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${monthDropdownOpen ? "rotate-180" : ""}`} />
-            </button>
-
-            {monthDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden max-h-72 overflow-y-auto">
-                <button
-                  onClick={() => { setMonthFilter("all"); setMonthDropdownOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                    monthFilter === "all"
-                      ? "bg-[#5B66E2] text-white hover:bg-[#4a55d1] dark:hover:bg-[#4a55d1]"
-                      : "text-gray-700 dark:text-gray-200"
-                  }`}
-                >
-                  All Months
-                </button>
-                {availableMonths.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => { setMonthFilter(m); setMonthDropdownOpen(false); }}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                      monthFilter === m
-                        ? "bg-[#5B66E2] text-white hover:bg-[#4a55d1] dark:hover:bg-[#4a55d1]"
-                        : "text-gray-700 dark:text-gray-200"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
