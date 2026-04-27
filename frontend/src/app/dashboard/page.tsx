@@ -594,8 +594,12 @@ export default function DashboardPage() {
               })()}
             </Card>
             <Card className="p-6 bg-card border-border">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Top 8 Banks by Amount</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Which banks collected the most — by total payment amount</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Top 8 Banks by Amount</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Which banks collected the most — by total payment amount</p>
+                </div>
+              </div>
               {apiLoading ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (
                 <DynamicChart data={portfolioAnalytics.bankAnalytics.slice(0, 8).map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="pie" dataKey="amount" xAxisKey="bank" height={320} />
               )}
@@ -605,15 +609,23 @@ export default function DashboardPage() {
           {/* Row 2: Transaction Count vs Amount — side by side horizontal bars */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <Card className="p-6 bg-card border-border">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Transaction Count by Bank</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Number of payment transactions per bank — high count means high volume, not necessarily high value</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Transaction Count by Bank</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Number of payment transactions per bank — high count means high volume, not necessarily high value</p>
+                </div>
+              </div>
               {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
                 <DynamicChart data={[...portfolioAnalytics.bankAnalytics].sort((a, b) => b.paymentCount - a.paymentCount).slice(0, 10).sort((a, b) => a.paymentCount - b.paymentCount).map((a) => ({ bank: a.bank, transactions: a.paymentCount }))} type="barh" dataKey="transactions" xAxisKey="bank" height={280} valueType="count" />
               )}
             </Card>
             <Card className="p-6 bg-card border-border">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">% Share by Bank</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Each bank's percentage of total collected amount — all banks ranked</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">% Share by Bank</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Each bank's percentage of total collected amount — all banks ranked</p>
+                </div>
+              </div>
               {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (() => {
                 const d = portfolioAnalytics.bankAnalytics.slice(0, portfolioBankTopN === "all" ? undefined : portfolioBankTopN);
                 const minWidth = Math.max(500, d.length * 28);
