@@ -859,66 +859,67 @@ export default function SheetsPage() {
             <option value={500}>500</option>
           </select>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <span>
             {paginationInfo.from} to {paginationInfo.to} of{" "}
             {paginationInfo.total.toLocaleString()}
           </span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => gridApiRef.current?.paginationGoToFirstPage()}
-              disabled={paginationInfo.page <= 1}
-              className="px-2 py-1 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              &laquo;
-            </button>
-            <button
-              onClick={() => gridApiRef.current?.paginationGoToPreviousPage()}
-              disabled={paginationInfo.page <= 1}
-              className="px-2 py-1 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              &lsaquo;
-            </button>
-            <span className="px-2 font-medium">
-              Page {paginationInfo.page} of {paginationInfo.totalPages}
-            </span>
-            {/* Custom page jump input */}
-            <span className="flex items-center gap-1 ml-1">
-              <span className="text-muted-foreground">Go to</span>
-              <input
-                type="number"
-                min={1}
-                max={paginationInfo.totalPages}
-                value={pageInput}
-                onChange={(e) => setPageInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const p = parseInt(pageInput, 10);
-                    if (!isNaN(p) && p >= 1 && p <= paginationInfo.totalPages) {
-                      gridApiRef.current?.paginationGoToPage(p - 1);
-                    }
-                    setPageInput("");
+          <button
+            onClick={() => gridApiRef.current?.paginationGoToFirstPage()}
+            disabled={paginationInfo.page <= 1}
+            className="px-2 py-1 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            &laquo;
+          </button>
+          <button
+            onClick={() => gridApiRef.current?.paginationGoToPreviousPage()}
+            disabled={paginationInfo.page <= 1}
+            className="px-2 py-1 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            &lsaquo;
+          </button>
+          <span className="flex items-center gap-1">
+            <span>Page</span>
+            <input
+              type="number"
+              min={1}
+              max={paginationInfo.totalPages}
+              value={pageInput !== "" ? pageInput : paginationInfo.page}
+              onChange={(e) => setPageInput(e.target.value)}
+              onBlur={() => {
+                const p = parseInt(pageInput, 10);
+                if (!isNaN(p) && p >= 1 && p <= paginationInfo.totalPages) {
+                  gridApiRef.current?.paginationGoToPage(p - 1);
+                }
+                setPageInput("");
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const p = parseInt(pageInput, 10);
+                  if (!isNaN(p) && p >= 1 && p <= paginationInfo.totalPages) {
+                    gridApiRef.current?.paginationGoToPage(p - 1);
                   }
-                }}
-                placeholder={String(paginationInfo.page)}
-                className="w-14 rounded-lg border border-border bg-background px-2 py-1 text-sm text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-            </span>
-            <button
-              onClick={() => gridApiRef.current?.paginationGoToNextPage()}
-              disabled={paginationInfo.page >= paginationInfo.totalPages}
-              className="px-2 py-1 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              &rsaquo;
-            </button>
-            <button
-              onClick={() => gridApiRef.current?.paginationGoToLastPage()}
-              disabled={paginationInfo.page >= paginationInfo.totalPages}
-              className="px-2 py-1 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              &raquo;
-            </button>
-          </div>
+                  setPageInput("");
+                }
+              }}
+              className="w-14 rounded-full border border-border bg-background px-2 py-1 text-sm text-center font-medium [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            <span>of {paginationInfo.totalPages.toLocaleString()}</span>
+          </span>
+          <button
+            onClick={() => gridApiRef.current?.paginationGoToNextPage()}
+            disabled={paginationInfo.page >= paginationInfo.totalPages}
+            className="px-2 py-1 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            &rsaquo;
+          </button>
+          <button
+            onClick={() => gridApiRef.current?.paginationGoToLastPage()}
+            disabled={paginationInfo.page >= paginationInfo.totalPages}
+            className="px-2 py-1 rounded-lg border border-border hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            &raquo;
+          </button>
         </div>
       </div>
     </div>
