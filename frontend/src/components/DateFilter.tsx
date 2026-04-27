@@ -90,16 +90,15 @@ export function DateFilter({ value, onChange, customRange, dataStartDate }: Date
 
   return (
     <div className="flex items-center gap-2">
-      <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400 hidden sm:block" />
-
       {/* Custom dropdown — always fires on click regardless of current value */}
       <div ref={dropdownRef} className="relative">
         <button
           onClick={() => setDropdownOpen((v) => !v)}
-          className="h-8 min-w-[140px] flex items-center justify-between gap-1.5 px-3 rounded-full border border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 dark:hover:bg-muted transition-colors"
         >
+          <Calendar className="w-4 h-4 flex-shrink-0" />
           <span className="truncate">{displayLabel}</span>
-          <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+          <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
         </button>
 
         {dropdownOpen && (
