@@ -23,7 +23,7 @@ import {
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { exportToExcel, exportToCSV, exportToJSON, EXPORT_FIELDS, type ExportOptions } from "@/utils/exportUtils";
-import { getDashboardSummary, getTransactions } from "@/lib/api";
+import { getDashboardSummary, exportAllRecords } from "@/lib/api";
 import { toast } from "sonner";
 import type { DataRow } from "@/types/data";
 
@@ -71,14 +71,11 @@ export default function ReportsPage() {
     }));
   }, [data]);
 
-  // Fetch ALL records from backend (no pagination) for export
+  // Fetch ALL records from backend in a single request (dedicated export endpoint)
   const fetchAllForExport = async (): Promise<{ Bank: string; "Payment Date": string; "Payment Amount": number; Account: string; Touchpoint: string }[]> => {
     if (!token || !sessionId) return reportData;
-    // Get total first, then fetch all
-    const first = await getTransactions(token, sessionId, { page: 1, page_size: 1 });
-    if (first.total === 0) return [];
-    const all = await getTransactions(token, sessionId, { page: 1, page_size: first.total });
-    return all.items.map((r) => ({
+    const allItems = await exportAllRecords(token, sessionId);
+    return allItems.map((r) => ({
       Bank: r.bank,
       "Payment Date": r.payment_date ?? "",
       "Payment Amount": r.payment_amount,

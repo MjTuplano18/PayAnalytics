@@ -124,11 +124,11 @@ export default function AccountsPage() {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 stagger-children">
-        {metrics.map((m) => {
+        {metrics.map((m, idx) => {
           const Icon = m.icon;
           return (
             <Card
-              key={m.label}
+              key={idx}
               className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
             >
               <div className="h-1 bg-[#5B66E2]" />

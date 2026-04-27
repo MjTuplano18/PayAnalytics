@@ -406,6 +406,26 @@ class UploadRepository:
         result = await self.session.execute(query)
         return total, float(total_amount), list(result.scalars().all())
 
+    async def get_all_records_for_export(
+        self, session_id: str, user_id: str
+    ) -> list[PaymentRecord]:
+        """Fetch ALL records for a session in a single query (no pagination). Used for exports."""
+        # Verify session ownership
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return []
+        result = await self.session.execute(
+            select(PaymentRecord)
+            .where(PaymentRecord.session_id == session_id)
+            .order_by(PaymentRecord.payment_date.desc())
+        )
+        return list(result.scalars().all())
+
     async def get_dashboard_summary(self, session_id: str, user_id: str) -> dict | None:
         # Verify session ownership
         session_check = await self.session.execute(

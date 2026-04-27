@@ -210,11 +210,16 @@ export default function TransactionsPage() {
     const rows = usingApi
       ? (apiRows ?? []).map((r) => [r.bank, r.payment_date, r.payment_amount.toFixed(2), r.account, r.touchpoint, r.environment ?? ""])
       : inMemoryFiltered.map((p) => [p.bank, p.paymentDate, p.paymentAmount.toFixed(2), p.account, p.touchpoint, p.environment ?? ""]);
+    // Quote any field that contains a comma, double-quote, or newline
+    const escapeField = (f: string | number | null | undefined) => {
+      const s = String(f ?? "");
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
     const csv = [
       ["Bank", "Payment Date", "Payment Amount", "Account", "Touchpoint", "Environment"],
       ...rows,
     ]
-      .map((row) => row.join(","))
+      .map((row) => row.map(escapeField).join(","))
       .join("\n");
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -254,6 +259,7 @@ export default function TransactionsPage() {
 
   // ── CRUD helpers (in-memory mode only) ──
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isCrudSubmitting, setIsCrudSubmitting] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingDisplayIndex, setEditingDisplayIndex] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
@@ -331,12 +337,14 @@ export default function TransactionsPage() {
   }, [token, sessionId, setData, recalcParsedData]);
 
   const handleAddTransaction = async () => {
+    if (isCrudSubmitting) return;
     const amount = parseFloat(addForm.paymentAmount);
     if (!addForm.bank || !addForm.paymentDate || isNaN(amount) || amount < 0 || !addForm.account || !addForm.touchpoint) {
       toast.error("Please fill in all fields with valid values. Amount cannot be negative.");
       return;
     }
 
+    setIsCrudSubmitting(true);
     if (usingApi && token && sessionId) {
       try {
         await createTransaction(token, sessionId, {
@@ -354,11 +362,13 @@ export default function TransactionsPage() {
         toast.success("Transaction added.");
       } catch {
         toast.error("Failed to add transaction.");
+      } finally {
+        setIsCrudSubmitting(false);
       }
       return;
     }
 
-    if (!data) return;
+    if (!data) { setIsCrudSubmitting(false); return; }
     const newRecord: PaymentRecord = {
       bank: addForm.bank.toUpperCase(),
       paymentDate: addForm.paymentDate,
@@ -371,6 +381,7 @@ export default function TransactionsPage() {
     setData(recalcParsedData(newPayments));
     setAddForm({ bank: "", paymentDate: "", paymentAmount: "", account: "", touchpoint: "", environment: "" });
     setShowAddForm(false);
+    setIsCrudSubmitting(false);
     toast.success("Transaction added.");
   };
 
@@ -391,13 +402,14 @@ export default function TransactionsPage() {
   };
 
   const handleSaveEdit = async () => {
-    if (editingIndex === null) return;
+    if (editingIndex === null || isCrudSubmitting) return;
     const amount = parseFloat(editForm.paymentAmount);
     if (!editForm.bank || !editForm.paymentDate || isNaN(amount) || amount < 0 || !editForm.account || !editForm.touchpoint) {
       toast.error("Please fill in all fields with valid values. Amount cannot be negative.");
       return;
     }
 
+    setIsCrudSubmitting(true);
     if (usingApi && token && sessionId && apiRows) {
       const row = editingDisplayIndex !== null ? apiRows[editingDisplayIndex] : null;
       if (!row) { toast.error("Could not find record to update."); return; }
@@ -417,11 +429,13 @@ export default function TransactionsPage() {
         toast.success("Transaction updated.");
       } catch {
         toast.error("Failed to update transaction.");
+      } finally {
+        setIsCrudSubmitting(false);
       }
       return;
     }
 
-    if (!data) return;
+    if (!data) { setIsCrudSubmitting(false); return; }
     const newPayments = [...data.payments];
     newPayments[editingIndex] = {
       bank: editForm.bank.toUpperCase(),
@@ -434,6 +448,7 @@ export default function TransactionsPage() {
     setData(recalcParsedData(newPayments));
     setEditingIndex(null);
     setEditingDisplayIndex(null);
+    setIsCrudSubmitting(false);
     toast.success("Transaction updated.");
   };
 

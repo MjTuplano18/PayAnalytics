@@ -225,7 +225,7 @@ async def get_transactions(
     if page < 1:
         page = 1
     if page_size < 1 or page_size > 200:
-        page_size = 25
+        raise HTTPException(status_code=422, detail="page_size must be between 1 and 200.")
 
     repo = UploadRepository(db)
     total, total_amount, records = await repo.get_transactions(
@@ -248,6 +248,24 @@ async def get_transactions(
         page_size=page_size,
         items=[PaymentRecordOut.model_validate(r) for r in records],
     )
+
+
+@router.get("/{session_id}/export/records", response_model=list[PaymentRecordOut])
+async def export_all_records(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[PaymentRecordOut]:
+    """Return ALL payment records for a session in a single response (no pagination).
+    Intended for client-side export. Use /transactions for normal paginated access."""
+    repo = UploadRepository(db)
+    records = await repo.get_all_records_for_export(session_id, current_user.id)
+    if not records:
+        # Check whether session exists vs. truly empty
+        session = await repo.get_session_metadata(session_id, current_user.id)
+        if not session:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
+    return [PaymentRecordOut.model_validate(r) for r in records]
 
 
 @router.get("/{session_id}/dashboard", response_model=DashboardSummary)

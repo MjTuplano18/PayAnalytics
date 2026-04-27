@@ -43,9 +43,15 @@ export function useUploadEvents(token: string | null) {
       const controller = new AbortController();
       abortRef.current = controller;
 
+      // Always read the latest token from localStorage — it may have been
+      // refreshed since this effect last ran (stale closure fix).
+      const currentToken =
+        (typeof window !== "undefined" && localStorage.getItem("pa_access_token")) ||
+        token;
+
       try {
         const response = await fetch(`${API_BASE}/api/v1/events/stream`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${currentToken}` },
           signal: controller.signal,
         });
 

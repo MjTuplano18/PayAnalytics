@@ -246,6 +246,11 @@ export function getDashboardSummary(token: string, sessionId: string) {
   return apiFetch<DashboardSummary>(`/api/v1/uploads/${sessionId}/dashboard`, { token });
 }
 
+/** Fetch ALL records for a session in a single request — use for exports only. */
+export function exportAllRecords(token: string, sessionId: string) {
+  return apiFetch<PaymentRecordOut[]>(`/api/v1/uploads/${sessionId}/export/records`, { token });
+}
+
 export interface AuditLogEntry {
   id: string;
   file_name: string;
