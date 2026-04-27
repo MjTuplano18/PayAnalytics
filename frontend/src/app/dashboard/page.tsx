@@ -500,8 +500,12 @@ export default function DashboardPage() {
 
           {/* Monthly Trend — full width */}
           <Card className="p-6 bg-card border-border mb-6">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Payment Trend by Month</h3>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Total payment amount collected per month — shows growth or decline over time</p>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Payment Trend by Month</h3>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Total payment amount collected per month — shows growth or decline over time</p>
+              </div>
+            </div>
             {apiLoading ? <Skeleton className="h-[220px] w-full rounded-xl" /> : monthlyTrend.length === 0 ? (
               <div className="h-[220px] flex items-center justify-center text-sm text-gray-400">No date data available</div>
             ) : (
@@ -534,16 +538,24 @@ export default function DashboardPage() {
           {/* Row 2: Top Banks bar + Touchpoint mix donut */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <Card className="p-6 bg-card border-border">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Top Banks by Payment Amount</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Top 10 banks ranked by total amount collected</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Top Banks by Payment Amount</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Top 10 banks ranked by total amount collected</p>
+                </div>
+              </div>
               {apiLoading ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (() => {
                 const d = fa.bankAnalytics.slice(0, 10);
                 return <DynamicChart data={[...d].sort((a, b) => a.totalAmount - b.totalAmount).map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="barh" dataKey="amount" xAxisKey="bank" height={320} />;
               })()}
             </Card>
             <Card className="p-6 bg-card border-border">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Touchpoint Mix (Top 8)</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Distribution of transactions across the top 8 touchpoints by count</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Touchpoint Mix (Top 8)</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Distribution of transactions across the top 8 touchpoints by count</p>
+                </div>
+              </div>
               {apiLoading ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (
                 <DynamicChart data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({ touchpoint: t.touchpoint, count: t.count }))} type="donut" dataKey="count" xAxisKey="touchpoint" height={320} valueType="count" />
               )}
@@ -710,15 +722,23 @@ export default function DashboardPage() {
           {/* Row 1: Channel type groups + Touchpoint donut */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <Card className="p-6 bg-card border-border">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Touchpoint Type Performance</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Inbound (IB) vs Outbound (OB) vs With Touchpoint vs Ghost Payment vs No Touchpoint — transaction count</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Touchpoint Type Performance</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Inbound (IB) vs Outbound (OB) vs With Touchpoint vs Ghost Payment vs No Touchpoint — transaction count</p>
+                </div>
+              </div>
               {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
                 <DynamicChart data={channelGroupData.map((g) => ({ group: g.group, count: g.count }))} type="bar" dataKey="count" xAxisKey="group" height={280} valueType="count" />
               )}
             </Card>
             <Card className="p-6 bg-card border-border">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Touchpoint Type — Amount Share</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Total payment amount collected per touchpoint type — shows which strategy drives the most value</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Touchpoint Type — Amount Share</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Total payment amount collected per touchpoint type — shows which strategy drives the most value</p>
+                </div>
+              </div>
               {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
                 <DynamicChart data={channelGroupData.map((g) => ({ group: g.group, amount: g.amount }))} type="pie" dataKey="amount" xAxisKey="group" height={280} />
               )}
@@ -728,15 +748,23 @@ export default function DashboardPage() {
           {/* Row 2: Amount by touchpoint (horizontal) + % share bar */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <Card className="p-6 bg-card border-border">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Amount by Touchpoint</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Total payment amount collected per individual touchpoint — ranked highest to lowest</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Amount by Touchpoint</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Total payment amount collected per individual touchpoint — ranked highest to lowest</p>
+                </div>
+              </div>
               {apiLoading ? <Skeleton className="h-[300px] w-full rounded-xl" /> : (
                 <DynamicChart data={[...channelAnalytics].sort((a, b) => a.totalAmount - b.totalAmount).slice(0, 12).map((t) => ({ touchpoint: t.touchpoint, amount: t.totalAmount }))} type="barh" dataKey="amount" xAxisKey="touchpoint" height={300} />
               )}
             </Card>
             <Card className="p-6 bg-card border-border">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-0.5">Top Touchpoints by Amount</h3>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Top 8 individual touchpoints by total amount — shows which specific touchpoints generate the most collections</p>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Top Touchpoints by Amount</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Top 8 individual touchpoints by total amount — shows which specific touchpoints generate the most collections</p>
+                </div>
+              </div>
               {apiLoading ? <Skeleton className="h-[300px] w-full rounded-xl" /> : (
                 <DynamicChart data={channelAnalytics.slice(0, 8).map((t) => ({ touchpoint: t.touchpoint, amount: t.totalAmount }))} type="donut" dataKey="amount" xAxisKey="touchpoint" height={300} />
               )}
