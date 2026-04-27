@@ -279,12 +279,12 @@ export default function DashboardPage() {
   function MetricCard({ label, value, icon: Icon, iconBg, info }: { label: string; value: string; icon: React.ElementType; iconBg: string; info?: string }) {
     return (
       <Card className="p-5 bg-card border-border hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-default">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-1.5">
           <span className="text-sm font-semibold text-gray-900 dark:text-white">{label}</span>
           <div className={`p-2 ${iconBg} rounded-lg`}><Icon className="w-4 h-4 text-white" /></div>
         </div>
         <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">{value}</div>
-        {info && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{info}</p>}
+        {info && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{info}</p>}
       </Card>
     );
   }

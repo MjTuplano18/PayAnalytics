@@ -200,7 +200,7 @@ export default function TouchpointsDashboardPage() {
                   className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
                 >
                   <div className="h-1 bg-[#5B66E2]" />
-                  <div className="flex flex-col h-[calc(100%-4px)] px-5 pt-3 pb-4 gap-3">
+                  <div className="flex flex-col h-[calc(100%-4px)] px-5 pt-3 pb-3 gap-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-gray-900 dark:text-white">
                         {card.label}
