@@ -297,7 +297,7 @@ export default function DashboardPage() {
     return (
       <Card className="p-5 bg-card border-border hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-default">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-white">{label}</span>
           <div className={`p-2 ${iconBg} rounded-lg`}><Icon className="w-4 h-4 text-white" /></div>
         </div>
         <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">{value}</div>

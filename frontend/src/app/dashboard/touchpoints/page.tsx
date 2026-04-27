@@ -202,8 +202,8 @@ export default function TouchpointsDashboardPage() {
                   <div className="h-1 bg-[#5B66E2]" />
                   <div className="flex flex-col h-[calc(100%-4px)] px-5 pt-3 pb-4 gap-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                        {card.label}:
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {card.label}
                       </span>
                       <div className={`p-2 mt-1 mr-0.5 ${card.iconBg} rounded-lg`}>
                         <Icon className="w-6 h-6 text-white" />
