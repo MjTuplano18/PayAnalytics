@@ -59,7 +59,7 @@ export function Sidebar() {
       >
         {/* Collapse / expand toggle arrow — sits on the right edge, vertically centered */}
         <button
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={() => setCollapsed(!collapsed)}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className="absolute -right-5 top-1/2 -translate-y-1/2 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-border/40 bg-white dark:bg-[rgba(7,13,18,0.92)] shadow-md text-muted-foreground hover:text-foreground transition-colors duration-200"
         >
