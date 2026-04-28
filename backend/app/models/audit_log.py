@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -24,7 +24,7 @@ class AuditLog(Base):
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     session_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     record_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    total_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    total_amount: Mapped[float] = mapped_column(Numeric(15, 2), nullable=False, default=0.0)
     details: Mapped[str | None] = mapped_column(String(500), nullable=True)
     snapshot_data: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_undone: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

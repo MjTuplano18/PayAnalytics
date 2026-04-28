@@ -99,6 +99,18 @@ function ChangePasswordSection({ token }: { token: string | null }) {
       toast.error("New password must be at least 8 characters.");
       return;
     }
+    if (!/[A-Z]/.test(newPassword)) {
+      toast.error("New password must contain at least one uppercase letter.");
+      return;
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      toast.error("New password must contain at least one lowercase letter.");
+      return;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      toast.error("New password must contain at least one digit.");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast.error("Passwords do not match.");
       return;
@@ -161,7 +173,7 @@ function ChangePasswordSection({ token }: { token: string | null }) {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
-              placeholder="Min. 8 characters"
+              placeholder="Min. 8 chars, upper, lower, digit"
               className="pr-10 bg-gray-100 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-[#5B66E2] focus-visible:ring-[#5B66E2]/30"
             />
             <button

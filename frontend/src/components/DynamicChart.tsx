@@ -51,6 +51,17 @@ const COLORS = [
 const BRAND = "#5B66E2";
 const BRAND_SECONDARY = "#4a55d1";
 
+const tooltipStyle = {
+  backgroundColor: "#1e293b",
+  border: "1px solid #334155",
+  color: "#ffffff",
+  borderRadius: "8px",
+  fontSize: "13px",
+} as const;
+
+const tooltipLabelStyle = { color: "#ffffff" } as const;
+const tooltipItemStyle = { color: "#ffffff" } as const;
+
 /** Truncate long labels for chart axes/legends */
 function truncate(str: string, max: number): string {
   return str.length > max ? str.slice(0, max) + "…" : str;
@@ -114,30 +125,18 @@ export function DynamicChart({
     );
   }
 
-  const tooltipStyle = {
-    backgroundColor: "#1e293b",
-    border: "1px solid #334155",
-    color: "#ffffff",
-    borderRadius: "8px",
-    fontSize: "13px",
-  };
-
-  const tooltipLabelStyle = { color: "#ffffff" };
-  const tooltipItemStyle  = { color: "#ffffff" };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const formatTooltipValue = (value: any) => {
+  const formatTooltipValue = useCallback((value: unknown) => {
     const num = Number(value);
     const formatted = fmtNum(isNaN(num) ? 0 : num);
     if (dataKey === "percentage") return `${formatted}%`;
     if (dataKey === "count") return formatted;
     return `₱${formatted}`;
-  };
+  }, [dataKey]);
 
-  const formatAxisTick = (value: number) => {
+  const formatAxisTick = useCallback((value: number) => {
     if (dataKey === "percentage") return `${fmtNum(value)}%`;
     return fmtNum(value);
-  };
+  }, [dataKey]);
 
   const renderChart = () => {
     // Responsive: on narrow containers, skip some x-axis labels to prevent overlap

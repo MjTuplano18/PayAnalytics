@@ -1,4 +1,5 @@
 import json
+import re
 import uuid
 from decimal import Decimal
 
@@ -313,12 +314,38 @@ async def delete_upload(
             detail="Upload session not found or you are not authorized to delete it.",
         )
 
-    # Lightweight snapshot — metadata only, no individual records (avoids OOM)
+    # Build snapshot that includes individual records so the undo can fully restore them.
+    # For large datasets (>5,000 records) we skip the record snapshot to avoid OOM —
+    # undo will be disabled for those entries.
+    _SNAPSHOT_RECORD_LIMIT = 5_000
+    records_for_snapshot: list[dict] = []
+    if session_obj.total_records <= _SNAPSHOT_RECORD_LIMIT:
+        all_records = await repo.get_all_records_for_export(session_id, session_obj.user_id)
+        records_for_snapshot = [
+            {
+                "id": r.id,
+                "bank": r.bank,
+                "account": r.account,
+                "touchpoint": r.touchpoint,
+                "payment_date": r.payment_date,
+                "payment_amount": r.payment_amount,
+                "environment": r.environment,
+                "month": r.month,
+            }
+            for r in all_records
+        ]
+
     snapshot = json.dumps({
-        "user_id": session_obj.user_id,
-        "file_name": session_obj.file_name,
-        "total_records": session_obj.total_records,
-        "total_amount": session_obj.total_amount,
+        "session": {
+            "id": session_obj.id,
+            "user_id": session_obj.user_id,
+            "file_name": session_obj.file_name,
+            "total_records": session_obj.total_records,
+            "total_amount": session_obj.total_amount,
+        },
+        "records": records_for_snapshot,
+        # Empty records list means undo is not available (dataset was too large)
+        "undo_available": len(records_for_snapshot) == session_obj.total_records,
     }, cls=_DecimalEncoder)
 
     # Log the deletion before actually deleting
@@ -571,8 +598,19 @@ async def delete_transactions_by_date_range(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Mass delete transactions within a date range. Returns count of deleted records."""
+    _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
     if not date_from or not date_to:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="date_from and date_to are required.")
+    if not _DATE_RE.match(date_from) or not _DATE_RE.match(date_to):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="date_from and date_to must be in YYYY-MM-DD format.",
+        )
+    if date_from > date_to:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="date_from must not be later than date_to.",
+        )
     repo = UploadRepository(db)
     audit_repo = AuditLogRepository(db)
 
@@ -613,7 +651,12 @@ async def create_audit_entry(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Create a custom audit log entry for the current user."""
+    """Create a custom audit log entry. Restricted to admins only."""
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
     audit_repo = AuditLogRepository(db)
     await audit_repo.log_action(
         user_id=current_user.id,
@@ -687,7 +730,16 @@ async def undo_audit_entry(
     snapshot = json.loads(entry.snapshot_data)
 
     if entry.action == "file_delete":
-        # Restore the deleted session and all its records
+        # Restore the deleted session and all its records.
+        # If undo_available is False the dataset was too large to snapshot — reject.
+        if not snapshot.get("undo_available", True):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Undo is not available for this deletion: the dataset exceeded 5,000 records "
+                    "and was not snapshotted. The records cannot be restored automatically."
+                ),
+            )
         session_data = snapshot.get("session", {})
         records_data = snapshot.get("records", [])
         restored_session = UploadSession(

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 
 class PaymentRecordIn(BaseModel):
@@ -22,7 +22,7 @@ class PaymentRecordOut(PaymentRecordIn):
 
 class UploadSessionCreate(BaseModel):
     file_name: str
-    records: list[PaymentRecordIn]
+    records: list[PaymentRecordIn] = Field(..., max_length=50_000, description="Payment records to upload (max 50,000 per call)")
 
 
 class UploadSessionOut(BaseModel):
@@ -116,7 +116,20 @@ class UnifiedAuditLogEntry(BaseModel):
 
 
 class BulkDeleteRequest(BaseModel):
-    ids: list[str]
+    ids: list[str] = Field(..., max_length=1_000, description="IDs of records to delete (max 1,000 per request)")
+
+
+# Allowed action values that can be submitted via the external audit endpoint.
+_ALLOWED_AUDIT_ACTIONS = frozenset(
+    {
+        "file_upload",
+        "file_delete",
+        "record_create",
+        "record_update",
+        "record_delete",
+        "record_bulk_delete",
+    }
+)
 
 
 class AuditLogCreate(BaseModel):
@@ -127,3 +140,12 @@ class AuditLogCreate(BaseModel):
     total_amount: float = 0.0
     details: str | None = None
     snapshot_data: str | None = None
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, v: str) -> str:
+        if v not in _ALLOWED_AUDIT_ACTIONS:
+            raise ValueError(
+                f"Invalid action '{v}'. Must be one of: {', '.join(sorted(_ALLOWED_AUDIT_ACTIONS))}"
+            )
+        return v

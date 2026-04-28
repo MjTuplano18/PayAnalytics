@@ -289,6 +289,7 @@ class UploadRepository:
         if count > 0:
             await self._update_session_totals(session_id)
             await self.session.flush()
+            await self.session.commit()
         return count
 
     async def delete_transactions_by_date_range(
@@ -381,7 +382,9 @@ class UploadRepository:
         if environment:
             query = query.where(PaymentRecord.environment == environment)
         if search:
-            pattern = f"%{search}%"
+            # Escape ILIKE metacharacters to prevent wildcard abuse / slow queries
+            safe_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{safe_search}%"
             query = query.where(
                 or_(
                     PaymentRecord.bank.ilike(pattern),

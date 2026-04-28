@@ -10,7 +10,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { parseExcelFile } from "@/utils/excelParser";
-import { saveUpload, getUpload, deleteUpload, type UploadSessionOut } from "@/lib/api";
+import { saveUpload, deleteUpload, type UploadSessionOut } from "@/lib/api";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUploads } from "@/lib/queries";
@@ -72,7 +72,9 @@ export default function UploadPage() {
   const [restoring, setRestoring] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const { data: sessions = [] } = useUploads(token, { refetchInterval: 30_000 });
+  // SSE (useUploadEvents in AppShell) already invalidates the uploads cache on new_upload events.
+  // No need for polling — removing refetchInterval avoids redundant Neon DB hits.
+  const { data: sessions = [] } = useUploads(token);
 
   // Multi-file merge state
   const mergeInputRef = useRef<HTMLInputElement>(null);
@@ -151,32 +153,34 @@ export default function UploadPage() {
 
   // Rebuild ParsedData from a filtered payment array
   function buildParsedData(payments: PaymentRecord[]): ParsedData {
-    const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
-    const tpMap = new Map<string, { count: number; totalAmount: number }>();
-    let totalAmount = 0;
+    const bankMap = new Map<string, { totalAmountCents: number; paymentCount: number; accounts: Set<string> }>();
+    const tpMap = new Map<string, { count: number; totalAmountCents: number }>();
+    let totalAmountCents = 0;
     const allAccounts = new Set<string>();
 
     for (const p of payments) {
-      totalAmount += p.paymentAmount;
+      totalAmountCents += Math.round(p.paymentAmount * 100);
       allAccounts.add(p.account);
-      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
+      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmountCents: 0, paymentCount: 0, accounts: new Set() });
       const b = bankMap.get(p.bank)!;
-      b.totalAmount += p.paymentAmount;
+      b.totalAmountCents += Math.round(p.paymentAmount * 100);
       b.paymentCount++;
       b.accounts.add(p.account);
-      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
+      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmountCents: 0 });
       const t = tpMap.get(p.touchpoint)!;
       t.count++;
-      t.totalAmount += p.paymentAmount;
+      t.totalAmountCents += Math.round(p.paymentAmount * 100);
     }
+
+    const totalAmount = totalAmountCents / 100;
 
     const bankAnalytics = Array.from(bankMap.entries())
       .map(([bank, d]) => ({
         bank,
         accountCount: d.accounts.size,
-        totalAmount: d.totalAmount,
+        totalAmount: d.totalAmountCents / 100,
         debtorSum: 0,
-        percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
+        percentage: totalAmount > 0 ? ((d.totalAmountCents / 100) / totalAmount) * 100 : 0,
         paymentCount: d.paymentCount,
       }))
       .sort((a, b) => b.totalAmount - a.totalAmount);
@@ -185,8 +189,8 @@ export default function UploadPage() {
       .map(([touchpoint, d]) => ({
         touchpoint,
         count: d.count,
-        totalAmount: d.totalAmount,
-        percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
+        totalAmount: d.totalAmountCents / 100,
+        percentage: totalAmount > 0 ? ((d.totalAmountCents / 100) / totalAmount) * 100 : 0,
       }))
       .sort((a, b) => b.count - a.count);
 
@@ -222,19 +226,19 @@ export default function UploadPage() {
         setSessionId(saved.id);
         await queryClient.invalidateQueries({ queryKey: ["uploads"] });
         toast.success(`File uploaded & saved! ${saved.total_records} records stored.`);
+        setUploadSuccess(true);
+        setTimeout(() => router.push("/dashboard"), 1500);
       } catch (backendErr) {
         setSessionId(null);
         const msg = backendErr instanceof Error ? backendErr.message : "Unknown error";
         toast.warning(`File loaded locally — server sync failed: ${msg}. Make sure the backend is running.`);
+        // Do NOT navigate — stay on the upload page so the user can retry.
       }
     } else {
       toast.success("File uploaded successfully!");
+      setUploadSuccess(true);
+      setTimeout(() => router.push("/dashboard"), 1500);
     }
-
-    setUploadSuccess(true);
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 1500);
   };
 
   // Handle date selection confirmation
@@ -414,70 +418,11 @@ export default function UploadPage() {
     if (!token) return;
     setRestoring(session.id);
     try {
-      const detail = await getUpload(token, session.id);
-      const payments = detail.records.map((r) => ({
-        bank: r.bank,
-        paymentDate: r.payment_date ?? "",
-        paymentAmount: r.payment_amount,
-        account: r.account,
-        touchpoint: r.touchpoint ?? "",
-        environment: r.environment,
-        month: r.month,
-      }));
-
-      const bankMap = new Map<string, { totalAmount: number; paymentCount: number; accounts: Set<string> }>();
-      const tpMap = new Map<string, { count: number; totalAmount: number }>();
-      let totalAmount = 0;
-      const allAccounts = new Set<string>();
-
-      for (const p of payments) {
-        totalAmount += p.paymentAmount;
-        allAccounts.add(p.account);
-        if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmount: 0, paymentCount: 0, accounts: new Set() });
-        const b = bankMap.get(p.bank)!;
-        b.totalAmount += p.paymentAmount;
-        b.paymentCount++;
-        b.accounts.add(p.account);
-        if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmount: 0 });
-        const t = tpMap.get(p.touchpoint)!;
-        t.count++;
-        t.totalAmount += p.paymentAmount;
-      }
-
-      const bankAnalytics = Array.from(bankMap.entries())
-        .map(([bank, d]) => ({
-          bank,
-          accountCount: d.accounts.size,
-          totalAmount: d.totalAmount,
-          debtorSum: 0,
-          percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
-          paymentCount: d.paymentCount,
-        }))
-        .sort((a, b) => b.totalAmount - a.totalAmount);
-
-      const touchpointAnalytics = Array.from(tpMap.entries())
-        .map(([touchpoint, d]) => ({
-          touchpoint,
-          count: d.count,
-          totalAmount: d.totalAmount,
-          percentage: totalAmount > 0 ? (d.totalAmount / totalAmount) * 100 : 0,
-        }))
-        .sort((a, b) => b.count - a.count);
-
-      const parsedData: ParsedData = {
-        payments,
-        bankAnalytics,
-        touchpointAnalytics,
-        totalAccounts: allAccounts.size,
-        totalAmount,
-        totalPayments: payments.length,
-        raw: [],
-      };
-
-      setData(parsedData);
-      setFileName(detail.file_name);
-      setSessionId(detail.id);
-      toast.success(`Session restored: ${detail.file_name}`);
+      // Set sessionId + fileName only — the dashboard and transactions pages
+      // each fetch their own data via TanStack Query (no need to load all records here).
+      setSessionId(session.id);
+      setFileName(session.file_name);
+      toast.success(`Session restored: ${session.file_name}`);
       router.push("/dashboard");
     } catch {
       toast.error("Failed to restore session");

@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSidebar } from "@/context/SidebarContext";
 import { DollarSign, Users, FileText, Landmark, Waypoints, Hash, BarChart3, ChevronDown, Check, Globe, Info, TrendingUp, Building2, Radio } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,10 +35,17 @@ function channelType(tp: string): string {
 export default function DashboardPage() {
   const { data, sessionId, setSessionId } = useData();
   const { token, user } = useAuth();
+  const router = useRouter();
+  const { setIsCollapsed } = useSidebar();
   const [activeTab, setActiveTab] = useState<"summary" | "portfolio" | "channels">("summary");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const { data: apiSummary, isLoading: apiLoading, error: apiError } = useDashboard(token, sessionId);
+
+  const handleUploadNav = () => {
+    setIsCollapsed(true);
+    router.push("/upload");
+  };
 
   // Auto-clear stale session on 404 or 500 (e.g. after DB migration / new database)
   useEffect(() => {
@@ -425,8 +434,19 @@ export default function DashboardPage() {
       {activeTab === "summary" && (
         <>
           {noData && (
-            <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
-              No records found for the selected time range. Upload data or try a different filter.
+            <div className="mb-6 p-6 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-center flex flex-col items-center gap-3">
+              <p className="text-sm text-[#5B66E2] dark:text-[#8B96F2]">
+                No records found. Upload a dataset to get started.
+              </p>
+              <button
+                onClick={handleUploadNav}
+                className="inline-flex items-center gap-2 rounded-full bg-[#5B66E2] px-5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0L8 8m4-4l4 4" />
+                </svg>
+                Upload File
+              </button>
             </div>
           )}
 

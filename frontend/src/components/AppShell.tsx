@@ -7,126 +7,63 @@ import { useTheme } from "next-themes";
 import { useAuth } from "@/context/AuthContext";
 import { DataProvider } from "@/context/DataContext";
 import { useData } from "@/context/DataContext";
-import { SidebarProvider } from "@/context/SidebarContext";
+import { SidebarProvider, useSidebar } from "@/context/SidebarContext";
 import { Sidebar } from "@/components/Sidebar";
 import { MainContent } from "@/components/MainContent";
 import { Toaster } from "@/components/ui/sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getUpload, listUploads, type UploadSessionDetail } from "@/lib/api";
-import { ParsedData } from "@/types/data";
+import { listUploads, type UploadSessionOut } from "@/lib/api";
 import { useUploadEvents } from "@/lib/useUploadEvents";
 
-/** Silently restores session data from backend on page refresh */
+/**
+ * Silently restores the active session (sessionId + fileName) from the backend
+ * on page refresh. Does NOT load individual records — the dashboard and
+ * transactions pages each fetch their own data via TanStack Query, so loading
+ * all records here would cause a large unnecessary payload on every refresh.
+ */
 function SessionRestorer() {
   const { token } = useAuth();
-  const { sessionId, setSessionId, data, setData, setFileName } = useData();
-  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { sessionId, setSessionId, fileName, setFileName } = useData();
   const autoPickedRef = useRef(false);
 
-  // Helper: build ParsedData from upload detail records
-  const hydrateFromDetail = (detail: UploadSessionDetail) => {
-    const payments = detail.records.map((r) => ({
-      id: r.id,
-      bank: r.bank,
-      paymentDate: r.payment_date ?? "",
-      paymentAmount: r.payment_amount,
-      account: r.account,
-      touchpoint: r.touchpoint ?? "",
-      environment: r.environment,
-      month: r.month,
-    }));
-
-    // Use integer-cents accumulation to avoid floating-point drift
-    const bankMap = new Map<string, { totalAmountCents: number; paymentCount: number; accounts: Set<string> }>();
-    const tpMap = new Map<string, { count: number; totalAmountCents: number }>();
-    const allAccounts = new Set<string>();
-
-    for (const p of payments) {
-      allAccounts.add(p.account);
-      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { totalAmountCents: 0, paymentCount: 0, accounts: new Set() });
-      const b = bankMap.get(p.bank)!;
-      b.totalAmountCents += Math.round(p.paymentAmount * 100); b.paymentCount++; b.accounts.add(p.account);
-      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, totalAmountCents: 0 });
-      const t = tpMap.get(p.touchpoint)!;
-      t.count++; t.totalAmountCents += Math.round(p.paymentAmount * 100);
-    }
-
-    // Use backend-computed total (SQL SUM on NUMERIC — exact) when available
-    const totalAmount = detail.total_amount ?? 0;
-
-    const bankAnalytics = Array.from(bankMap.entries())
-      .map(([bank, d]) => {
-        const bankAmount = d.totalAmountCents / 100;
-        return { bank, accountCount: d.accounts.size, totalAmount: bankAmount, debtorSum: 0, percentage: totalAmount > 0 ? (bankAmount / totalAmount) * 100 : 0, paymentCount: d.paymentCount };
-      })
-      .sort((a, b) => b.totalAmount - a.totalAmount);
-
-    const touchpointAnalytics = Array.from(tpMap.entries())
-      .map(([tp, d]) => {
-        const tpAmount = d.totalAmountCents / 100;
-        return { touchpoint: tp, count: d.count, totalAmount: tpAmount, percentage: totalAmount > 0 ? (tpAmount / totalAmount) * 100 : 0 };
-      })
-      .sort((a, b) => b.count - a.count);
-
-    return { payments, bankAnalytics, touchpointAnalytics, totalAccounts: allAccounts.size, totalAmount, totalPayments: payments.length, raw: [] } as ParsedData;
-  };
-
-  // Restore existing sessionId
+  // If sessionId is already set, validate it still exists (lightweight list check)
   useEffect(() => {
-    if (!sessionId || !token || data) return;
+    if (!sessionId || !token) return;
+    // If fileName is already set the session is fully hydrated — nothing to do.
+    if (fileName) return;
 
-    let cancelled = false;
-
-    const restore = (attempt: number) => {
-      getUpload(token, sessionId).then((detail) => {
-        if (cancelled) return;
-        setData(hydrateFromDetail(detail));
-        setFileName(detail.file_name);
-      }).catch((err: unknown) => {
-        if (cancelled) return;
-        const is404 = err instanceof Error && err.message.includes("404");
-        // Also treat CORS/network errors as unrecoverable (session likely gone)
-        const isNetworkError = err instanceof TypeError && err.message.includes("fetch");
-        if (is404 || isNetworkError) {
-          setSessionId(null);
-          return;
-        }
-        if (attempt < 3) {
-          retryRef.current = setTimeout(() => restore(attempt + 1), 1500 * (attempt + 1));
-        } else {
-          // Exhausted retries — clear stale session
-          setSessionId(null);
-        }
-      });
-    };
-
-    restore(0);
-
-    return () => {
-      cancelled = true;
-      if (retryRef.current) clearTimeout(retryRef.current);
-    };
-  }, [sessionId, token, data]);  // eslint-disable-line react-hooks/exhaustive-deps
+    // Fetch just the session list (metadata only) to confirm the session exists
+    // and fill in the fileName without loading all records.
+    listUploads(token).then((sessions: UploadSessionOut[]) => {
+      const match = sessions.find((s) => s.id === sessionId);
+      if (!match) {
+        setSessionId(null);
+        return;
+      }
+      setFileName(match.file_name);
+    }).catch(() => {
+      // Network error — clear stale session so the app doesn't hang
+      setSessionId(null);
+    });
+  }, [sessionId, token, fileName]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-pick the most recent upload if no sessionId is set
   useEffect(() => {
-    if (sessionId || !token || data || autoPickedRef.current) return;
+    if (sessionId || !token || autoPickedRef.current) return;
     autoPickedRef.current = true;
 
-    listUploads(token).then((sessions) => {
+    listUploads(token).then((sessions: UploadSessionOut[]) => {
       if (sessions.length === 0) return;
-      // Sort by uploaded_at descending, pick the most recent
-      const sorted = [...sessions].sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
+      const sorted = [...sessions].sort(
+        (a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+      );
       const latest = sorted[0];
-      return getUpload(token, latest.id).then((detail) => {
-        setData(hydrateFromDetail(detail));
-        setFileName(detail.file_name);
-        setSessionId(detail.id);
-      });
+      setSessionId(latest.id);
+      setFileName(latest.file_name);
     }).catch(() => {
       // Silently fail — user can upload manually
     });
-  }, [sessionId, token, data]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId, token]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
 }
@@ -218,6 +155,19 @@ function UploadEventListener() {
   return null;
 }
 
+/** Invisible overlay — covers the page when the sidebar is expanded so any click outside collapses it. */
+function CollapseSidebarOverlay() {
+  const { isCollapsed, setIsCollapsed } = useSidebar();
+  if (isCollapsed) return null;
+  return (
+    <div
+      className="fixed inset-0 z-40"
+      onClick={() => setIsCollapsed(true)}
+      aria-hidden="true"
+    />
+  );
+}
+
 // Authenticated layout
   return (
     <DataProvider>
@@ -236,6 +186,7 @@ function UploadEventListener() {
           />
         </div>
         <div className="relative z-10 min-h-screen">
+          <CollapseSidebarOverlay />
           <Sidebar />
           <MainContent>{children}</MainContent>
         </div>

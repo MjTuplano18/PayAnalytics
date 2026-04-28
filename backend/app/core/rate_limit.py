@@ -16,13 +16,28 @@ from app.core.config import settings
 # Stores timestamps (seconds) of recent requests keyed by client IP
 _attempt_log: dict[str, deque[float]] = defaultdict(deque)
 
+# Maximum number of IPs to track before evicting the oldest entries (memory cap).
+_MAX_TRACKED_IPS = 10_000
+
 
 def _client_ip(request: Request) -> str:
-    """Return the real client IP, respecting X-Forwarded-For if present."""
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """Return the real client IP from the direct TCP connection.
+
+    X-Forwarded-For is intentionally NOT trusted here because an attacker can
+    forge it to bypass the rate limiter.  The direct socket address is always
+    authoritative when running behind a single trusted reverse proxy (Render,
+    Nginx, etc.).  If you need to honour X-Forwarded-For, validate it against
+    a known proxy IP allowlist first.
+    """
     return request.client.host if request.client else "unknown"
+
+
+def _evict_oldest_ip() -> None:
+    """Remove the entry with the oldest most-recent-attempt timestamp to cap RAM."""
+    if not _attempt_log:
+        return
+    oldest_ip = min(_attempt_log, key=lambda ip: _attempt_log[ip][-1] if _attempt_log[ip] else 0)
+    del _attempt_log[oldest_ip]
 
 
 def check_login_rate_limit(request: Request) -> None:
@@ -54,3 +69,7 @@ def check_login_rate_limit(request: Request) -> None:
         )
 
     log.append(now)
+
+    # Cap total number of tracked IPs to prevent unbounded memory growth.
+    if len(_attempt_log) > _MAX_TRACKED_IPS:
+        _evict_oldest_ip()

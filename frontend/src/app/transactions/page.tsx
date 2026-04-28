@@ -29,6 +29,8 @@ export default function TransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True while the debounce timer is running (user typed but search hasn't fired yet)
+  const isSearchPending = searchQuery !== debouncedSearch;
   const [bankFilter, setBankFilter] = useState("all");
   const [tpFilter, setTpFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
@@ -647,8 +649,16 @@ export default function TransactionsPage() {
                 placeholder="Search bank, account, touchpoint..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); }}
-                className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#5B66E2] text-sm"
+                className="w-full pl-10 pr-8 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#5B66E2] text-sm"
               />
+              {(isSearchPending || (apiLoading && !!searchQuery)) && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <svg className="h-4 w-4 animate-spin text-[#5B66E2]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                </span>
+              )}
             </div>
 
             {/* Environment filter — first, drives bank list */}

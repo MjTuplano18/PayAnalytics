@@ -105,6 +105,9 @@ export function useAuditLog(token: string | null, isAdmin: boolean) {
     queryKey: queryKeys.auditLog(token!),
     queryFn: () => getAuditLog(token!),
     enabled: !!token && isAdmin,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -114,5 +117,8 @@ export function useUnifiedAuditLog(token: string | null) {
     queryKey: queryKeys.unifiedAuditLog(token!),
     queryFn: () => getUnifiedAuditLog(token!),
     enabled: !!token,
+    staleTime: 2 * 60 * 1000,   // 2 min — avoid re-fetching on every settings tab open
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }

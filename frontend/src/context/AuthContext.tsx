@@ -9,9 +9,11 @@ import React, {
   useState,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   login as apiLogin,
   getMe,
+  listUploads,
   refreshTokens,
   type UserResponse,
 } from "@/lib/api";
@@ -38,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
 
   // Load user from stored token on mount
   useEffect(() => {
@@ -82,9 +85,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setTokenState(tokens.access_token);
       const u = await getMe(tokens.access_token);
       setUser(u);
+      // Pre-warm the uploads list cache so the dashboard doesn't show a spinner
+      // immediately after login — the data is available before the route change.
+      queryClient.prefetchQuery({
+        queryKey: ["uploads", tokens.access_token],
+        queryFn: () => listUploads(tokens.access_token),
+        staleTime: 5 * 60 * 1000,
+      }).catch(() => { /* non-critical — silently ignore prefetch errors */ });
       router.replace("/dashboard");
     },
-    [router]
+    [router, queryClient]
   );
 
   const logout = useCallback(() => {

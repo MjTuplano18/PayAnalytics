@@ -19,7 +19,7 @@ AUDIT_LOG_MAX_AGE_MINUTES = 24 * 60  # 24 hours
 
 
 async def _audit_log_cleanup_loop() -> None:
-    """Background task that deletes audit log entries older than 20 minutes."""
+    """Background task that deletes audit log entries older than 24 hours."""
     while True:
         await asyncio.sleep(AUDIT_LOG_CLEANUP_INTERVAL)
         try:

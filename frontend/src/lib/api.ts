@@ -215,10 +215,6 @@ export function listUploads(token: string) {
   return apiFetch<UploadSessionOut[]>("/api/v1/uploads", { token });
 }
 
-export function getLatestUpload(token: string) {
-  return apiFetch<UploadSessionOut>("/api/v1/uploads/latest", { token });
-}
-
 export function getUpload(token: string, sessionId: string) {
   return apiFetch<UploadSessionDetail>(`/api/v1/uploads/${sessionId}`, { token });
 }
