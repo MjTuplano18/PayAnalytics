@@ -12,7 +12,7 @@ alembic
 
 # Auth
 python-jose[cryptography]
-bcrypt
+bcrypt>=4.1.0
 
 # File parsing (streaming)
 openpyxl
