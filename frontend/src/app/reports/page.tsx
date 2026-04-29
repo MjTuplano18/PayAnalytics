@@ -107,7 +107,7 @@ export default function ReportsPage() {
         fields: Array.from(selectedFields),
         includeSummary,
         formatCurrency,
-        bankAnalytics: data?.bankAnalytics ?? apiSummary?.banks.map((b) => ({ bank: b.bank, totalAmount: b.total_amount, paymentCount: b.payment_count, accountCount: b.account_count, percentage: b.percentage })),
+        bankAnalytics: data?.bankAnalytics ?? apiSummary?.banks.map((b) => ({ bank: b.bank, totalAmount: b.total_amount, paymentCount: b.payment_count, accountCount: b.account_count, percentage: b.percentage, debtorSum: b.payment_count })),
         touchpointAnalytics: data?.touchpointAnalytics ?? apiSummary?.touchpoints.map((t) => ({ touchpoint: t.touchpoint, count: t.count, totalAmount: t.total_amount, percentage: t.percentage })),
         totalAmount: data?.totalAmount ?? apiSummary?.total_amount,
         dateRangeLabel: "All Data",
