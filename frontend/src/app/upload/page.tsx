@@ -343,9 +343,9 @@ export default function UploadPage() {
         bank: p.bank || "Unknown",
         account: p.account || "",
         touchpoint: p.touchpoint || "NO TOUCHPOINT",
-        payment_date: p.paymentDate || null,
+        payment_date: p.paymentDate || undefined,
         payment_amount: Number.isFinite(p.paymentAmount) ? p.paymentAmount : 0,
-        environment: p.environment || null,
+        environment: p.environment || undefined,
       }));
       setUploadProgress(60);
       const saved = await saveUpload(token, { file_name: file.name, records });
