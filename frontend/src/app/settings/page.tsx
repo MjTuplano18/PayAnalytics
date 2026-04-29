@@ -447,13 +447,15 @@ function UnifiedAuditLogSection({ token }: { token: string | null }) {
 
   return (
     <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <ClipboardList className="h-5 w-5 text-[#8B96F2]" />
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Audit Log</h2>
+      <div className="flex items-start gap-2 mb-4">
+        <ClipboardList className="h-5 w-5 text-[#8B96F2] mt-0.5 shrink-0" />
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Audit Log</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-[8px]">
+            Your recent file activity (uploads, deletions, record changes).
+          </p>
+        </div>
       </div>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        Your recent file activity (uploads, deletions, record changes).
-      </p>
 
       {loading ? (
         <div className="space-y-2">
@@ -464,40 +466,28 @@ function UnifiedAuditLogSection({ token }: { token: string | null }) {
       ) : entries.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">No activity recorded yet.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="pb-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Action</th>
-                <th className="pb-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">File</th>
-                <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Records</th>
-                <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
-                <th className="pb-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">When</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {entries.map((e) => {
-                const actionInfo = ACTION_LABELS[e.action] ?? { label: e.action, color: "bg-gray-500/10 text-gray-400" };
-                return (
-                  <tr key={e.id} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors">
-                    <td className="py-2.5">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${actionInfo.color}`}>
-                        {actionInfo.label}
-                      </span>
-                    </td>
-                    <td className="py-2.5 text-gray-700 dark:text-gray-300 max-w-[180px] truncate" title={e.file_name}>
-                      {e.file_name}
-                    </td>
-                    <td className="py-2.5 text-right text-gray-700 dark:text-gray-300">{fmt(e.record_count)}</td>
-                    <td className="py-2.5 text-right text-green-600 dark:text-green-400 font-medium">
-                      {e.total_amount > 0 ? `₱${fmt(e.total_amount)}` : "—"}
-                    </td>
-                    <td className="py-2.5 text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">{fmtDate(e.created_at)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="overflow-y-auto max-h-[420px] space-y-2 pr-1">
+          {entries.map((e) => {
+            const actionInfo = ACTION_LABELS[e.action] ?? { label: e.action, color: "bg-gray-500/10 text-gray-400" };
+            return (
+              <div
+                key={e.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 shadow-sm hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors"
+              >
+                <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${actionInfo.color}`}>
+                  {actionInfo.label}
+                </span>
+                <span className="flex-1 truncate text-sm text-gray-700 dark:text-gray-300 min-w-0" title={e.file_name}>
+                  {e.file_name}
+                </span>
+                <span className="shrink-0 text-sm text-gray-600 dark:text-gray-400">{fmt(e.record_count)} rec</span>
+                <span className="shrink-0 text-sm font-medium text-green-600 dark:text-green-400">
+                  {e.total_amount > 0 ? `₱${fmt(e.total_amount)}` : "—"}
+                </span>
+                <span className="shrink-0 text-xs text-gray-400 whitespace-nowrap">{fmtDate(e.created_at)}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </Card>

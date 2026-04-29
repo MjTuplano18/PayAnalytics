@@ -38,7 +38,7 @@ class AuthService:
         user = await self._repo.get_by_email(email)
 
         # Use constant-time comparison to prevent timing attacks
-        if not user or not verify_password(password, user.hashed_password):
+        if not user or not await verify_password(password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password.",
@@ -108,7 +108,7 @@ class AuthService:
     async def change_password(
         self, user: User, current_password: str, new_password: str
     ) -> None:
-        if not verify_password(current_password, user.hashed_password):
+        if not await verify_password(current_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Current password is incorrect.",

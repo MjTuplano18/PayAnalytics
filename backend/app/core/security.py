@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -10,9 +11,14 @@ def hash_password(plain_password: str) -> str:
     return bcrypt.hashpw(plain_password.encode(), bcrypt.gensalt()).decode()
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Run bcrypt.checkpw in a thread pool so it does not block the event loop."""
     try:
-        return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+        return await asyncio.to_thread(
+            bcrypt.checkpw,
+            plain_password.encode(),
+            hashed_password.encode(),
+        )
     except Exception:
         return False
 
