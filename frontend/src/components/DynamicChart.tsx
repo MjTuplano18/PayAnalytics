@@ -114,17 +114,6 @@ export function DynamicChart({
     }));
   }, [data, xAxisKey]);
 
-  if (!data || data.length === 0) {
-    return (
-      <div
-        className="flex items-center justify-center rounded-lg bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-        style={{ height }}
-      >
-        No data available
-      </div>
-    );
-  }
-
   const formatTooltipValue = useCallback((value: unknown) => {
     const num = Number(value);
     const formatted = fmtNum(isNaN(num) ? 0 : num);
@@ -137,6 +126,17 @@ export function DynamicChart({
     if (dataKey === "percentage") return `${fmtNum(value)}%`;
     return fmtNum(value);
   }, [dataKey]);
+
+  if (!data || data.length === 0) {
+    return (
+      <div
+        className="flex items-center justify-center rounded-lg bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+        style={{ height }}
+      >
+        No data available
+      </div>
+    );
+  }
 
   const renderChart = () => {
     // Responsive: on narrow containers, skip some x-axis labels to prevent overlap

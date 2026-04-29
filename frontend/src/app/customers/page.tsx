@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Users, DollarSign, FileText, Info } from "lucide-react";
 import { useData } from "@/context/DataContext";
+import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
 import { DynamicChart } from "@/components/DynamicChart";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
+import { getUpload } from "@/lib/api";
+import type { PaymentRecord } from "@/types/data";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -13,16 +16,43 @@ function fmt(n: number): string {
 
 export default function AccountsPage() {
   const { data, sessionId } = useData();
+  const { token } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const rowsPerPage = 25;
 
+  // When data context is null but sessionId is set, fetch records from API
+  const [apiPayments, setApiPayments] = useState<PaymentRecord[] | null>(null);
+  const [apiLoading, setApiLoading] = useState(false);
+
+  useEffect(() => {
+    if (data || !sessionId || !token) return;
+    setApiLoading(true);
+    getUpload(token, sessionId)
+      .then((detail) => {
+        setApiPayments(
+          detail.records.map((r) => ({
+            id: r.id,
+            bank: r.bank,
+            account: r.account,
+            touchpoint: r.touchpoint ?? "",
+            paymentDate: r.payment_date ?? "",
+            paymentAmount: r.payment_amount,
+            environment: r.environment ?? undefined,
+          }))
+        );
+      })
+      .catch(() => setApiPayments([]))
+      .finally(() => setApiLoading(false));
+  }, [data, sessionId, token]);
+
   // Filter payments by date range first
+  const sourcePayments = data?.payments ?? apiPayments ?? [];
   const payments = useMemo(() => {
-    if (!data) return [];
-    return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
-  }, [data, dateRange, customRange]);
+    if (sourcePayments.length === 0) return [];
+    return filterByDateRange(sourcePayments, dateRange, (p) => p.paymentDate, customRange);
+  }, [sourcePayments, dateRange, customRange]);
 
   // Account-level analytics (aggregate by debtor_id/account)
   const accountData = useMemo(() => {
@@ -51,7 +81,16 @@ export default function AccountsPage() {
       .sort((a, b) => b.totalAmount - a.totalAmount);
   }, [payments]);
 
-  if (!data) {
+  if (!data && !apiPayments) {
+    if (apiLoading) {
+      return (
+        <div className="px-4 sm:px-8 py-8 min-h-screen">
+          <div className="p-12 rounded-lg text-center bg-card border border-border">
+            <p className="text-gray-600 dark:text-gray-400">Loading account data…</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="px-4 sm:px-8 py-8 min-h-screen">
         <div className="p-12 rounded-lg text-center bg-card border border-border">
@@ -81,7 +120,7 @@ export default function AccountsPage() {
   const metrics = [
     {
       label: "Total Accounts",
-      value: fmt(data.totalAccounts),
+      value: fmt(data?.totalAccounts ?? accountData.length),
       icon: Users,
       iconBg: "bg-[#4a55d1]",
       info: "Unique accounts in dataset",

@@ -384,14 +384,15 @@ export default function SheetsPage() {
   useEffect(() => {
     let cancelled = false;
     if (!sessionId || !token) return;
-    // DataContext (via SessionRestorer) already has rows with IDs — skip redundant fetch
-    if (data?.payments?.length) return;
+    // DataContext has rows with IDs — skip redundant fetch
+    // But if payments exist without IDs (e.g. just parsed from Excel), still fetch to get IDs
+    const paymentsHaveIds = data?.payments?.length && data.payments.some((p) => p.id);
+    if (paymentsHaveIds) return;
     const load = async () => {
       try {
         const detail = await getUpload(token, sessionId);
         if (cancelled) return;
-        setRows(
-          detail.records.map((r) => ({
+        const newRows = detail.records.map((r) => ({
             id: r.id,
             bank: r.bank,
             paymentDate: r.payment_date ?? "",
@@ -399,8 +400,10 @@ export default function SheetsPage() {
             account: r.account,
             touchpoint: r.touchpoint ?? "",
             environment: r.environment ?? "",
-          }))
-        );
+          }));
+          setRows(newRows);
+          // Also sync back to DataContext so future edits/deletes have IDs
+          if (!cancelled) syncToContext(newRows);
       } catch {
         // ignore
       }
@@ -409,7 +412,7 @@ export default function SheetsPage() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, token, data?.payments?.length]);
+  }, [sessionId, token, data?.payments?.length, syncToContext]);
 
   /* ---- Cell edit handler ---- */
   const onCellValueChanged = useCallback(
@@ -618,8 +621,8 @@ export default function SheetsPage() {
                   .map((r) => r.id)
                   .filter(Boolean) as string[];
                 if (ids.length > 0) {
-                  // Batch deletes in chunks of 2000 to avoid request size limits
-                  const BATCH = 2000;
+                  // Batch deletes in chunks of 1000 (backend max per request)
+                  const BATCH = 1000;
                   let totalDeleted = 0;
                   for (let i = 0; i < ids.length; i += BATCH) {
                     const chunk = ids.slice(i, i + BATCH);
@@ -678,27 +681,15 @@ export default function SheetsPage() {
   const handleExport = useCallback(
     async (format: "excel" | "csv") => {
       try {
-        let exportData;
-        if (sessionId && token) {
-          const detail = await getUpload(token, sessionId);
-          exportData = detail.records.map((r) => ({
-            Bank: r.bank,
-            "Payment Date": r.payment_date ?? "",
-            "Payment Amount": r.payment_amount,
-            Account: r.account,
-            Touchpoint: r.touchpoint ?? "",
-            Environment: r.environment ?? "",
-          }));
-        } else {
-          exportData = rows.map((r) => ({
-            Bank: r.bank,
-            "Payment Date": r.paymentDate,
-            "Payment Amount": r.paymentAmount,
-            Account: r.account,
-            Touchpoint: r.touchpoint ?? "",
-            Environment: r.environment ?? "",
-          }));
-        }
+        // Always export current in-memory rows (reflects live edits/deletes)
+        const exportData = rows.map((r) => ({
+          Bank: r.bank,
+          "Payment Date": r.paymentDate,
+          "Payment Amount": r.paymentAmount,
+          Account: r.account,
+          Touchpoint: r.touchpoint ?? "",
+          Environment: r.environment ?? "",
+        }));
         const name = `sheet_export_${new Date().toISOString().split("T")[0]}`;
         if (format === "excel") {
           await exportToExcel(exportData, name);
@@ -712,7 +703,7 @@ export default function SheetsPage() {
         toast.error("Export failed");
       }
     },
-    [rows, token, sessionId]
+    [rows]
   );
 
   /* ---- Empty state ---- */

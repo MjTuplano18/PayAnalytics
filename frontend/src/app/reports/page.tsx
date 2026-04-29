@@ -24,6 +24,7 @@ import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { exportToExcel, exportToCSV, exportToJSON, EXPORT_FIELDS, type ExportOptions } from "@/utils/exportUtils";
 import { getDashboardSummary, exportAllRecords } from "@/lib/api";
+import { useDashboard } from "@/lib/queries";
 import { toast } from "sonner";
 import type { DataRow } from "@/types/data";
 
@@ -34,6 +35,7 @@ function fmt(n: number): string {
 export default function ReportsPage() {
   const { data, rawData, sessionId, fileName } = useData();
   const { token } = useAuth();
+  const { data: apiSummary } = useDashboard(token, sessionId);
   const [exporting, setExporting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -105,9 +107,9 @@ export default function ReportsPage() {
         fields: Array.from(selectedFields),
         includeSummary,
         formatCurrency,
-        bankAnalytics: data?.bankAnalytics,
-        touchpointAnalytics: data?.touchpointAnalytics,
-        totalAmount: data?.totalAmount,
+        bankAnalytics: data?.bankAnalytics ?? apiSummary?.banks.map((b) => ({ bank: b.bank, totalAmount: b.total_amount, paymentCount: b.payment_count, accountCount: b.account_count, percentage: b.percentage })),
+        touchpointAnalytics: data?.touchpointAnalytics ?? apiSummary?.touchpoints.map((t) => ({ touchpoint: t.touchpoint, count: t.count, totalAmount: t.total_amount, percentage: t.percentage })),
+        totalAmount: data?.totalAmount ?? apiSummary?.total_amount,
         dateRangeLabel: "All Data",
       };
 
@@ -144,9 +146,9 @@ export default function ReportsPage() {
   }
 
   // Summary stats
-  const totalRecords = sessionId ? (data?.totalPayments ?? 0) : reportData.length;
-  const totalAmount = data?.totalAmount ?? 0;
-  const bankCount = data?.bankAnalytics.length ?? 0;
+  const totalRecords = data?.totalPayments ?? apiSummary?.total_payments ?? 0;
+  const totalAmount = data?.totalAmount ?? apiSummary?.total_amount ?? 0;
+  const bankCount = data?.bankAnalytics.length ?? apiSummary?.total_banks ?? 0;
 
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">

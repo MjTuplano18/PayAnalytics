@@ -285,7 +285,7 @@ async def get_dashboard(
     summary = await repo.get_dashboard_summary(session_id=session_id, user_id=current_user.id)
     if not summary:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
-    cache_set(cache_key, summary, ttl=300)
+    cache_set(cache_key, summary, ttl=1800)  # 30 min — data doesn't change unless re-uploaded
     return DashboardSummary(**summary)
 
 

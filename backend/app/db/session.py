@@ -24,7 +24,18 @@ async def get_db() -> AsyncSession:  # type: ignore[misc]
     async with AsyncSessionFactory() as session:
         try:
             yield session
-            await session.commit()
         except Exception:
-            await session.rollback()
+            try:
+                await session.rollback()
+            except Exception:
+                pass  # Connection may already be closed
             raise
+        else:
+            try:
+                await session.commit()
+            except Exception:
+                try:
+                    await session.rollback()
+                except Exception:
+                    pass
+                raise

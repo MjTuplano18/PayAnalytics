@@ -22,7 +22,7 @@ class PaymentRecordOut(PaymentRecordIn):
 
 class UploadSessionCreate(BaseModel):
     file_name: str
-    records: list[PaymentRecordIn] = Field(..., max_length=50_000, description="Payment records to upload (max 50,000 per call)")
+    records: list[PaymentRecordIn]
 
 
 class UploadSessionOut(BaseModel):
@@ -70,6 +70,11 @@ class EnvironmentCampaignMap(BaseModel):
     touchpoints_by_bank: dict[str, list[str]]
 
 
+class MonthlyTrendPoint(BaseModel):
+    month: str
+    amount: float
+
+
 class DashboardSummary(BaseModel):
     total_payments: int
     total_amount: float
@@ -81,6 +86,7 @@ class DashboardSummary(BaseModel):
     environments: list[str] = []
     months: list[str] = []
     environment_map: list[EnvironmentCampaignMap] = []
+    monthly_trend: list[MonthlyTrendPoint] = []
     session_id: str | None = None
 
 
@@ -116,7 +122,7 @@ class UnifiedAuditLogEntry(BaseModel):
 
 
 class BulkDeleteRequest(BaseModel):
-    ids: list[str] = Field(..., max_length=1_000, description="IDs of records to delete (max 1,000 per request)")
+    ids: list[str] = Field(..., max_length=5_000, description="IDs of records to delete (max 5,000 per request)")
 
 
 # Allowed action values that can be submitted via the external audit endpoint.

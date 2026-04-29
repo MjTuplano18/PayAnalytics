@@ -58,7 +58,17 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.detail || `Request failed (${res.status})`);
+    const detail = body?.detail;
+    let message: string;
+    if (Array.isArray(detail)) {
+      message = detail.map((e: { msg?: string; loc?: unknown[] }) => {
+        const loc = Array.isArray(e.loc) ? e.loc.slice(1).join(" → ") : "";
+        return loc ? `${loc}: ${e.msg ?? "invalid"}` : (e.msg ?? "invalid");
+      }).join("; ");
+    } else {
+      message = detail || `Request failed (${res.status})`;
+    }
+    throw new Error(message);
   }
 
   if (res.status === 204) {
@@ -197,6 +207,7 @@ export interface DashboardSummary {
   environments: string[];
   months: string[];
   environment_map: EnvironmentCampaignMap[];
+  monthly_trend: { month: string; amount: number }[];
   session_id: string | null;
 }
 

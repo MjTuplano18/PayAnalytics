@@ -41,6 +41,10 @@ export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const { data: apiSummary, isLoading: apiLoading, error: apiError } = useDashboard(token, sessionId);
+  // isFetching is true during background refreshes; isLoading is true only when
+  // there is no cached data yet. Use showSkeleton to prevent skeleton flash on
+  // re-navigation when data is already in the TanStack Query cache.
+  const showSkeleton = apiLoading && !apiSummary;
 
   const handleUploadNav = () => {
     setIsCollapsed(true);
@@ -99,6 +103,29 @@ export default function DashboardPage() {
 
   // ── Core analytics (used by Summary + Portfolio) ──
   const rawFa = useMemo(() => {
+    // Prefer in-memory data (live, reflects sheets edits/deletes immediately)
+    if (payments.length > 0) {
+      const bankMap = new Map<string, { amounts: number[]; paymentCount: number; accounts: Set<string> }>();
+      const tpMap = new Map<string, { count: number; amounts: number[] }>();
+      const allAccounts = new Set<string>();
+      const sc = (nums: number[]) => nums.reduce((s, n) => s + Math.round(n * 100), 0) / 100;
+      for (const p of payments) {
+        allAccounts.add(p.account);
+        if (!bankMap.has(p.bank)) bankMap.set(p.bank, { amounts: [], paymentCount: 0, accounts: new Set() });
+        const b = bankMap.get(p.bank)!; b.amounts.push(p.paymentAmount); b.paymentCount++; b.accounts.add(p.account);
+        if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, amounts: [] });
+        const t = tpMap.get(p.touchpoint)!; t.count++; t.amounts.push(p.paymentAmount);
+      }
+      const totalAmount = sc(payments.map((p) => p.paymentAmount));
+      const bankAnalytics = Array.from(bankMap.entries())
+        .map(([bank, d]) => { const bt = sc(d.amounts); return { bank, accountCount: d.accounts.size, totalAmount: bt, debtorSum: d.paymentCount, percentage: totalAmount > 0 ? (bt / totalAmount) * 100 : 0, paymentCount: d.paymentCount }; })
+        .sort((a, b) => b.totalAmount - a.totalAmount);
+      const touchpointAnalytics = Array.from(tpMap.entries())
+        .map(([touchpoint, d]) => { const tt = sc(d.amounts); return { touchpoint, count: d.count, totalAmount: tt, percentage: totalAmount > 0 ? (tt / totalAmount) * 100 : 0 }; })
+        .sort((a, b) => b.count - a.count);
+      return { bankAnalytics, touchpointAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: payments.length };
+    }
+    // Fallback to API summary when no in-memory data (e.g. after page refresh)
     if (apiSummary && !isFiltered) {
       return {
         totalAmount: apiSummary.total_amount,
@@ -113,61 +140,52 @@ export default function DashboardPage() {
         })),
       };
     }
-    if (payments.length === 0) return null;
-    const bankMap = new Map<string, { amounts: number[]; paymentCount: number; accounts: Set<string> }>();
-    const tpMap = new Map<string, { count: number; amounts: number[] }>();
-    const allAccounts = new Set<string>();
-    const sc = (nums: number[]) => nums.reduce((s, n) => s + Math.round(n * 100), 0) / 100;
-    for (const p of payments) {
-      allAccounts.add(p.account);
-      if (!bankMap.has(p.bank)) bankMap.set(p.bank, { amounts: [], paymentCount: 0, accounts: new Set() });
-      const b = bankMap.get(p.bank)!; b.amounts.push(p.paymentAmount); b.paymentCount++; b.accounts.add(p.account);
-      if (!tpMap.has(p.touchpoint)) tpMap.set(p.touchpoint, { count: 0, amounts: [] });
-      const t = tpMap.get(p.touchpoint)!; t.count++; t.amounts.push(p.paymentAmount);
-    }
-    const totalAmount = sc(payments.map((p) => p.paymentAmount));
-    const bankAnalytics = Array.from(bankMap.entries())
-      .map(([bank, d]) => { const bt = sc(d.amounts); return { bank, accountCount: d.accounts.size, totalAmount: bt, debtorSum: d.paymentCount, percentage: totalAmount > 0 ? (bt / totalAmount) * 100 : 0, paymentCount: d.paymentCount }; })
-      .sort((a, b) => b.totalAmount - a.totalAmount);
-    const touchpointAnalytics = Array.from(tpMap.entries())
-      .map(([touchpoint, d]) => { const tt = sc(d.amounts); return { touchpoint, count: d.count, totalAmount: tt, percentage: totalAmount > 0 ? (tt / totalAmount) * 100 : 0 }; })
-      .sort((a, b) => b.count - a.count);
-    return { bankAnalytics, touchpointAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: payments.length };
+    return null;
   }, [apiSummary, payments, isFiltered]);
 
   const fa = rawFa ?? { totalAmount: 0, totalAccounts: 0, totalPayments: 0, bankAnalytics: [], touchpointAnalytics: [] };
-  const noData = !rawFa && !apiLoading;
+  const noData = !rawFa && !showSkeleton;
 
   // ── Monthly trend ──
   const monthlyTrend = useMemo(() => {
-    if (payments.length === 0) return [];
-    const map = new Map<string, number>();
-    for (const p of payments) {
-      const raw = p.paymentDate.slice(0, 7) || "";
-      if (!raw || raw === "Unknown") continue;
-      map.set(raw, (map.get(raw) || 0) + p.paymentAmount);
+    // When in-memory data is available use it (supports date filtering)
+    if (payments.length > 0) {
+      const map = new Map<string, number>();
+      for (const p of payments) {
+        const raw = p.paymentDate.slice(0, 7) || "";
+        if (!raw || raw === "Unknown") continue;
+        map.set(raw, (map.get(raw) || 0) + p.paymentAmount);
+      }
+      if (map.size === 0) return [];
+
+      const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+      const peakMonth = Array.from(map.entries()).sort(([, a], [, b]) => b - a)[0][0];
+      const [py, pm] = peakMonth.split("-").map(Number);
+      const peakNum = py * 12 + pm;
+
+      return sorted
+        .filter(([raw]) => {
+          const [y, m] = raw.split("-").map(Number);
+          return Math.abs(y * 12 + m - peakNum) <= 6;
+        })
+        .map(([raw, amount]) => {
+          const parts = raw.split("-");
+          const label = new Date(Number(parts[0]), Number(parts[1]) - 1, 1)
+            .toLocaleDateString("en-US", { month: "short", year: "numeric" });
+          return { month: label, rawMonth: raw, amount };
+        });
     }
-    if (map.size === 0) return [];
-
-    // Sort all months and remove outliers:
-    // keep only months within 3 months of the month that has the most records
-    const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-    const peakMonth = Array.from(map.entries()).sort(([, a], [, b]) => b - a)[0][0];
-    const [py, pm] = peakMonth.split("-").map(Number);
-    const peakNum = py * 12 + pm;
-
-    return sorted
-      .filter(([raw]) => {
-        const [y, m] = raw.split("-").map(Number);
-        return Math.abs(y * 12 + m - peakNum) <= 6;
-      })
-      .map(([raw, amount]) => {
-        const parts = raw.split("-");
+    // Fallback to API summary monthly trend (no in-memory data, e.g. after page refresh)
+    if (apiSummary?.monthly_trend?.length) {
+      return apiSummary.monthly_trend.map(({ month, amount }) => {
+        const parts = month.split("-");
         const label = new Date(Number(parts[0]), Number(parts[1]) - 1, 1)
           .toLocaleDateString("en-US", { month: "short", year: "numeric" });
-        return { month: label, rawMonth: raw, amount };
+        return { month: label, rawMonth: month, amount };
       });
-  }, [payments]);
+    }
+    return [];
+  }, [payments, apiSummary]);
 
   // ── Portfolio tab data ──
   const allEnvironments = useMemo(() => {
@@ -214,6 +232,18 @@ export default function DashboardPage() {
 
   const portfolioAnalytics = useMemo(() => {
     const src = portfolioFiltered;
+    // Fallback to apiSummary when no in-memory data and no filters active
+    if (src.length === 0 && apiSummary && selectedEnvironments.size === 0 && selectedBanks.size === 0) {
+      const bankAnalytics = apiSummary.banks.map((b) => ({
+        bank: b.bank,
+        accountCount: b.account_count,
+        totalAmount: b.total_amount,
+        debtorSum: b.payment_count,
+        percentage: b.percentage,
+        paymentCount: b.payment_count,
+      }));
+      return { bankAnalytics, totalAmount: apiSummary.total_amount, totalAccounts: apiSummary.total_accounts, totalPayments: apiSummary.total_payments };
+    }
     if (src.length === 0) return { bankAnalytics: [] as typeof fa.bankAnalytics, totalAmount: 0, totalAccounts: 0, totalPayments: 0 };
     const bankMap = new Map<string, { amounts: number[]; paymentCount: number; accounts: Set<string> }>();
     const allAccounts = new Set<string>();
@@ -227,7 +257,7 @@ export default function DashboardPage() {
       .map(([bank, d]) => { const bt = d.amounts.reduce((s, n) => s + Math.round(n * 100), 0) / 100; return { bank, accountCount: d.accounts.size, totalAmount: bt, debtorSum: d.paymentCount, percentage: totalAmount > 0 ? (bt / totalAmount) * 100 : 0, paymentCount: d.paymentCount }; })
       .sort((a, b) => b.totalAmount - a.totalAmount);
     return { bankAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: src.length };
-  }, [portfolioFiltered]);
+  }, [portfolioFiltered, apiSummary, selectedEnvironments, selectedBanks, fa]);
 
   // ── Channels tab data ──
   const allTouchpoints = useMemo(() => {
@@ -240,6 +270,15 @@ export default function DashboardPage() {
     const src = selectedTouchpoints.size > 0
       ? payments.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
       : payments;
+    // Fallback to apiSummary when no in-memory data and no filters active
+    if (src.length === 0 && apiSummary && selectedTouchpoints.size === 0) {
+      return apiSummary.touchpoints.map((t) => ({
+        touchpoint: t.touchpoint,
+        count: t.count,
+        totalAmount: t.total_amount,
+        percentage: t.percentage,
+      }));
+    }
     if (src.length === 0) return [];
     const tpMap = new Map<string, { count: number; amounts: number[] }>();
     for (const p of src) {
@@ -251,13 +290,25 @@ export default function DashboardPage() {
     return Array.from(tpMap.entries())
       .map(([touchpoint, d]) => { const tt = d.amounts.reduce((s, n) => s + Math.round(n * 100), 0) / 100; return { touchpoint, count: d.count, totalAmount: tt, percentage: totalAmount > 0 ? (tt / totalAmount) * 100 : 0 }; })
       .sort((a, b) => b.count - a.count);
-  }, [payments, selectedTouchpoints]);
+  }, [payments, selectedTouchpoints, apiSummary]);
 
   // Channel type grouping (IB / OB / Direct / Ghost / Automated / No Touchpoint)
   const channelGroupData = useMemo(() => {
     const src = selectedTouchpoints.size > 0
       ? payments.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
       : payments;
+    // Fallback: derive groups from channelAnalytics (which already has apiSummary fallback)
+    if (src.length === 0 && channelAnalytics.length > 0) {
+      const groupMap = new Map<string, { count: number; amount: number }>();
+      for (const t of channelAnalytics) {
+        const g = channelType(t.touchpoint || "");
+        if (!groupMap.has(g)) groupMap.set(g, { count: 0, amount: 0 });
+        const e = groupMap.get(g)!; e.count += t.count; e.amount += t.totalAmount;
+      }
+      return Array.from(groupMap.entries())
+        .map(([group, d]) => ({ group, count: d.count, amount: Math.round(d.amount * 100) / 100 }))
+        .sort((a, b) => b.count - a.count);
+    }
     const groupMap = new Map<string, { count: number; amount: number }>();
     for (const p of src) {
       const g = channelType(p.touchpoint || "");
@@ -267,7 +318,7 @@ export default function DashboardPage() {
     return Array.from(groupMap.entries())
       .map(([group, d]) => ({ group, count: d.count, amount: Math.round(d.amount * 100) / 100 }))
       .sort((a, b) => b.count - a.count);
-  }, [payments, selectedTouchpoints]);
+  }, [payments, selectedTouchpoints, channelAnalytics]);
 
   const tpTotal = channelAnalytics.reduce((s, t) => s + t.count, 0);
   const tpTotalAmount = channelAnalytics.reduce((s, t) => s + Math.round(t.totalAmount * 100), 0) / 100;
@@ -278,7 +329,7 @@ export default function DashboardPage() {
   const TABS = [
     { id: "summary" as const, label: "Overview", icon: TrendingUp },
     { id: "portfolio" as const, label: "Banks", icon: Building2 },
-    { id: "channels" as const, label: "Touchpoints", icon: Radio },
+    { id: "channels" as const, label: "Environments", icon: Radio },
   ];
 
   const paginationBtnClass = "px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors";
@@ -452,7 +503,7 @@ export default function DashboardPage() {
 
           {/* KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {apiLoading ? (
+            {showSkeleton ? (
               Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
             ) : (
               <>
@@ -472,12 +523,12 @@ export default function DashboardPage() {
                 <p className="text-xs text-gray-400 dark:text-gray-500">Total payment amount collected per month — shows growth or decline over time</p>
               </div>
             </div>
-            {apiLoading ? <Skeleton className="h-[220px] w-full rounded-xl" /> : monthlyTrend.length === 0 ? (
+            {showSkeleton ? <Skeleton className="h-[220px] w-full rounded-xl" /> : monthlyTrend.length === 0 ? (
               <div className="h-[220px] flex items-center justify-center text-sm text-gray-400">No date data available</div>
             ) : (
               <DynamicChart data={monthlyTrend} type="line" dataKey="amount" xAxisKey="month" height={220} />
             )}
-            {!apiLoading && monthlyTrend.length >= 2 && (() => {
+            {!showSkeleton && monthlyTrend.length >= 2 && (() => {
               const first = monthlyTrend[0];
               const last = monthlyTrend[monthlyTrend.length - 1];
               // Only show % change if first month has substantial data (> 1% of last month)
@@ -510,7 +561,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Top 10 banks ranked by total amount collected</p>
                 </div>
               </div>
-              {apiLoading ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (() => {
+              {showSkeleton ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (() => {
                 const d = fa.bankAnalytics.slice(0, 10);
                 return <DynamicChart data={[...d].sort((a, b) => a.totalAmount - b.totalAmount).map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="barh" dataKey="amount" xAxisKey="bank" height={320} />;
               })()}
@@ -522,7 +573,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Distribution of transactions across the top 8 touchpoints by count</p>
                 </div>
               </div>
-              {apiLoading ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (
+              {showSkeleton ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (
                 <DynamicChart data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({ touchpoint: t.touchpoint, count: t.count }))} type="donut" dataKey="count" xAxisKey="touchpoint" height={320} valueType="count" />
               )}
             </Card>
@@ -537,7 +588,7 @@ export default function DashboardPage() {
         <>
           {/* KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {apiLoading ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />) : (
+            {showSkeleton ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />) : (
               <>
                 <MetricCard label="Total Payment Amount" value={`₱${fmt(portfolioAnalytics.totalAmount)}`} icon={DollarSign} iconBg="bg-[#5B66E2]" />
                 <MetricCard label="Unique Accounts" value={fmt(portfolioAnalytics.totalAccounts)} icon={Users} iconBg="bg-[#4a55d1]" />
@@ -547,7 +598,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {portfolioFiltered.length === 0 && !apiLoading && (
+          {portfolioFiltered.length === 0 && !showSkeleton && (
             <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
               No records found for the selected filters.
             </div>
@@ -565,7 +616,7 @@ export default function DashboardPage() {
                   <option value="10">Top 10</option><option value="20">Top 20</option><option value="50">Top 50</option><option value="all">All</option>
                 </select>
               </div>
-              {apiLoading ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (() => {
+              {showSkeleton ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (() => {
                 const d = portfolioBankTopN === "all" ? portfolioAnalytics.bankAnalytics : portfolioAnalytics.bankAnalytics.slice(0, portfolioBankTopN);
                 const minWidth = Math.max(500, d.length * 28);
                 return <div className="overflow-x-auto rounded-xl"><div style={{ minWidth }}><DynamicChart data={d.map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="bar" dataKey="amount" xAxisKey="bank" height={320} /></div></div>;
@@ -578,7 +629,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Which banks collected the most — by total payment amount</p>
                 </div>
               </div>
-              {apiLoading ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (
+              {showSkeleton ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (
                 <DynamicChart data={portfolioAnalytics.bankAnalytics.slice(0, 8).map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="pie" dataKey="amount" xAxisKey="bank" height={320} />
               )}
             </Card>
@@ -593,7 +644,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Number of payment transactions per bank — high count means high volume, not necessarily high value</p>
                 </div>
               </div>
-              {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
+              {showSkeleton ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
                 <DynamicChart data={[...portfolioAnalytics.bankAnalytics].sort((a, b) => b.paymentCount - a.paymentCount).slice(0, 10).sort((a, b) => a.paymentCount - b.paymentCount).map((a) => ({ bank: a.bank, transactions: a.paymentCount }))} type="barh" dataKey="transactions" xAxisKey="bank" height={280} valueType="count" />
               )}
             </Card>
@@ -604,7 +655,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Each bank's percentage of total collected amount — all banks ranked</p>
                 </div>
               </div>
-              {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (() => {
+              {showSkeleton ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (() => {
                 const d = portfolioAnalytics.bankAnalytics.slice(0, portfolioBankTopN === "all" ? undefined : portfolioBankTopN);
                 const minWidth = Math.max(500, d.length * 28);
                 return <div className="overflow-x-auto rounded-xl"><div style={{ minWidth }}><DynamicChart data={d.map((a) => ({ bank: a.bank, percentage: Math.round(a.percentage * 10) / 10 }))} type="bar" dataKey="percentage" xAxisKey="bank" height={280} /></div></div>;
@@ -613,7 +664,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Bank Analytics Table */}
-          {apiLoading ? (
+          {showSkeleton ? (
             <div className="rounded-lg border bg-card border-border mb-8 p-6">
               <Skeleton className="h-6 w-40 mb-4" />
               {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2 rounded-md" />)}
@@ -669,7 +720,7 @@ export default function DashboardPage() {
         <>
           {/* KPI Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {apiLoading ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />) : (
+            {showSkeleton ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />) : (
               <>
                 <MetricCard label="Total Transactions" value={fmt(tpTotal)} icon={Hash} iconBg="bg-[#5B66E2]" />
                 <MetricCard label="Total Amount" value={`₱${fmt(tpTotalAmount)}`} icon={DollarSign} iconBg="bg-[#4a55d1]" />
@@ -679,7 +730,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {channelAnalytics.length === 0 && !apiLoading && (
+          {channelAnalytics.length === 0 && !showSkeleton && (
             <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
               No records found for the selected filters.
             </div>
@@ -694,7 +745,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Inbound (IB) vs Outbound (OB) vs With Touchpoint vs Ghost Payment vs No Touchpoint — transaction count</p>
                 </div>
               </div>
-              {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
+              {showSkeleton ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
                 <DynamicChart data={channelGroupData.map((g) => ({ group: g.group, count: g.count }))} type="bar" dataKey="count" xAxisKey="group" height={280} valueType="count" />
               )}
             </Card>
@@ -705,7 +756,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Total payment amount collected per touchpoint type — shows which strategy drives the most value</p>
                 </div>
               </div>
-              {apiLoading ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
+              {showSkeleton ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
                 <DynamicChart data={channelGroupData.map((g) => ({ group: g.group, amount: g.amount }))} type="pie" dataKey="amount" xAxisKey="group" height={280} />
               )}
             </Card>
@@ -720,7 +771,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Total payment amount collected per individual touchpoint — ranked highest to lowest</p>
                 </div>
               </div>
-              {apiLoading ? <Skeleton className="h-[300px] w-full rounded-xl" /> : (
+              {showSkeleton ? <Skeleton className="h-[300px] w-full rounded-xl" /> : (
                 <DynamicChart data={[...channelAnalytics].sort((a, b) => a.totalAmount - b.totalAmount).slice(0, 12).map((t) => ({ touchpoint: t.touchpoint, amount: t.totalAmount }))} type="barh" dataKey="amount" xAxisKey="touchpoint" height={300} />
               )}
             </Card>
@@ -731,7 +782,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Top 8 individual touchpoints by total amount — shows which specific touchpoints generate the most collections</p>
                 </div>
               </div>
-              {apiLoading ? <Skeleton className="h-[300px] w-full rounded-xl" /> : (
+              {showSkeleton ? <Skeleton className="h-[300px] w-full rounded-xl" /> : (
                 <DynamicChart data={channelAnalytics.slice(0, 8).map((t) => ({ touchpoint: t.touchpoint, amount: t.totalAmount }))} type="donut" dataKey="amount" xAxisKey="touchpoint" height={300} />
               )}
             </Card>

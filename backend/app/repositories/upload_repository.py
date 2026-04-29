@@ -441,19 +441,7 @@ class UploadRepository:
         if not upload:
             return None
 
-        # Total payments and amount
-        totals = await self.session.execute(
-            select(
-                func.count(PaymentRecord.id),
-                func.sum(PaymentRecord.payment_amount),
-                func.count(func.distinct(PaymentRecord.account)),
-                func.count(func.distinct(PaymentRecord.bank)),
-            ).where(PaymentRecord.session_id == session_id)
-        )
-        total_payments, total_amount, total_accounts, total_banks = totals.one()
-        total_amount = total_amount or 0.0
-
-        # Bank breakdown
+        # Bank breakdown (also used to derive totals — one query instead of two)
         bank_rows = await self.session.execute(
             select(
                 PaymentRecord.bank,
@@ -465,15 +453,29 @@ class UploadRepository:
             .group_by(PaymentRecord.bank)
             .order_by(func.sum(PaymentRecord.payment_amount).desc())
         )
+        bank_rows_list = bank_rows.all()
+        total_amount = float(sum(r.total_amount or 0.0 for r in bank_rows_list))
+        total_payments_from_banks = sum(r.payment_count for r in bank_rows_list)
+
+        # Get accurate totals (accounts deduplicated across banks, total payments)
+        totals = await self.session.execute(
+            select(
+                func.count(PaymentRecord.id),
+                func.count(func.distinct(PaymentRecord.account)),
+            ).where(PaymentRecord.session_id == session_id)
+        )
+        total_payments, total_accounts = totals.one()
+        total_payments = total_payments or total_payments_from_banks
+
         banks = [
             {
                 "bank": row.bank,
                 "payment_count": row.payment_count,
                 "account_count": row.account_count,
-                "total_amount": row.total_amount or 0.0,
-                "percentage": round((row.total_amount or 0.0) / total_amount * 100, 2) if total_amount else 0,
+                "total_amount": float(row.total_amount or 0.0),
+                "percentage": round(float(row.total_amount or 0.0) / total_amount * 100, 2) if total_amount else 0,
             }
-            for row in bank_rows.all()
+            for row in bank_rows_list
         ]
 
         # Touchpoint breakdown
@@ -497,44 +499,35 @@ class UploadRepository:
             for row in tp_rows.all()
         ]
 
-        # Distinct dates
-        date_rows = await self.session.execute(
-            select(func.distinct(PaymentRecord.payment_date))
-            .where(PaymentRecord.session_id == session_id)
-            .where(PaymentRecord.payment_date.isnot(None))
-            .order_by(PaymentRecord.payment_date)
-        )
-        dates = [row[0] for row in date_rows.all()]
-
-        # Distinct environments
-        env_rows = await self.session.execute(
-            select(func.distinct(PaymentRecord.environment))
-            .where(PaymentRecord.session_id == session_id)
-            .where(PaymentRecord.environment.isnot(None))
-            .order_by(PaymentRecord.environment)
-        )
-        environments = [row[0] for row in env_rows.all()]
-
-        # Environment → bank → touchpoint mapping (for cascading filters)
-        env_bank_tp_rows = await self.session.execute(
+        # Combined query: env, bank, touchpoint, payment_date in one pass
+        # (replaces separate dates, environments, and env_bank_tp queries)
+        combo_rows = await self.session.execute(
             select(
                 PaymentRecord.environment,
                 PaymentRecord.bank,
                 PaymentRecord.touchpoint,
+                PaymentRecord.payment_date,
             )
             .where(PaymentRecord.session_id == session_id)
-            .where(PaymentRecord.environment.isnot(None))
             .distinct()
-            .order_by(PaymentRecord.environment, PaymentRecord.bank, PaymentRecord.touchpoint)
+            .order_by(PaymentRecord.environment, PaymentRecord.bank, PaymentRecord.touchpoint, PaymentRecord.payment_date)
         )
         env_map_build: dict[str, dict[str, set[str]]] = {}
-        for env, bank, touchpoint in env_bank_tp_rows.all():
-            if env not in env_map_build:
-                env_map_build[env] = {}
-            if bank not in env_map_build[env]:
-                env_map_build[env][bank] = set()
-            if touchpoint:
-                env_map_build[env][bank].add(touchpoint)
+        dates_set: set[str] = set()
+        environments_set: set[str] = set()
+        for env, bank, touchpoint, payment_date in combo_rows.all():
+            if env is not None:
+                environments_set.add(env)
+                if env not in env_map_build:
+                    env_map_build[env] = {}
+                if bank not in env_map_build[env]:
+                    env_map_build[env][bank] = set()
+                if touchpoint:
+                    env_map_build[env][bank].add(touchpoint)
+            if payment_date:
+                dates_set.add(payment_date)
+        dates = sorted(dates_set)
+        environments = sorted(environments_set)
 
         environment_map = [
             {
@@ -548,15 +541,35 @@ class UploadRepository:
             for env, banks_dict in sorted(env_map_build.items())
         ]
 
+        # Monthly trend: sum of payment_amount grouped by year-month (first 7 chars of payment_date)
+        from sqlalchemy import literal_column
+        month_expr = literal_column("LEFT(payment_records.payment_date, 7)")
+        monthly_rows = await self.session.execute(
+            select(
+                month_expr.label("month"),
+                func.sum(PaymentRecord.payment_amount).label("amount"),
+            )
+            .where(PaymentRecord.session_id == session_id)
+            .where(PaymentRecord.payment_date.isnot(None))
+            .where(func.length(PaymentRecord.payment_date) >= 7)
+            .group_by(month_expr)
+            .order_by(month_expr)
+        )
+        monthly_trend = [
+            {"month": row.month, "amount": float(row.amount or 0)}
+            for row in monthly_rows.all()
+        ]
+
         return {
             "total_payments": total_payments or 0,
             "total_amount": total_amount,
             "total_accounts": total_accounts or 0,
-            "total_banks": total_banks or 0,
+            "total_banks": len(banks),
             "banks": banks,
             "touchpoints": touchpoints,
             "dates": dates,
             "environments": environments,
             "environment_map": environment_map,
+            "monthly_trend": monthly_trend,
             "session_id": session_id,
         }

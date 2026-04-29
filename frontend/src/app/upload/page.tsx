@@ -340,12 +340,12 @@ export default function UploadPage() {
       setUploadProgress(50);
       setUploadPhase("saving");
       const records = parsedData.payments.map((p) => ({
-        bank: p.bank,
-        account: p.account,
-        touchpoint: p.touchpoint,
-        payment_date: p.paymentDate,
-        payment_amount: p.paymentAmount,
-        environment: p.environment,
+        bank: p.bank || "Unknown",
+        account: p.account || "",
+        touchpoint: p.touchpoint || "NO TOUCHPOINT",
+        payment_date: p.paymentDate || null,
+        payment_amount: Number.isFinite(p.paymentAmount) ? p.paymentAmount : 0,
+        environment: p.environment || null,
       }));
       setUploadProgress(60);
       const saved = await saveUpload(token, { file_name: file.name, records });
@@ -353,6 +353,9 @@ export default function UploadPage() {
       setUploadPhase("done");
       setSessionId(saved.id);
       setFileName(file.name);
+      // Populate in-memory data so all pages (Customers, filtered Dashboard, etc.) work
+      setData(parsedData);
+      setRawData(parsedData.raw);
       await queryClient.invalidateQueries({ queryKey: ["uploads"] });
       toast.success(`Uploaded! ${saved.total_records.toLocaleString()} records saved.`);
       setUploadSuccess(true);
