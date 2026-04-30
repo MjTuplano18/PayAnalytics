@@ -8,6 +8,29 @@ interface FetchOptions extends RequestInit {
   _isRetry?: boolean;
 }
 
+// Single in-flight refresh promise — prevents multiple parallel 401s from each
+// triggering their own token refresh and causing ERR_INSUFFICIENT_RESOURCES.
+let _refreshPromise: Promise<string | null> | null = null;
+
+async function _doRefresh(): Promise<string | null> {
+  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  if (!refreshToken) return null;
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) return null;
+    const tokens = await res.json();
+    localStorage.setItem(TOKEN_KEY, tokens.access_token);
+    localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
+    return tokens.access_token as string;
+  } catch {
+    return null;
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   options: FetchOptions = {}
@@ -28,28 +51,16 @@ export async function apiFetch<T>(
     throw new Error(`Network error: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // Auto-refresh on 401 — try once with a fresh token
+  // Auto-refresh on 401 — only one refresh runs at a time; others wait for it
   if (res.status === 401 && !_isRetry && typeof window !== "undefined") {
-    const refreshToken = localStorage.getItem(REFRESH_KEY);
-    if (refreshToken) {
-      try {
-        const refreshRes = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        });
-        if (refreshRes.ok) {
-          const tokens = await refreshRes.json();
-          localStorage.setItem(TOKEN_KEY, tokens.access_token);
-          localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
-          // Retry original request with new token
-          return apiFetch<T>(path, { ...options, token: tokens.access_token, _isRetry: true });
-        }
-      } catch {
-        // refresh failed — fall through to throw
-      }
+    if (!_refreshPromise) {
+      _refreshPromise = _doRefresh().finally(() => { _refreshPromise = null; });
     }
-    // Refresh failed or no refresh token — redirect to login
+    const newToken = await _refreshPromise;
+    if (newToken) {
+      return apiFetch<T>(path, { ...options, token: newToken, _isRetry: true });
+    }
+    // Refresh failed — clear session and redirect
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
     window.location.href = "/login";
