@@ -20,9 +20,19 @@ class PaymentRecordOut(PaymentRecordIn):
     model_config = {"from_attributes": True}
 
 
+MAX_RECORDS_PER_UPLOAD = 100_000  # Guard against OOM on 512 MB Render free tier
+
+
 class UploadSessionCreate(BaseModel):
     file_name: str
     records: list[PaymentRecordIn]
+
+    @field_validator("records")
+    @classmethod
+    def validate_records_count(cls, v: list[PaymentRecordIn]) -> list[PaymentRecordIn]:
+        if len(v) > MAX_RECORDS_PER_UPLOAD:
+            raise ValueError(f"Upload contains {len(v):,} records, exceeding the limit of {MAX_RECORDS_PER_UPLOAD:,}.")
+        return v
 
 
 class UploadSessionOut(BaseModel):
@@ -123,6 +133,13 @@ class UnifiedAuditLogEntry(BaseModel):
 
 class BulkDeleteRequest(BaseModel):
     ids: list[str] = Field(..., max_length=5_000, description="IDs of records to delete (max 5,000 per request)")
+
+    @field_validator("ids")
+    @classmethod
+    def validate_ids_length(cls, v: list[str]) -> list[str]:
+        if len(v) > 5_000:
+            raise ValueError("Cannot delete more than 5,000 records per request.")
+        return v
 
 
 # Allowed action values that can be submitted via the external audit endpoint.
