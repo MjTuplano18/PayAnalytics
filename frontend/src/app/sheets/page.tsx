@@ -324,6 +324,35 @@ export default function SheetsPage() {
         filter: "agTextColumnFilter",
         minWidth: 140,
         flex: 1,
+        valueSetter: (params) => {
+          const raw = String(params.newValue ?? "").trim();
+          if (!raw) {
+            params.data.paymentDate = "";
+            return true;
+          }
+          // Accept DD/MM/YYYY only
+          const match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          if (!match) {
+            toast.error("Invalid date format. Use DD/MM/YYYY (e.g. 31/01/2026).");
+            return false;
+          }
+          const [, dd, mm, yyyy] = match;
+          const day = parseInt(dd, 10);
+          const month = parseInt(mm, 10);
+          const year = parseInt(yyyy, 10);
+          const d = new Date(year, month - 1, day);
+          if (
+            d.getFullYear() !== year ||
+            d.getMonth() + 1 !== month ||
+            d.getDate() !== day
+          ) {
+            toast.error("Invalid date. Please enter a real date in DD/MM/YYYY format.");
+            return false;
+          }
+          // Store as YYYY-MM-DD internally (ISO format used elsewhere in the app)
+          params.data.paymentDate = `${yyyy}-${mm}-${dd}`;
+          return true;
+        },
       },
       {
         headerName: "Payment Amount",

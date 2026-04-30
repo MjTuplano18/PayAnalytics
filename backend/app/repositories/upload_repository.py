@@ -330,7 +330,11 @@ class UploadRepository:
         return count
 
     async def _update_session_totals(self, session_id: str) -> None:
-        """Recalculate and update session totals after record deletions."""
+        """Recalculate and update session totals after record deletions.
+
+        If all records are deleted the session is also deleted to satisfy the
+        DB-level CHECK constraint (total_records > 0) added in migration 004.
+        """
         agg = await self.session.execute(
             select(
                 func.count(PaymentRecord.id),
@@ -340,8 +344,12 @@ class UploadRepository:
         total_records, total_amount = agg.one()
         upload = await self.session.get(UploadSession, session_id)
         if upload:
-            upload.total_records = total_records
-            upload.total_amount = float(total_amount)
+            if total_records == 0:
+                # Deleting the session also cascade-deletes any remaining records.
+                await self.session.delete(upload)
+            else:
+                upload.total_records = total_records
+                upload.total_amount = float(total_amount)
 
     async def get_transactions(
         self,
