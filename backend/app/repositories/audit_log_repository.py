@@ -49,7 +49,7 @@ class AuditLogRepository:
             )
             total = int(total_result.scalar_one() or 0)
             # keep only the most recent N entries per user
-            keep = 50
+            keep = 20
             if total > keep:
                 # delete the oldest (total - keep) entries for this user
                 n_to_delete = total - keep

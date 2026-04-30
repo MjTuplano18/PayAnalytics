@@ -157,7 +157,7 @@ async def get_unified_audit_log(
 ) -> list[UnifiedAuditLogEntry]:
     """List file actions for the current user (up to 50 entries)."""
     audit_repo = AuditLogRepository(db)
-    logs = await audit_repo.list_user_logs(current_user.id, limit=50)
+    logs = await audit_repo.list_user_logs(current_user.id, limit=20)
 
     # Determine which entries can be undone: 3 most recent non-undone entries that have snapshot_data
     undoable_ids: set[str] = set()
