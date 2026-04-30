@@ -12,6 +12,7 @@ import {
   getDashboardSummary,
   getTransactions,
   listUploads,
+  getUpload,
   getAuditLog,
   getUnifiedAuditLog,
 } from "@/lib/api";
@@ -19,6 +20,7 @@ import {
 // ── Query key factory ────────────────────────────────────────────────────────
 export const queryKeys = {
   uploads: (token: string) => ["uploads", token] as const,
+  uploadRecords: (token: string, sessionId: string) => ["upload-records", sessionId, token] as const,
   dashboard: (token: string, sessionId: string, dateFrom?: string, dateTo?: string) =>
     ["dashboard", sessionId, token, dateFrom, dateTo] as const,
   transactions: (
@@ -100,6 +102,19 @@ export function useUploads(
           new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
       ),
     ...options,
+  });
+}
+
+/** Fetch all records for a session — cached 10 minutes so back-navigation is instant */
+export function useUploadRecords(token: string | null, sessionId: string | null, sessionValidated = true) {
+  return useQuery({
+    queryKey: queryKeys.uploadRecords(token!, sessionId!),
+    queryFn: () => getUpload(token!, sessionId!),
+    enabled: !!token && !!sessionId && sessionValidated,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 }
 

@@ -21,6 +21,7 @@ import {
   updateTransaction,
   bulkDeleteTransactions,
 } from "@/lib/api";
+import { useUploadRecords } from "@/lib/queries";
 import { Plus, Trash2, Download, ChevronDown, Undo2, Redo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -150,10 +151,16 @@ function SetFilter({ model, onModelChange, colDef, api }: CustomFilterProps<Shee
 /*  Page                                                              */
 /* ------------------------------------------------------------------ */
 export default function SheetsPage() {
-  const { data, setData, rawData, setRawData, fileName, sessionId } =
+  const { data, setData, rawData, setRawData, fileName, sessionId, sessionValidated } =
     useData();
   const { token } = useAuth();
   const queryClient = useQueryClient();
+
+  // Use cached TanStack Query data for backend session (avoids re-fetch on every navigation)
+  const paymentsHaveIds = !!(data?.payments?.length && data.payments.some((p) => p.id));
+  const { data: uploadDetail, isLoading: uploadLoading } = useUploadRecords(
+    token, (!data || !paymentsHaveIds) ? sessionId : null, sessionValidated
+  );
 
   const [rows, setRows] = useState<SheetRow[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -379,40 +386,23 @@ export default function SheetsPage() {
     );
   }, [data]);
 
-  /* ---- Load rows from backend for persisted sessions ---- */
-  /* ---- Fetch from backend only when DataContext hasn't loaded yet ---- */
+  /* ---- Load rows from backend for persisted sessions (cached via TanStack Query) ---- */
   useEffect(() => {
-    let cancelled = false;
-    if (!sessionId || !token) return;
-    // DataContext has rows with IDs — skip redundant fetch
-    // But if payments exist without IDs (e.g. just parsed from Excel), still fetch to get IDs
-    const paymentsHaveIds = data?.payments?.length && data.payments.some((p) => p.id);
-    if (paymentsHaveIds) return;
-    const load = async () => {
-      try {
-        const detail = await getUpload(token, sessionId);
-        if (cancelled) return;
-        const newRows = detail.records.map((r) => ({
-            id: r.id,
-            bank: r.bank,
-            paymentDate: r.payment_date ?? "",
-            paymentAmount: r.payment_amount,
-            account: r.account,
-            touchpoint: r.touchpoint ?? "",
-            environment: r.environment ?? "",
-          }));
-          setRows(newRows);
-          // Also sync back to DataContext so future edits/deletes have IDs
-          if (!cancelled) syncToContext(newRows);
-      } catch {
-        // ignore
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId, token, data?.payments?.length, syncToContext]);
+    if (!uploadDetail) return;
+    if (paymentsHaveIds) return; // DataContext already has IDs
+    const newRows = uploadDetail.records.map((r) => ({
+      id: r.id,
+      bank: r.bank,
+      paymentDate: r.payment_date ?? "",
+      paymentAmount: r.payment_amount,
+      account: r.account,
+      touchpoint: r.touchpoint ?? "",
+      environment: r.environment ?? "",
+    }));
+    setRows(newRows);
+    syncToContext(newRows);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadDetail]);
 
   /* ---- Cell edit handler ---- */
   const onCellValueChanged = useCallback(
@@ -706,8 +696,20 @@ export default function SheetsPage() {
     [rows]
   );
 
+  /* ---- Loading state (fetching from backend) ---- */
+  if (uploadLoading || (rows.length === 0 && sessionId && !data)) {
+    return (
+      <div className="px-4 sm:px-8 py-8 min-h-screen">
+        <div className="p-10 rounded-2xl text-center bg-card border border-border">
+          <h1 className="text-2xl font-semibold mb-2">Sheets</h1>
+          <p className="text-muted-foreground">Loading spreadsheet data...</p>
+        </div>
+      </div>
+    );
+  }
+
   /* ---- Empty state ---- */
-  if (!data || rows.length === 0) {
+  if (!data && rows.length === 0) {
     return (
       <div className="px-4 sm:px-8 py-8 min-h-screen">
         <div className="p-10 rounded-2xl text-center bg-card border border-border">

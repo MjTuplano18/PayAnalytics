@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Users, DollarSign, FileText, Info } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
 import { DynamicChart } from "@/components/DynamicChart";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
-import { getUpload } from "@/lib/api";
+import { useUploadRecords } from "@/lib/queries";
 import type { PaymentRecord } from "@/types/data";
 
 function fmt(n: number): string {
@@ -15,37 +15,28 @@ function fmt(n: number): string {
 }
 
 export default function AccountsPage() {
-  const { data, sessionId } = useData();
+  const { data, sessionId, sessionValidated } = useData();
   const { token } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const rowsPerPage = 25;
 
-  // When data context is null but sessionId is set, fetch records from API
-  const [apiPayments, setApiPayments] = useState<PaymentRecord[] | null>(null);
-  const [apiLoading, setApiLoading] = useState(false);
-
-  useEffect(() => {
-    if (data || !sessionId || !token) return;
-    setApiLoading(true);
-    getUpload(token, sessionId)
-      .then((detail) => {
-        setApiPayments(
-          detail.records.map((r) => ({
-            id: r.id,
-            bank: r.bank,
-            account: r.account,
-            touchpoint: r.touchpoint ?? "",
-            paymentDate: r.payment_date ?? "",
-            paymentAmount: r.payment_amount,
-            environment: r.environment ?? undefined,
-          }))
-        );
-      })
-      .catch(() => setApiPayments([]))
-      .finally(() => setApiLoading(false));
-  }, [data, sessionId, token]);
+  // When data context is null but sessionId is set, fetch records from API (cached via TanStack Query)
+  const { data: uploadDetail, isLoading: apiLoading } = useUploadRecords(
+    token, data ? null : sessionId, sessionValidated
+  );
+  const apiPayments: PaymentRecord[] | null = uploadDetail
+    ? uploadDetail.records.map((r) => ({
+        id: r.id,
+        bank: r.bank,
+        account: r.account,
+        touchpoint: r.touchpoint ?? "",
+        paymentDate: r.payment_date ?? "",
+        paymentAmount: r.payment_amount,
+        environment: r.environment ?? undefined,
+      }))
+    : null;
 
   // Filter payments by date range first
   const sourcePayments = data?.payments ?? apiPayments ?? [];
