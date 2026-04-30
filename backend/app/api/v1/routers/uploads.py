@@ -45,6 +45,11 @@ async def create_upload(
     db: AsyncSession = Depends(get_db),
 ) -> UploadSessionOut:
     """Save an uploaded dataset (records parsed from Excel/CSV on the frontend)."""
+    if not payload.records:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The uploaded dataset contains no data rows.",
+        )
     repo = UploadRepository(db)
     audit_repo = AuditLogRepository(db)
     session = await repo.create_session(

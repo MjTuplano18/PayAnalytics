@@ -68,6 +68,17 @@ function SessionRestorer() {
   return null;
 }
 
+/** Pings the backend health endpoint on first load to wake it up (e.g. Render cold start). */
+function BackendWakeup() {
+  useEffect(() => {
+    const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
+    fetch(`${base}/health`, { method: "GET", cache: "no-store" }).catch(() => {
+      // Silently ignore — this is a best-effort wakeup ping
+    });
+  }, []);
+  return null;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const pathname = usePathname();
@@ -133,6 +144,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (isLoginPage) {
     return (
       <>
+        <BackendWakeup />
         {children}
         <Toaster position="bottom-right" />
       </>
@@ -171,6 +183,7 @@ function CollapseSidebarOverlay() {
 // Authenticated layout
   return (
     <DataProvider>
+      <BackendWakeup />
       <SessionRestorer />
       <UploadEventListener />
       <SidebarProvider>
