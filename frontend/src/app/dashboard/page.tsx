@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { DynamicChart } from "@/components/DynamicChart";
-import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
+import { DateFilter, DateRange, CustomDateRange, filterByDateRange, dateRangeToBounds } from "@/components/DateFilter";
 import { type DashboardSummary } from "@/lib/api";
 import { useDashboard } from "@/lib/queries";
 
@@ -40,7 +40,8 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<"summary" | "portfolio" | "channels">("summary");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
-  const { data: apiSummary, isLoading: apiLoading, error: apiError } = useDashboard(token, sessionId, sessionValidated);
+  const dateBounds = useMemo(() => dateRangeToBounds(dateRange, customRange), [dateRange, customRange]);
+  const { data: apiSummary, isLoading: apiLoading, error: apiError } = useDashboard(token, sessionId, sessionValidated, dateBounds.date_from, dateBounds.date_to);
   // isFetching is true during background refreshes; isLoading is true only when
   // there is no cached data yet. Use showSkeleton to prevent skeleton flash on
   // re-navigation when data is already in the TanStack Query cache.
@@ -125,8 +126,13 @@ export default function DashboardPage() {
         .sort((a, b) => b.count - a.count);
       return { bankAnalytics, touchpointAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: payments.length };
     }
-    // Fallback to API summary when no in-memory data (e.g. after page refresh)
-    if (apiSummary && !isFiltered) {
+    // If in-memory data is loaded but filtered to 0, return zeroed analytics (don't fall through to empty state)
+    if (data !== null && isFiltered) {
+      return { bankAnalytics: [], touchpointAnalytics: [], totalAmount: 0, totalAccounts: 0, totalPayments: 0 };
+    }
+    // Fallback to API summary when no in-memory data (e.g. after page refresh).
+    // The API is called with date_from/date_to so it is already filtered server-side.
+    if (apiSummary) {
       return {
         totalAmount: apiSummary.total_amount,
         totalAccounts: apiSummary.total_accounts,
@@ -141,10 +147,10 @@ export default function DashboardPage() {
       };
     }
     return null;
-  }, [apiSummary, payments, isFiltered]);
+  }, [apiSummary, data, payments, isFiltered]);
 
   const fa = rawFa ?? { totalAmount: 0, totalAccounts: 0, totalPayments: 0, bankAnalytics: [], touchpointAnalytics: [] };
-  const noData = !rawFa && !showSkeleton;
+  const noData = !rawFa && !showSkeleton && !isFiltered;
 
   // ── Monthly trend ──
   const monthlyTrend = useMemo(() => {
@@ -175,6 +181,8 @@ export default function DashboardPage() {
           return { month: label, rawMonth: raw, amount };
         });
     }
+    // In-memory data loaded but filter returns no results — show empty chart
+    if (data !== null && isFiltered) return [];
     // Fallback to API summary monthly trend (no in-memory data, e.g. after page refresh)
     if (apiSummary?.monthly_trend?.length) {
       return apiSummary.monthly_trend.map(({ month, amount }) => {
@@ -185,7 +193,7 @@ export default function DashboardPage() {
       });
     }
     return [];
-  }, [payments, apiSummary]);
+  }, [payments, data, isFiltered, apiSummary]);
 
   // ── Portfolio tab data ──
   const allEnvironments = useMemo(() => {
@@ -232,7 +240,12 @@ export default function DashboardPage() {
 
   const portfolioAnalytics = useMemo(() => {
     const src = portfolioFiltered;
-    // Fallback to apiSummary when no in-memory data and no filters active
+    // In-memory data loaded but filter returns no results — show zeros (don't fall through to API data)
+    if (src.length === 0 && data !== null && isFiltered) {
+      return { bankAnalytics: [] as typeof fa.bankAnalytics, totalAmount: 0, totalAccounts: 0, totalPayments: 0 };
+    }
+    // Fallback to apiSummary when no in-memory data and no tab filters active.
+    // apiSummary is already date-filtered from the API call.
     if (src.length === 0 && apiSummary && selectedEnvironments.size === 0 && selectedBanks.size === 0) {
       const bankAnalytics = apiSummary.banks.map((b) => ({
         bank: b.bank,
@@ -270,7 +283,10 @@ export default function DashboardPage() {
     const src = selectedTouchpoints.size > 0
       ? payments.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
       : payments;
-    // Fallback to apiSummary when no in-memory data and no filters active
+    // In-memory data loaded but filter returns no results — show zeros
+    if (src.length === 0 && data !== null && isFiltered) return [];
+    // Fallback to apiSummary when no in-memory data and no tab filters active.
+    // apiSummary is already date-filtered from the API call.
     if (src.length === 0 && apiSummary && selectedTouchpoints.size === 0) {
       return apiSummary.touchpoints.map((t) => ({
         touchpoint: t.touchpoint,
@@ -489,15 +505,7 @@ export default function DashboardPage() {
               <p className="text-sm text-[#5B66E2] dark:text-[#8B96F2]">
                 No records found. Upload a dataset to get started.
               </p>
-              <button
-                onClick={handleUploadNav}
-                className="inline-flex items-center gap-2 rounded-full bg-[#5B66E2] px-5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 12V4m0 0L8 8m4-4l4 4" />
-                </svg>
-                Upload File
-              </button>
+
             </div>
           )}
 

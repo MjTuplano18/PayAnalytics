@@ -260,8 +260,12 @@ export function getTransactions(
   return apiFetch<PaginatedTransactions>(`/api/v1/uploads/${sessionId}/transactions${query}`, { token });
 }
 
-export function getDashboardSummary(token: string, sessionId: string) {
-  return apiFetch<DashboardSummary>(`/api/v1/uploads/${sessionId}/dashboard`, { token });
+export function getDashboardSummary(token: string, sessionId: string, params: { date_from?: string; date_to?: string } = {}) {
+  const qs = new URLSearchParams();
+  if (params.date_from) qs.set("date_from", params.date_from);
+  if (params.date_to) qs.set("date_to", params.date_to);
+  const query = qs.toString() ? `?${qs}` : "";
+  return apiFetch<DashboardSummary>(`/api/v1/uploads/${sessionId}/dashboard${query}`, { token });
 }
 
 /** Fetch ALL records for a session in a single request — use for exports only. */

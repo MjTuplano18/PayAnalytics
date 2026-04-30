@@ -19,8 +19,8 @@ import {
 // ── Query key factory ────────────────────────────────────────────────────────
 export const queryKeys = {
   uploads: (token: string) => ["uploads", token] as const,
-  dashboard: (token: string, sessionId: string) =>
-    ["dashboard", sessionId, token] as const,
+  dashboard: (token: string, sessionId: string, dateFrom?: string, dateTo?: string) =>
+    ["dashboard", sessionId, token, dateFrom, dateTo] as const,
   transactions: (
     token: string,
     sessionId: string,
@@ -39,10 +39,10 @@ export const queryKeys = {
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
 /** Fetch aggregated dashboard KPIs for a session — cached 10 minutes */
-export function useDashboard(token: string | null, sessionId: string | null, sessionValidated = true) {
+export function useDashboard(token: string | null, sessionId: string | null, sessionValidated = true, dateFrom?: string, dateTo?: string) {
   return useQuery({
-    queryKey: queryKeys.dashboard(token!, sessionId!),
-    queryFn: () => getDashboardSummary(token!, sessionId!),
+    queryKey: queryKeys.dashboard(token!, sessionId!, dateFrom, dateTo),
+    queryFn: () => getDashboardSummary(token!, sessionId!, { date_from: dateFrom, date_to: dateTo }),
     enabled: !!token && !!sessionId && sessionValidated,
     staleTime: 5 * 60 * 1000,    // 5 min — mark stale after 5 min
     gcTime: 30 * 60 * 1000,      // 30 min — keep in memory
