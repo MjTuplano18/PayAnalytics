@@ -10,7 +10,7 @@ class _DecimalEncoder(json.JSONEncoder):
             return float(o)
         return super().default(o)
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies.auth import get_current_user
@@ -277,20 +277,23 @@ async def export_all_records(
 @router.get("/{session_id}/dashboard", response_model=DashboardSummary)
 async def get_dashboard(
     session_id: str,
+    date_from: str | None = Query(default=None, description="Filter records from this date (YYYY-MM-DD)"),
+    date_to: str | None = Query(default=None, description="Filter records up to this date (YYYY-MM-DD)"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DashboardSummary:
     """Get aggregated KPI summary for an upload session (cached 5 min)."""
-    cache_key = f"dashboard:{session_id}"
+    cache_key = f"dashboard:{session_id}:{date_from or ''}:{date_to or ''}"
     cached = cache_get(cache_key)
     if cached is not None:
         return DashboardSummary(**cached)
 
     repo = UploadRepository(db)
-    summary = await repo.get_dashboard_summary(session_id=session_id, user_id=current_user.id)
+    summary = await repo.get_dashboard_summary(session_id=session_id, user_id=current_user.id, date_from=date_from, date_to=date_to)
     if not summary:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
-    cache_set(cache_key, summary, ttl=1800)  # 30 min — data doesn't change unless re-uploaded
+    # Use shorter TTL for filtered queries since they are more specific
+    cache_set(cache_key, summary, ttl=300 if (date_from or date_to) else 1800)
     return DashboardSummary(**summary)
 
 

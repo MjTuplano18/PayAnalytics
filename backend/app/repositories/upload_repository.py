@@ -429,7 +429,7 @@ class UploadRepository:
         )
         return list(result.scalars().all())
 
-    async def get_dashboard_summary(self, session_id: str, user_id: str) -> dict | None:
+    async def get_dashboard_summary(self, session_id: str, user_id: str, date_from: str | None = None, date_to: str | None = None) -> dict | None:
         # Verify session ownership
         session_check = await self.session.execute(
             select(UploadSession).where(
@@ -441,6 +441,13 @@ class UploadRepository:
         if not upload:
             return None
 
+        # Build optional date filter conditions
+        date_conditions = []
+        if date_from:
+            date_conditions.append(PaymentRecord.payment_date >= date_from)
+        if date_to:
+            date_conditions.append(PaymentRecord.payment_date <= date_to)
+
         # Bank breakdown (also used to derive totals — one query instead of two)
         bank_rows = await self.session.execute(
             select(
@@ -449,7 +456,7 @@ class UploadRepository:
                 func.count(func.distinct(PaymentRecord.account)).label("account_count"),
                 func.sum(PaymentRecord.payment_amount).label("total_amount"),
             )
-            .where(PaymentRecord.session_id == session_id)
+            .where(PaymentRecord.session_id == session_id, *date_conditions)
             .group_by(PaymentRecord.bank)
             .order_by(func.sum(PaymentRecord.payment_amount).desc())
         )
@@ -462,7 +469,7 @@ class UploadRepository:
             select(
                 func.count(PaymentRecord.id),
                 func.count(func.distinct(PaymentRecord.account)),
-            ).where(PaymentRecord.session_id == session_id)
+            ).where(PaymentRecord.session_id == session_id, *date_conditions)
         )
         total_payments, total_accounts = totals.one()
         total_payments = total_payments or total_payments_from_banks
@@ -485,7 +492,7 @@ class UploadRepository:
                 func.count(PaymentRecord.id).label("count"),
                 func.sum(PaymentRecord.payment_amount).label("total_amount"),
             )
-            .where(PaymentRecord.session_id == session_id)
+            .where(PaymentRecord.session_id == session_id, *date_conditions)
             .group_by(PaymentRecord.touchpoint)
             .order_by(func.count(PaymentRecord.id).desc())
         )
@@ -549,7 +556,7 @@ class UploadRepository:
                 month_expr.label("month"),
                 func.sum(PaymentRecord.payment_amount).label("amount"),
             )
-            .where(PaymentRecord.session_id == session_id)
+            .where(PaymentRecord.session_id == session_id, *date_conditions)
             .where(PaymentRecord.payment_date.isnot(None))
             .where(func.length(PaymentRecord.payment_date) >= 7)
             .group_by(month_expr)
