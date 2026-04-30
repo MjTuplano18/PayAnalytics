@@ -241,21 +241,34 @@ export default function DashboardPage() {
   const portfolioAnalytics = useMemo(() => {
     const src = portfolioFiltered;
     // In-memory data loaded but filter returns no results — show zeros (don't fall through to API data)
-    if (src.length === 0 && data !== null && isFiltered) {
+    if (src.length === 0 && data !== null && isFiltered && selectedEnvironments.size === 0 && selectedBanks.size === 0) {
       return { bankAnalytics: [] as typeof fa.bankAnalytics, totalAmount: 0, totalAccounts: 0, totalPayments: 0 };
     }
-    // Fallback to apiSummary when no in-memory data and no tab filters active.
+    // Fallback to apiSummary when no in-memory data — filter banks by selected environment/bank using environment_map.
     // apiSummary is already date-filtered from the API call.
-    if (src.length === 0 && apiSummary && selectedEnvironments.size === 0 && selectedBanks.size === 0) {
-      const bankAnalytics = apiSummary.banks.map((b) => ({
-        bank: b.bank,
-        accountCount: b.account_count,
-        totalAmount: b.total_amount,
-        debtorSum: b.payment_count,
-        percentage: b.percentage,
-        paymentCount: b.payment_count,
+    if (src.length === 0 && apiSummary) {
+      // Determine which banks are visible given the selected environment/bank filters
+      let visibleBanks = apiSummary.banks;
+      if (selectedEnvironments.size > 0 && apiSummary.environment_map) {
+        const bankSet = new Set<string>();
+        for (const envEntry of apiSummary.environment_map) {
+          if (selectedEnvironments.has(envEntry.environment)) {
+            envEntry.banks.forEach((b) => bankSet.add(b));
+          }
+        }
+        visibleBanks = visibleBanks.filter((b) => bankSet.has(b.bank));
+      }
+      if (selectedBanks.size > 0) {
+        visibleBanks = visibleBanks.filter((b) => selectedBanks.has(b.bank));
+      }
+      const filteredTotal = visibleBanks.reduce((s, b) => s + b.total_amount, 0);
+      const bankAnalytics = visibleBanks.map((b) => ({
+        bank: b.bank, accountCount: b.account_count, totalAmount: b.total_amount,
+        debtorSum: b.payment_count, percentage: filteredTotal > 0 ? (b.total_amount / filteredTotal) * 100 : 0, paymentCount: b.payment_count,
       }));
-      return { bankAnalytics, totalAmount: apiSummary.total_amount, totalAccounts: apiSummary.total_accounts, totalPayments: apiSummary.total_payments };
+      const filteredAccounts = visibleBanks.reduce((s, b) => s + b.account_count, 0);
+      const filteredPayments = visibleBanks.reduce((s, b) => s + b.payment_count, 0);
+      return { bankAnalytics, totalAmount: filteredTotal, totalAccounts: filteredAccounts, totalPayments: filteredPayments };
     }
     if (src.length === 0) return { bankAnalytics: [] as typeof fa.bankAnalytics, totalAmount: 0, totalAccounts: 0, totalPayments: 0 };
     const bankMap = new Map<string, { amounts: number[]; paymentCount: number; accounts: Set<string> }>();
@@ -283,17 +296,16 @@ export default function DashboardPage() {
     const src = selectedTouchpoints.size > 0
       ? payments.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
       : payments;
-    // In-memory data loaded but filter returns no results — show zeros
-    if (src.length === 0 && data !== null && isFiltered) return [];
-    // Fallback to apiSummary when no in-memory data and no tab filters active.
+    // In-memory data loaded but date filter returns no results (no touchpoint selection) — show zeros
+    if (src.length === 0 && data !== null && isFiltered && selectedTouchpoints.size === 0) return [];
+    // Fallback to apiSummary when no in-memory data — filter by selected touchpoints.
     // apiSummary is already date-filtered from the API call.
-    if (src.length === 0 && apiSummary && selectedTouchpoints.size === 0) {
-      return apiSummary.touchpoints.map((t) => ({
-        touchpoint: t.touchpoint,
-        count: t.count,
-        totalAmount: t.total_amount,
-        percentage: t.percentage,
+    if (src.length === 0 && apiSummary) {
+      const all = apiSummary.touchpoints.map((t) => ({
+        touchpoint: t.touchpoint, count: t.count, totalAmount: t.total_amount, percentage: t.percentage,
       }));
+      if (selectedTouchpoints.size === 0) return all;
+      return all.filter((t) => selectedTouchpoints.has(t.touchpoint));
     }
     if (src.length === 0) return [];
     const tpMap = new Map<string, { count: number; amounts: number[] }>();
@@ -306,7 +318,7 @@ export default function DashboardPage() {
     return Array.from(tpMap.entries())
       .map(([touchpoint, d]) => { const tt = d.amounts.reduce((s, n) => s + Math.round(n * 100), 0) / 100; return { touchpoint, count: d.count, totalAmount: tt, percentage: totalAmount > 0 ? (tt / totalAmount) * 100 : 0 }; })
       .sort((a, b) => b.count - a.count);
-  }, [payments, selectedTouchpoints, apiSummary]);
+  }, [payments, data, isFiltered, selectedTouchpoints, apiSummary]);
 
   // Channel type grouping (IB / OB / Direct / Ghost / Automated / No Touchpoint)
   const channelGroupData = useMemo(() => {
