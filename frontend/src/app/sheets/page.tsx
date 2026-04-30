@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { AgGridReact, useGridFilter } from "ag-grid-react";
 import type { CustomFilterProps } from "ag-grid-react";
 import {
@@ -151,10 +152,11 @@ function SetFilter({ model, onModelChange, colDef, api }: CustomFilterProps<Shee
 /*  Page                                                              */
 /* ------------------------------------------------------------------ */
 export default function SheetsPage() {
-  const { data, setData, rawData, setRawData, fileName, sessionId, sessionValidated } =
+  const { data, setData, rawData, setRawData, fileName, setFileName, sessionId, setSessionId, sessionValidated } =
     useData();
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // Use cached TanStack Query data for backend session (avoids re-fetch on every navigation)
   const paymentsHaveIds = !!(data?.payments?.length && data.payments.some((p) => p.id));
@@ -665,6 +667,17 @@ export default function SheetsPage() {
               syncToContext(newRows);
               toast.success(`${count} row${count > 1 ? "s" : ""} deleted.`);
               invalidateAll();
+
+              // If all records are deleted, the backend will have auto-deleted
+              // the session. Clear context + localStorage and send user to upload.
+              if (newRows.length === 0) {
+                setData(null);
+                setSessionId(null);
+                setFileName("");
+                queryClient.clear();
+                toast.info("All records deleted. Please upload a new file.");
+                router.push("/upload");
+              }
             } catch (err) {
               toast.error(
                 "Bulk delete failed: " +
