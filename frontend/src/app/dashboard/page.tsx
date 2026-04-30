@@ -293,19 +293,36 @@ export default function DashboardPage() {
   }, [apiSummary, data]);
 
   const channelAnalytics = useMemo(() => {
+    let base = payments;
+    if (selectedEnvironments.size > 0) base = base.filter((p) => selectedEnvironments.has(p.environment || "Unknown"));
     const src = selectedTouchpoints.size > 0
-      ? payments.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
-      : payments;
-    // In-memory data loaded but date filter returns no results (no touchpoint selection) — show zeros
-    if (src.length === 0 && data !== null && isFiltered && selectedTouchpoints.size === 0) return [];
-    // Fallback to apiSummary when no in-memory data — filter by selected touchpoints.
+      ? base.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
+      : base;
+    // In-memory data loaded but filters return no results (no touchpoint/env selection active) — show zeros
+    if (src.length === 0 && data !== null && isFiltered && selectedTouchpoints.size === 0 && selectedEnvironments.size === 0) return [];
+    // Fallback to apiSummary when no in-memory data — filter by selected environments + touchpoints.
     // apiSummary is already date-filtered from the API call.
     if (src.length === 0 && apiSummary) {
-      const all = apiSummary.touchpoints.map((t) => ({
+      // Build allowed touchpoint set when environments are selected
+      let allowedTouchpoints: Set<string> | null = null;
+      if (selectedEnvironments.size > 0 && apiSummary.environment_map) {
+        allowedTouchpoints = new Set<string>();
+        for (const envEntry of apiSummary.environment_map) {
+          if (selectedEnvironments.has(envEntry.environment)) {
+            for (const tps of Object.values(envEntry.touchpoints_by_bank)) {
+              tps.forEach((tp) => allowedTouchpoints!.add(tp));
+            }
+          }
+        }
+      }
+      let all = apiSummary.touchpoints.map((t) => ({
         touchpoint: t.touchpoint, count: t.count, totalAmount: t.total_amount, percentage: t.percentage,
       }));
-      if (selectedTouchpoints.size === 0) return all;
-      return all.filter((t) => selectedTouchpoints.has(t.touchpoint));
+      if (allowedTouchpoints !== null) all = all.filter((t) => allowedTouchpoints!.has(t.touchpoint));
+      if (selectedTouchpoints.size > 0) all = all.filter((t) => selectedTouchpoints.has(t.touchpoint));
+      // Recalculate percentages after filtering
+      const filteredTotal = all.reduce((s, t) => s + t.totalAmount, 0);
+      return all.map((t) => ({ ...t, percentage: filteredTotal > 0 ? (t.totalAmount / filteredTotal) * 100 : 0 }));
     }
     if (src.length === 0) return [];
     const tpMap = new Map<string, { count: number; amounts: number[] }>();
@@ -318,13 +335,15 @@ export default function DashboardPage() {
     return Array.from(tpMap.entries())
       .map(([touchpoint, d]) => { const tt = d.amounts.reduce((s, n) => s + Math.round(n * 100), 0) / 100; return { touchpoint, count: d.count, totalAmount: tt, percentage: totalAmount > 0 ? (tt / totalAmount) * 100 : 0 }; })
       .sort((a, b) => b.count - a.count);
-  }, [payments, data, isFiltered, selectedTouchpoints, apiSummary]);
+  }, [payments, data, isFiltered, selectedTouchpoints, selectedEnvironments, apiSummary]);
 
   // Channel type grouping (IB / OB / Direct / Ghost / Automated / No Touchpoint)
   const channelGroupData = useMemo(() => {
+    let base = payments;
+    if (selectedEnvironments.size > 0) base = base.filter((p) => selectedEnvironments.has(p.environment || "Unknown"));
     const src = selectedTouchpoints.size > 0
-      ? payments.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
-      : payments;
+      ? base.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
+      : base;
     // Fallback: derive groups from channelAnalytics (which already has apiSummary fallback)
     if (src.length === 0 && channelAnalytics.length > 0) {
       const groupMap = new Map<string, { count: number; amount: number }>();
@@ -346,7 +365,7 @@ export default function DashboardPage() {
     return Array.from(groupMap.entries())
       .map(([group, d]) => ({ group, count: d.count, amount: Math.round(d.amount * 100) / 100 }))
       .sort((a, b) => b.count - a.count);
-  }, [payments, selectedTouchpoints, channelAnalytics]);
+  }, [payments, selectedTouchpoints, selectedEnvironments, channelAnalytics]);
 
   const tpTotal = channelAnalytics.reduce((s, t) => s + t.count, 0);
   const tpTotalAmount = channelAnalytics.reduce((s, t) => s + Math.round(t.totalAmount * 100), 0) / 100;
