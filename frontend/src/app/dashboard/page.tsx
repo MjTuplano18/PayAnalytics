@@ -33,14 +33,14 @@ function channelType(tp: string): string {
 }
 
 export default function DashboardPage() {
-  const { data, sessionId, setSessionId } = useData();
+  const { data, sessionId, setSessionId, sessionValidated } = useData();
   const { token, user } = useAuth();
   const router = useRouter();
   const { setIsCollapsed } = useSidebar();
   const [activeTab, setActiveTab] = useState<"summary" | "portfolio" | "channels">("summary");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
-  const { data: apiSummary, isLoading: apiLoading, error: apiError } = useDashboard(token, sessionId);
+  const { data: apiSummary, isLoading: apiLoading, error: apiError } = useDashboard(token, sessionId, sessionValidated);
   // isFetching is true during background refreshes; isLoading is true only when
   // there is no cached data yet. Use showSkeleton to prevent skeleton flash on
   // re-navigation when data is already in the TanStack Query cache.

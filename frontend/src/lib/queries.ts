@@ -39,11 +39,11 @@ export const queryKeys = {
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
 /** Fetch aggregated dashboard KPIs for a session — cached 10 minutes */
-export function useDashboard(token: string | null, sessionId: string | null) {
+export function useDashboard(token: string | null, sessionId: string | null, sessionValidated = true) {
   return useQuery({
     queryKey: queryKeys.dashboard(token!, sessionId!),
     queryFn: () => getDashboardSummary(token!, sessionId!),
-    enabled: !!token && !!sessionId,
+    enabled: !!token && !!sessionId && sessionValidated,
     staleTime: 5 * 60 * 1000,    // 5 min — mark stale after 5 min
     gcTime: 30 * 60 * 1000,      // 30 min — keep in memory
     refetchOnWindowFocus: false,  // don't refetch when user switches browser tabs
@@ -65,12 +65,13 @@ export function useTransactions(
     environment?: string;
     page?: number;
     page_size?: number;
-  } = {}
+  } = {},
+  sessionValidated = true
 ) {
   return useQuery({
     queryKey: queryKeys.transactions(token!, sessionId!, filters),
     queryFn: () => getTransactions(token!, sessionId!, filters),
-    enabled: !!token && !!sessionId,
+    enabled: !!token && !!sessionId && sessionValidated,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,

@@ -23,7 +23,7 @@ function fmt(n: number): string {
 }
 
 export default function TransactionsPage() {
-  const { data, setData, rawData, sessionId, setSessionId } = useData();
+  const { data, setData, rawData, sessionId, setSessionId, sessionValidated } = useData();
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,7 +53,7 @@ export default function TransactionsPage() {
   }, [searchQuery]);
 
   // Backend-mode state using TanStack Query (cached, no redundant Neon fetches)
-  const { data: dashSummary } = useDashboard(token, sessionId);
+  const { data: dashSummary } = useDashboard(token, sessionId, sessionValidated);
   const dateBounds = dateRangeToBounds(dateRange, customRange);
   const apiFilters = {
     bank: bankFilter !== "all" ? bankFilter : undefined,
@@ -66,7 +66,7 @@ export default function TransactionsPage() {
     page: currentPage,
     page_size: rowsPerPage,
   };
-  const { data: txPage, isFetching: apiLoading, error: txError } = useTransactions(token, sessionId, apiFilters);
+  const { data: txPage, isFetching: apiLoading, error: txError } = useTransactions(token, sessionId, apiFilters, sessionValidated);
 
   // Auto-clear stale session on 404 or 500 (e.g. after DB migration / new database)
   useEffect(() => {

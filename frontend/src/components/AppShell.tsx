@@ -23,47 +23,44 @@ import { useUploadEvents } from "@/lib/useUploadEvents";
  */
 function SessionRestorer() {
   const { token } = useAuth();
-  const { sessionId, setSessionId, fileName, setFileName } = useData();
-  const autoPickedRef = useRef(false);
+  const { sessionId, setSessionId, fileName, setFileName, setSessionValidated } = useData();
+  const didRunRef = useRef(false);
 
-  // If sessionId is already set, validate it still exists (lightweight list check)
+  // Single consolidated effect: validate existing session OR auto-pick latest.
+  // Runs once per token (i.e. once on login/refresh). Gates sessionValidated so
+  // downstream queries don't fire with a stale sessionId before we confirm it.
   useEffect(() => {
-    if (!sessionId || !token) return;
-    // If fileName is already set the session is fully hydrated — nothing to do.
-    if (fileName) return;
+    if (!token) return;
+    if (didRunRef.current) return;
+    didRunRef.current = true;
 
-    // Fetch just the session list (metadata only) to confirm the session exists
-    // and fill in the fileName without loading all records.
     listUploads(token).then((sessions: UploadSessionOut[]) => {
-      const match = sessions.find((s) => s.id === sessionId);
-      if (!match) {
-        setSessionId(null);
-        return;
+      if (sessionId) {
+        // Validate the stored sessionId still exists on the backend
+        const match = sessions.find((s) => s.id === sessionId);
+        if (!match) {
+          setSessionId(null);
+        } else if (!fileName) {
+          setFileName(match.file_name);
+        }
+      } else {
+        // No stored session — auto-pick the most recent one
+        if (sessions.length > 0) {
+          const sorted = [...sessions].sort(
+            (a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+          );
+          const latest = sorted[0];
+          setSessionId(latest.id);
+          setFileName(latest.file_name);
+        }
       }
-      setFileName(match.file_name);
+      setSessionValidated(true);
     }).catch(() => {
-      // Network error — clear stale session so the app doesn't hang
+      // Network error — clear stale session and unblock queries
       setSessionId(null);
+      setSessionValidated(true);
     });
-  }, [sessionId, token, fileName]);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-pick the most recent upload if no sessionId is set
-  useEffect(() => {
-    if (sessionId || !token || autoPickedRef.current) return;
-    autoPickedRef.current = true;
-
-    listUploads(token).then((sessions: UploadSessionOut[]) => {
-      if (sessions.length === 0) return;
-      const sorted = [...sessions].sort(
-        (a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
-      );
-      const latest = sorted[0];
-      setSessionId(latest.id);
-      setFileName(latest.file_name);
-    }).catch(() => {
-      // Silently fail — user can upload manually
-    });
-  }, [sessionId, token]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
 }

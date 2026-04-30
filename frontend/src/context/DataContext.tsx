@@ -13,6 +13,9 @@ interface DataContextType {
   /** The active upload session ID stored in the backend (null = in-memory only) */
   sessionId: string | null;
   setSessionId: (id: string | null) => void;
+  /** True once SessionRestorer has verified the sessionId against the backend. Gates API queries to avoid 404 noise from stale IDs. */
+  sessionValidated: boolean;
+  setSessionValidated: (v: boolean) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -20,6 +23,8 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<ParsedData | null>(null);
   const [rawData, setRawData] = useState<DataRow[]>([]);
+  // False until SessionRestorer confirms the stored sessionId is valid
+  const [sessionValidated, setSessionValidated] = useState(false);
 
   // Initialise sessionId from localStorage so it survives page refresh
   const [sessionId, setSessionIdState] = useState<string | null>(() => {
@@ -63,7 +68,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   return (
     <DataContext.Provider
-      value={{ data, setData, rawData, setRawData, fileName, setFileName, sessionId, setSessionId }}
+      value={{ data, setData, rawData, setRawData, fileName, setFileName, sessionId, setSessionId, sessionValidated, setSessionValidated }}
     >
       {children}
     </DataContext.Provider>

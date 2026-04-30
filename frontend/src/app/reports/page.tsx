@@ -33,9 +33,9 @@ function fmt(n: number): string {
 }
 
 export default function ReportsPage() {
-  const { data, rawData, sessionId, fileName } = useData();
+  const { data, rawData, sessionId, fileName, sessionValidated } = useData();
   const { token } = useAuth();
-  const { data: apiSummary } = useDashboard(token, sessionId);
+  const { data: apiSummary } = useDashboard(token, sessionId, sessionValidated);
   const [exporting, setExporting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
