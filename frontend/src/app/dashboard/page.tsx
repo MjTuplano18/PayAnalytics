@@ -618,7 +618,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {portfolioFiltered.length === 0 && !showSkeleton && (
+          {portfolioFiltered.length === 0 && portfolioAnalytics.bankAnalytics.length === 0 && !showSkeleton && (
             <div className="mb-6 p-4 rounded-lg border border-[#5B66E2]/30 bg-[#5B66E2]/10 text-sm text-[#5B66E2] dark:text-[#8B96F2] text-center">
               No records found for the selected filters.
             </div>
