@@ -149,6 +149,20 @@ export default function ReportsPage() {
   const totalRecords = data?.totalPayments ?? apiSummary?.total_payments ?? 0;
   const totalAmount = data?.totalAmount ?? apiSummary?.total_amount ?? 0;
   const bankCount = data?.bankAnalytics.length ?? apiSummary?.total_banks ?? 0;
+  const reportBankAnalytics = data?.bankAnalytics ?? apiSummary?.banks.map((b) => ({
+    bank: b.bank,
+    accountCount: b.account_count,
+    totalAmount: b.total_amount,
+    debtorSum: b.payment_count,
+    percentage: b.percentage,
+    paymentCount: b.payment_count,
+  })) ?? [];
+  const reportTouchpointAnalytics = data?.touchpointAnalytics ?? apiSummary?.touchpoints.map((t) => ({
+    touchpoint: t.touchpoint,
+    count: t.count,
+    totalAmount: t.total_amount,
+    percentage: t.percentage,
+  })) ?? [];
 
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
@@ -258,14 +272,14 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {activeTab === "builder" && data ? (
+        {activeTab === "builder" && (data || apiSummary) ? (
           <ReportBuilder
-            payments={data.payments}
-            bankAnalytics={data.bankAnalytics}
-            touchpointAnalytics={data.touchpointAnalytics}
-            totalAmount={data.totalAmount}
-            totalAccounts={data.totalAccounts}
-            totalPayments={data.totalPayments}
+            payments={data?.payments ?? []}
+            bankAnalytics={reportBankAnalytics}
+            touchpointAnalytics={reportTouchpointAnalytics}
+            totalAmount={totalAmount}
+            totalAccounts={data?.totalAccounts ?? 0}
+            totalPayments={totalRecords}
           />
         ) : (
         <>
@@ -287,7 +301,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Bank breakdown table */}
-        {data && data.bankAnalytics.length > 0 && (
+        {reportBankAnalytics.length > 0 && (
           <div className="rounded-lg border bg-card border-border overflow-x-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-[#5B66E2]" />
@@ -303,7 +317,7 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {data.bankAnalytics
+                {reportBankAnalytics
                   .slice((bankPage - 1) * bankRowsPerPage, bankPage * bankRowsPerPage)
                   .map((b) => (
                   <tr key={b.bank} className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors">
@@ -315,10 +329,10 @@ export default function ReportsPage() {
                 ))}
               </tbody>
             </table>
-            {data.bankAnalytics.length > bankRowsPerPage && (
+            {reportBankAnalytics.length > bankRowsPerPage && (
               <div className="print:hidden flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                  Page {bankPage} of {Math.ceil(data.bankAnalytics.length / bankRowsPerPage)}
+                  Page {bankPage} of {Math.ceil(reportBankAnalytics.length / bankRowsPerPage)}
                 </span>
                 <div className="flex gap-2">
                   <Button
@@ -332,7 +346,7 @@ export default function ReportsPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={bankPage >= Math.ceil(data.bankAnalytics.length / bankRowsPerPage)}
+                    disabled={bankPage >= Math.ceil(reportBankAnalytics.length / bankRowsPerPage)}
                     onClick={() => setBankPage((p) => p + 1)}
                   >
                     <ChevronRight className="w-4 h-4" />
