@@ -26,19 +26,26 @@ function SessionRestorer() {
   const { sessionId, setSessionId, fileName, setFileName, setSessionValidated } = useData();
   const didRunRef = useRef(false);
 
-  // Single consolidated effect: validate existing session OR auto-pick latest.
-  // Runs once per token (i.e. once on login/refresh). Gates sessionValidated so
-  // downstream queries don't fire with a stale sessionId before we confirm it.
+  // Optimistic session validation: if we already have a sessionId in localStorage,
+  // immediately mark as validated so pages load instantly. Then validate against the
+  // backend in the background and correct any stale/expired session silently.
   useEffect(() => {
     if (!token) return;
     if (didRunRef.current) return;
     didRunRef.current = true;
 
+    // If we have a stored sessionId, trust it immediately — pages can render now.
+    if (sessionId) {
+      setSessionValidated(true);
+    }
+
+    // Background validation: confirm session is still valid on the backend.
     listUploads(token).then((sessions: UploadSessionOut[]) => {
       if (sessionId) {
         // Validate the stored sessionId still exists on the backend
         const match = sessions.find((s) => s.id === sessionId);
         if (!match) {
+          // Session expired/deleted — clear it
           setSessionId(null);
         } else if (!fileName) {
           setFileName(match.file_name);
@@ -54,10 +61,10 @@ function SessionRestorer() {
           setFileName(latest.file_name);
         }
       }
+      // Mark validated (in case we didn't already above)
       setSessionValidated(true);
     }).catch(() => {
-      // Network error — clear stale session and unblock queries
-      setSessionId(null);
+      // Network error — unblock queries (keep existing sessionId optimistically)
       setSessionValidated(true);
     });
   }, [token]);  // eslint-disable-line react-hooks/exhaustive-deps
