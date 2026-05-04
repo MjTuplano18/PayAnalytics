@@ -202,15 +202,17 @@ export default function DashboardPage() {
     return [...new Set(data.payments.map((p) => p.environment).filter(Boolean) as string[])].sort();
   }, [apiSummary, data]);
 
-  // Banks filtered by selected environments (cascading)
+  // Banks filtered by selected environments + touchpoints (cascading)
   const allBanks = useMemo(() => {
-    // If environments are selected, only show banks that exist in those environments
-    if (selectedEnvironments.size > 0) {
+    if (selectedEnvironments.size > 0 || selectedTouchpoints.size > 0) {
       if (apiSummary?.environment_map) {
         const bankSet = new Set<string>();
         for (const envEntry of apiSummary.environment_map) {
-          if (selectedEnvironments.has(envEntry.environment)) {
-            envEntry.banks.forEach((b) => bankSet.add(b));
+          const envMatch = selectedEnvironments.size === 0 || selectedEnvironments.has(envEntry.environment);
+          if (!envMatch) continue;
+          for (const [bank, tps] of Object.entries(envEntry.touchpoints_by_bank)) {
+            const tpMatch = selectedTouchpoints.size === 0 || tps.some((tp) => selectedTouchpoints.has(tp));
+            if (tpMatch) bankSet.add(bank);
           }
         }
         return Array.from(bankSet).sort();
@@ -219,24 +221,29 @@ export default function DashboardPage() {
       if (data) {
         const bankSet = new Set<string>();
         data.payments
-          .filter((p) => selectedEnvironments.has(p.environment || "Unknown"))
+          .filter((p) => {
+            const envMatch = selectedEnvironments.size === 0 || selectedEnvironments.has(p.environment || "Unknown");
+            const tpMatch = selectedTouchpoints.size === 0 || selectedTouchpoints.has(p.touchpoint || "Unknown");
+            return envMatch && tpMatch;
+          })
           .forEach((p) => bankSet.add(p.bank));
         return Array.from(bankSet).sort();
       }
       return [];
     }
-    // No environment selected — show all banks
+    // No environment or touchpoint selected — show all banks
     if (apiSummary) return apiSummary.banks.map((b) => b.bank).sort();
     if (!data) return [];
     return [...new Set(data.payments.map((p) => p.bank))].sort();
-  }, [apiSummary, data, selectedEnvironments]);
+  }, [apiSummary, data, selectedEnvironments, selectedTouchpoints]);
 
   const portfolioFiltered = useMemo(() => {
     let f = payments;
     if (selectedEnvironments.size > 0) f = f.filter((p) => selectedEnvironments.has(p.environment || "Unknown"));
     if (selectedBanks.size > 0) f = f.filter((p) => selectedBanks.has(p.bank));
+    if (selectedTouchpoints.size > 0) f = f.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"));
     return f;
-  }, [payments, selectedEnvironments, selectedBanks]);
+  }, [payments, selectedEnvironments, selectedBanks, selectedTouchpoints]);
 
   const portfolioAnalytics = useMemo(() => {
     const src = portfolioFiltered;
@@ -287,31 +294,53 @@ export default function DashboardPage() {
 
   // ── Channels tab data ──
   const allTouchpoints = useMemo(() => {
+    if (selectedBanks.size > 0) {
+      // Cascade: only show touchpoints that exist for the selected bank(s)
+      if (apiSummary?.environment_map) {
+        const tpSet = new Set<string>();
+        for (const envEntry of apiSummary.environment_map) {
+          for (const [bank, tps] of Object.entries(envEntry.touchpoints_by_bank)) {
+            if (selectedBanks.has(bank)) tps.forEach((tp) => tpSet.add(tp));
+          }
+        }
+        return Array.from(tpSet).sort();
+      }
+      if (data) {
+        const tpSet = new Set<string>();
+        data.payments
+          .filter((p) => selectedBanks.has(p.bank))
+          .forEach((p) => tpSet.add(p.touchpoint || "Unknown"));
+        return Array.from(tpSet).sort();
+      }
+      return [];
+    }
     if (apiSummary) return apiSummary.touchpoints.map((t) => t.touchpoint);
     if (!data) return [];
     return [...new Set(data.payments.map((p) => p.touchpoint || "Unknown"))].sort();
-  }, [apiSummary, data]);
+  }, [apiSummary, data, selectedBanks]);
 
   const channelAnalytics = useMemo(() => {
     let base = payments;
     if (selectedEnvironments.size > 0) base = base.filter((p) => selectedEnvironments.has(p.environment || "Unknown"));
+    if (selectedBanks.size > 0) base = base.filter((p) => selectedBanks.has(p.bank));
     const src = selectedTouchpoints.size > 0
       ? base.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
       : base;
     // In-memory data loaded but filters return no results (no touchpoint/env selection active) — show zeros
-    if (src.length === 0 && data !== null && isFiltered && selectedTouchpoints.size === 0 && selectedEnvironments.size === 0) return [];
+    if (src.length === 0 && data !== null && isFiltered && selectedTouchpoints.size === 0 && selectedEnvironments.size === 0 && selectedBanks.size === 0) return [];
     // Fallback to apiSummary when no in-memory data — filter by selected environments + touchpoints.
     // apiSummary is already date-filtered from the API call.
     if (src.length === 0 && apiSummary) {
-      // Build allowed touchpoint set when environments are selected
+      // Build allowed touchpoint set when environments or banks are selected
       let allowedTouchpoints: Set<string> | null = null;
-      if (selectedEnvironments.size > 0 && apiSummary.environment_map) {
+      if ((selectedEnvironments.size > 0 || selectedBanks.size > 0) && apiSummary.environment_map) {
         allowedTouchpoints = new Set<string>();
         for (const envEntry of apiSummary.environment_map) {
-          if (selectedEnvironments.has(envEntry.environment)) {
-            for (const tps of Object.values(envEntry.touchpoints_by_bank)) {
-              tps.forEach((tp) => allowedTouchpoints!.add(tp));
-            }
+          const envMatch = selectedEnvironments.size === 0 || selectedEnvironments.has(envEntry.environment);
+          if (!envMatch) continue;
+          for (const [bank, tps] of Object.entries(envEntry.touchpoints_by_bank)) {
+            const bankMatch = selectedBanks.size === 0 || selectedBanks.has(bank);
+            if (bankMatch) tps.forEach((tp) => allowedTouchpoints!.add(tp));
           }
         }
       }
@@ -335,12 +364,13 @@ export default function DashboardPage() {
     return Array.from(tpMap.entries())
       .map(([touchpoint, d]) => { const tt = d.amounts.reduce((s, n) => s + Math.round(n * 100), 0) / 100; return { touchpoint, count: d.count, totalAmount: tt, percentage: totalAmount > 0 ? (tt / totalAmount) * 100 : 0 }; })
       .sort((a, b) => b.count - a.count);
-  }, [payments, data, isFiltered, selectedTouchpoints, selectedEnvironments, apiSummary]);
+  }, [payments, data, isFiltered, selectedTouchpoints, selectedEnvironments, selectedBanks, apiSummary]);
 
   // Channel type grouping (IB / OB / Direct / Ghost / Automated / No Touchpoint)
   const channelGroupData = useMemo(() => {
     let base = payments;
     if (selectedEnvironments.size > 0) base = base.filter((p) => selectedEnvironments.has(p.environment || "Unknown"));
+    if (selectedBanks.size > 0) base = base.filter((p) => selectedBanks.has(p.bank));
     const src = selectedTouchpoints.size > 0
       ? base.filter((p) => selectedTouchpoints.has(p.touchpoint || "Unknown"))
       : base;
@@ -365,7 +395,7 @@ export default function DashboardPage() {
     return Array.from(groupMap.entries())
       .map(([group, d]) => ({ group, count: d.count, amount: Math.round(d.amount * 100) / 100 }))
       .sort((a, b) => b.count - a.count);
-  }, [payments, selectedTouchpoints, selectedEnvironments, channelAnalytics]);
+  }, [payments, selectedTouchpoints, selectedEnvironments, selectedBanks, channelAnalytics]);
 
   const tpTotal = channelAnalytics.reduce((s, t) => s + t.count, 0);
   const tpTotalAmount = channelAnalytics.reduce((s, t) => s + Math.round(t.totalAmount * 100), 0) / 100;
@@ -376,7 +406,7 @@ export default function DashboardPage() {
   const TABS = [
     { id: "summary" as const, label: "Overview", icon: TrendingUp },
     { id: "portfolio" as const, label: "Banks", icon: Building2 },
-    { id: "channels" as const, label: "Environments", icon: Radio },
+    { id: "channels" as const, label: "Touchpoints", icon: Radio },
   ];
 
   const paginationBtnClass = "px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors";
@@ -467,8 +497,8 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-          {/* Bank filter — Portfolio tab only */}
-          {activeTab === "portfolio" && (
+          {/* Bank filter — Portfolio + Touchpoints tabs */}
+          {(activeTab === "portfolio" || activeTab === "channels") && (
             <div ref={bankDropdownRef} className="relative">
               <button onClick={() => setBankDropdownOpen((v) => !v)} className={dropdownBtnClass}>
                 <Landmark className="h-4 w-4" />
@@ -490,8 +520,8 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-          {/* Touchpoint filter — Channels tab only */}
-          {activeTab === "channels" && (
+          {/* Touchpoint filter — Portfolio + Channels tabs */}
+          {(activeTab === "portfolio" || activeTab === "channels") && (
             <div ref={tpDropdownRef} className="relative">
               <button onClick={() => setTpDropdownOpen((v) => !v)} className={dropdownBtnClass}>
                 <Waypoints className="h-4 w-4" />
@@ -762,7 +792,7 @@ export default function DashboardPage() {
             {showSkeleton ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />) : (
               <>
                 <MetricCard label="Total Transactions" value={fmt(tpTotal)} icon={Hash} iconBg="bg-[#5B66E2]" />
-                <MetricCard label="Total Amount" value={`₱${fmt(tpTotalAmount)}`} icon={DollarSign} iconBg="bg-[#4a55d1]" />
+                <MetricCard label="Total Amount" value={`₱${fmtAmt(tpTotalAmount)}`} icon={DollarSign} iconBg="bg-[#4a55d1]" />
                 <MetricCard label="Active Touchpoints" value={fmt(channelAnalytics.length)} icon={Waypoints} iconBg="bg-[#5B66E2]" />
                 <MetricCard label="Top Touchpoint" value={channelAnalytics[0]?.touchpoint ?? "—"} icon={BarChart3} iconBg="bg-[#4048c0]" />
               </>
