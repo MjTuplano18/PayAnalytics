@@ -55,14 +55,15 @@ export default function AccountsPage() {
     }
   );
 
-  // In-memory fallback (when no sessionId — data loaded from localStorage)
+  // In-memory fallback — always computed from data.payments so the page shows
+  // something useful when the API is slow, cold-starting, or returns empty.
   const inMemoryPayments: PaymentRecord[] = useMemo(() => {
-    if (!data || useApiPath) return [];
+    if (!data) return [];
     return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
-  }, [data, useApiPath, dateRange, customRange]);
+  }, [data, dateRange, customRange]);
 
   const inMemoryAccountData = useMemo(() => {
-    if (useApiPath || inMemoryPayments.length === 0) return [];
+    if (inMemoryPayments.length === 0) return [];
     const q = debouncedSearch.toLowerCase();
     const filtered = q
       ? inMemoryPayments.filter((p) => p.account.toLowerCase().includes(q))
@@ -84,11 +85,16 @@ export default function AccountsPage() {
         banks: [...d.banks].join(", "),
       }))
       .sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [useApiPath, inMemoryPayments, debouncedSearch]);
+  }, [inMemoryPayments, debouncedSearch]);
+
+  // Prefer server-side API data when available; fall back to in-memory when the
+  // API is still loading, cold-starting, or returned an empty accounts list.
+  const apiAccounts = accountsSummary?.accounts ?? [];
+  const hasApiAccounts = useApiPath && apiAccounts.length > 0;
 
   // Unified display values
-  const pageRows = useApiPath
-    ? (accountsSummary?.accounts ?? []).map((a) => ({
+  const pageRows = hasApiAccounts
+    ? apiAccounts.map((a) => ({
         account: a.account,
         totalAmount: a.total_amount,
         paymentCount: a.payment_count,
@@ -97,7 +103,7 @@ export default function AccountsPage() {
       }))
     : inMemoryAccountData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const totalAccounts = useApiPath
+  const totalAccounts = hasApiAccounts
     ? (accountsSummary?.total_accounts ?? 0)
     : inMemoryAccountData.length;
 
@@ -107,7 +113,7 @@ export default function AccountsPage() {
   const isLoading = useApiPath ? summaryLoading : false;
 
   // KPI metrics — computed over the full dataset (no page filter)
-  const allApiAccounts = accountsSummary?.accounts ?? [];
+  const allApiAccounts = apiAccounts;
   const avgPayments = allApiAccounts.length > 0
     ? allApiAccounts.reduce((s, a) => s + a.payment_count, 0) / allApiAccounts.length
     : (inMemoryAccountData.length > 0 ? inMemoryAccountData.reduce((s, a) => s + a.paymentCount, 0) / inMemoryAccountData.length : 0);
