@@ -6,6 +6,14 @@ const REFRESH_KEY = "pa_refresh_token";
 interface FetchOptions extends RequestInit {
   token?: string;
   _isRetry?: boolean;
+  _retryCount?: number;
+}
+
+const COLD_START_MAX_RETRIES = 2;
+const COLD_START_RETRY_DELAY_MS = 3000;
+
+function _sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Single in-flight refresh promise — prevents multiple parallel 401s from each
@@ -35,20 +43,34 @@ export async function apiFetch<T>(
   path: string,
   options: FetchOptions = {}
 ): Promise<T> {
-  const { token, headers, _isRetry, ...rest } = options;
+  const { token, headers, _isRetry, _retryCount = 0, ...rest } = options;
 
   let res: Response;
   try {
+    const isFormData = rest.body instanceof FormData;
     res = await fetch(`${API_BASE}${path}`, {
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
     ...rest,
   });
   } catch (err) {
+    // Retry on network errors — these occur when Render's free tier returns a 502
+    // during cold start; Render's proxy omits CORS headers, so the browser reports
+    // a network/CORS error instead of the actual 502.
+    if (_retryCount < COLD_START_MAX_RETRIES) {
+      await _sleep(COLD_START_RETRY_DELAY_MS * (_retryCount + 1));
+      return apiFetch<T>(path, { ...options, _retryCount: _retryCount + 1 });
+    }
     throw new Error(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Also retry explicit 502/503/504 responses (gateway errors)
+  if ((res.status === 502 || res.status === 503 || res.status === 504) && _retryCount < COLD_START_MAX_RETRIES) {
+    await _sleep(COLD_START_RETRY_DELAY_MS * (_retryCount + 1));
+    return apiFetch<T>(path, { ...options, _retryCount: _retryCount + 1 });
   }
 
   // Auto-refresh on 401 — only one refresh runs at a time; others wait for it
@@ -176,6 +198,24 @@ export interface UploadSessionOut {
 
 export interface UploadSessionDetail extends UploadSessionOut {
   records: PaymentRecordOut[];
+  /** True when the session has more than MAX_DETAIL_RECORDS rows.
+   *  Full data is accessible via getTransactions() or getAccountsSummary(). */
+  records_truncated: boolean;
+}
+
+export interface AccountSummaryEntry {
+  account: string;
+  total_amount: number;
+  payment_count: number;
+  bank_count: number;
+  banks: string;
+}
+
+export interface AccountsSummaryResponse {
+  session_id: string;
+  total_accounts: number;
+  total_records: number;
+  accounts: AccountSummaryEntry[];
 }
 
 export interface PaginatedTransactions {
@@ -239,6 +279,10 @@ export function listUploads(token: string) {
 
 export function getUpload(token: string, sessionId: string) {
   return apiFetch<UploadSessionDetail>(`/api/v1/uploads/${sessionId}`, { token });
+}
+
+export function getAccountsSummary(token: string, sessionId: string) {
+  return apiFetch<AccountsSummaryResponse>(`/api/v1/uploads/${sessionId}/accounts-summary`, { token });
 }
 
 export function getTransactions(
@@ -399,18 +443,9 @@ export async function uploadFile(
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(
-    `${API_BASE}/api/v1/uploads/file`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-    }
-  );
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.detail || `Upload failed (${res.status})`);
-  }
-  return res.json() as Promise<UploadSessionOut>;
+  return apiFetch<UploadSessionOut>(`/api/v1/uploads/file`, {
+    method: "POST",
+    token,
+    body: formData,
+  });
 }

@@ -10,7 +10,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { parseExcelFile } from "@/utils/excelParser";
-import { saveUpload, deleteUpload, type UploadSessionOut } from "@/lib/api";
+import { saveUpload, deleteUpload, uploadFile, type UploadSessionOut } from "@/lib/api";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUploads } from "@/lib/queries";
@@ -331,31 +331,50 @@ export default function UploadPage() {
     setError(null);
     setUploadSuccess(false);
 
+    // Always use server-side streaming — the backend handles all file sizes safely.
+    // Client-side parsing is only used for in-memory preview, not for saving to DB.
+    const LARGE_FILE_THRESHOLD = 0; // All uploads go through the streaming endpoint
+    const usesServerStreaming = file.size > LARGE_FILE_THRESHOLD;
+
     try {
-      // Parse client-side then save directly — skip setData/setRawData
-      // to avoid expensive React re-renders with large datasets.
-      // The dashboard will fetch data from the API via sessionId.
-      setUploadProgress(10);
-      const parsedData = await parseExcelFile(file);
-      setUploadProgress(50);
-      setUploadPhase("saving");
-      const records = parsedData.payments.map((p) => ({
-        bank: p.bank || "Unknown",
-        account: p.account || "",
-        touchpoint: p.touchpoint || "NO TOUCHPOINT",
-        payment_date: p.paymentDate || undefined,
-        payment_amount: Number.isFinite(p.paymentAmount) ? p.paymentAmount : 0,
-        environment: p.environment || undefined,
-      }));
-      setUploadProgress(60);
-      const saved = await saveUpload(token, { file_name: file.name, records });
-      setUploadProgress(100);
-      setUploadPhase("done");
-      setSessionId(saved.id);
-      setFileName(file.name);
-      // Populate in-memory data so all pages (Customers, filtered Dashboard, etc.) work
-      setData(parsedData);
-      setRawData(parsedData.raw);
+      let saved: UploadSessionOut;
+
+      if (usesServerStreaming) {
+        // Server-side streaming path: send raw file, backend parses row-by-row
+        setUploadProgress(20);
+        setUploadPhase("saving");
+        saved = await uploadFile(token, file);
+        setUploadProgress(100);
+        setUploadPhase("done");
+        setSessionId(saved.id);
+        setFileName(file.name);
+        // No in-memory data for large files — dashboard fetches from API
+        setData(null);
+        setRawData([]);
+      } else {
+        // Client-side path for smaller files (fast, supports in-memory filters)
+        setUploadProgress(10);
+        const parsedData = await parseExcelFile(file);
+        setUploadProgress(50);
+        setUploadPhase("saving");
+        const records = parsedData.payments.map((p) => ({
+          bank: p.bank || "Unknown",
+          account: p.account || "",
+          touchpoint: p.touchpoint || "NO TOUCHPOINT",
+          payment_date: p.paymentDate || undefined,
+          payment_amount: Number.isFinite(p.paymentAmount) ? p.paymentAmount : 0,
+          environment: p.environment || undefined,
+        }));
+        setUploadProgress(60);
+        saved = await saveUpload(token, { file_name: file.name, records });
+        setUploadProgress(100);
+        setUploadPhase("done");
+        setSessionId(saved.id);
+        setFileName(file.name);
+        setData(parsedData);
+        setRawData(parsedData.raw);
+      }
+
       await queryClient.invalidateQueries({ queryKey: ["uploads"] });
       toast.success(`Uploaded! ${saved.total_records.toLocaleString()} records saved.`);
       setUploadSuccess(true);

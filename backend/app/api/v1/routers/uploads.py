@@ -33,6 +33,9 @@ from app.schemas.upload import (
     UploadSessionDetail,
     UploadSessionOut,
     AuditLogCreate,
+    AccountsSummaryResponse,
+    AccountSummary,
+    MAX_DETAIL_RECORDS,
 )
 
 router = APIRouter(prefix="/uploads", tags=["Uploads"])
@@ -71,7 +74,7 @@ async def create_upload(
     return UploadSessionOut.model_validate(session)
 
 
-MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB (supports large XLSX/CSV files with 100k+ records)
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 
 
@@ -84,12 +87,14 @@ async def upload_file(
     """
     Upload an Excel/CSV file for server-side streaming parse.
 
-    The file is parsed row-by-row using openpyxl read-only mode to keep
-    peak memory low (important for 512 MB Render free tier).
+    The file is parsed row-by-row using openpyxl read-only mode and inserted
+    in batches of 2000 — only ~2000 records are in Python memory at any time,
+    making it safe for 100k+ row files on the 512 MB Render free tier.
     SSE progress events are broadcast during batch inserts.
     """
     import os
     from app.utils.file_parser import stream_xlsx, stream_csv
+    from app.schemas.upload import MAX_RECORDS_PER_FILE_UPLOAD
 
     file_name = file.filename or "upload"
     ext = os.path.splitext(file_name)[1].lower()
@@ -104,29 +109,31 @@ async def upload_file(
     if len(contents) > MAX_UPLOAD_SIZE:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="File exceeds 10 MB limit.",
+            detail=f"File exceeds {MAX_UPLOAD_SIZE // (1024 * 1024)} MB limit.",
         )
 
-    # Stream-parse into records
-    if ext == ".csv":
-        records = list(stream_csv(contents))
-    else:
-        records = list(stream_xlsx(contents))
+    # Stream-parse into records (generator — NOT materialised into a list)
+    record_stream = stream_csv(contents) if ext == ".csv" else stream_xlsx(contents)
 
-    if not records:
+    repo = UploadRepository(db)
+    audit_repo = AuditLogRepository(db)
+    try:
+        session = await repo.create_session_streaming(
+            user_id=current_user.id,
+            file_name=file_name,
+            records=record_stream,
+            max_records=MAX_RECORDS_PER_FILE_UPLOAD,
+            on_progress=broadcast_upload_progress,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    if session.total_records == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The uploaded file contains no data rows.",
         )
 
-    repo = UploadRepository(db)
-    audit_repo = AuditLogRepository(db)
-    session = await repo.create_session(
-        user_id=current_user.id,
-        file_name=file_name,
-        records=records,
-        on_progress=broadcast_upload_progress,
-    )
     await audit_repo.log_action(
         user_id=current_user.id,
         action="file_upload",
@@ -195,9 +202,14 @@ async def get_upload(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UploadSessionDetail:
-    """Get a single upload session with all its records."""
+    """Get a single upload session with up to MAX_DETAIL_RECORDS records inline.
+
+    For sessions larger than MAX_DETAIL_RECORDS, records are truncated and
+    records_truncated=True is set in the response.  Full data is always
+    available via /transactions (paginated) and /accounts-summary (aggregated).
+    """
     repo = UploadRepository(db)
-    session = await repo.get_session(session_id=session_id, user_id=current_user.id)
+    session = await repo.get_session_metadata(session_id=session_id, user_id=current_user.id)
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
     # Recompute total from SQL SUM (exact on NUMERIC columns) instead of
@@ -209,7 +221,49 @@ async def get_upload(
         .where(PaymentRecord.session_id == session_id)
     )
     session.total_amount = float(agg.scalar_one())
-    return UploadSessionDetail.model_validate(session)
+
+    # Load records with a hard cap to avoid OOM on large sessions
+    truncated = session.total_records > MAX_DETAIL_RECORDS
+    records = await repo.get_records_limited(
+        session_id=session_id,
+        user_id=current_user.id,
+        limit=MAX_DETAIL_RECORDS,
+    )
+    result = UploadSessionDetail(
+        id=str(session.id),
+        user_id=str(session.user_id),
+        file_name=session.file_name,
+        total_records=session.total_records,
+        total_amount=session.total_amount,
+        uploaded_at=session.uploaded_at,
+        records=[PaymentRecordOut.model_validate(r) for r in records],
+        records_truncated=truncated,
+    )
+    return result
+
+
+@router.get("/{session_id}/accounts-summary", response_model=AccountsSummaryResponse)
+async def get_accounts_summary(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AccountsSummaryResponse:
+    """Return per-account aggregates computed fully in SQL.
+
+    Memory-safe for any dataset size — no record rows are loaded into Python.
+    Used by the Customers page to show account-level analytics.
+    """
+    repo = UploadRepository(db)
+    session = await repo.get_session_metadata(session_id=session_id, user_id=current_user.id)
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
+    rows = await repo.get_accounts_summary(session_id=session_id, user_id=current_user.id)
+    return AccountsSummaryResponse(
+        session_id=session_id,
+        total_accounts=len(rows),
+        total_records=session.total_records,
+        accounts=[AccountSummary(**r) for r in rows],
+    )
 
 
 @router.get("/{session_id}/transactions", response_model=PaginatedTransactions)

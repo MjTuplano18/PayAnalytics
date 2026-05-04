@@ -20,7 +20,8 @@ class PaymentRecordOut(PaymentRecordIn):
     model_config = {"from_attributes": True}
 
 
-MAX_RECORDS_PER_UPLOAD = 100_000  # Guard against OOM on 512 MB Render free tier
+MAX_RECORDS_PER_UPLOAD = 50_000  # Guard against OOM on 512 MB Render free tier (JSON body path)
+MAX_RECORDS_PER_FILE_UPLOAD = 200_000  # Streaming file path is memory-safe — much higher limit
 
 
 class UploadSessionCreate(BaseModel):
@@ -48,6 +49,28 @@ class UploadSessionOut(BaseModel):
 
 class UploadSessionDetail(UploadSessionOut):
     records: list[PaymentRecordOut] = []
+    records_truncated: bool = False  # True when dataset exceeds MAX_DETAIL_RECORDS
+
+
+# Maximum records returned inline in GET /{session_id} to prevent OOM on 512 MB Render tier.
+# Larger datasets are still fully accessible via the paginated /transactions endpoint and
+# the /accounts-summary endpoint (server-side aggregation).
+MAX_DETAIL_RECORDS = 10_000
+
+
+class AccountSummary(BaseModel):
+    account: str
+    total_amount: float
+    payment_count: int
+    bank_count: int
+    banks: str  # comma-separated list
+
+
+class AccountsSummaryResponse(BaseModel):
+    session_id: str
+    total_accounts: int
+    total_records: int
+    accounts: list[AccountSummary]
 
 
 class PaginatedTransactions(BaseModel):

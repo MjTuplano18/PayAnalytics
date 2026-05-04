@@ -546,7 +546,7 @@ export default function DashboardPage() {
               Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
             ) : (
               <>
-                <MetricCard label="Total Payment Amount" value={`₱${fmt(fa.totalAmount)}`} icon={DollarSign} iconBg="bg-[#5B66E2]" info="Sum of all payments" />
+                <MetricCard label="Total Payment Amount" value={`₱${fmtAmt(fa.totalAmount)}`} icon={DollarSign} iconBg="bg-[#5B66E2]" info="Sum of all payments" />
                 <MetricCard label="Unique Accounts" value={fmt(fa.totalAccounts)} icon={Users} iconBg="bg-[#4a55d1]" info="Distinct debtor IDs" />
                 <MetricCard label="Total Transactions" value={fmt(fa.totalPayments)} icon={FileText} iconBg="bg-[#5B66E2]" info="Total payment rows" />
                 <MetricCard label="Banks / Portfolios" value={fmt(fa.bankAnalytics.length)} icon={Landmark} iconBg="bg-[#4048c0]" info="Distinct banks" />
@@ -629,7 +629,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {showSkeleton ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />) : (
               <>
-                <MetricCard label="Total Payment Amount" value={`₱${fmt(portfolioAnalytics.totalAmount)}`} icon={DollarSign} iconBg="bg-[#5B66E2]" />
+                <MetricCard label="Total Payment Amount" value={`₱${fmtAmt(portfolioAnalytics.totalAmount)}`} icon={DollarSign} iconBg="bg-[#5B66E2]" />
                 <MetricCard label="Unique Accounts" value={fmt(portfolioAnalytics.totalAccounts)} icon={Users} iconBg="bg-[#4a55d1]" />
                 <MetricCard label="Total Transactions" value={fmt(portfolioAnalytics.totalPayments)} icon={FileText} iconBg="bg-[#5B66E2]" />
                 <MetricCard label="Total Banks" value={fmt(portfolioAnalytics.bankAnalytics.length)} icon={Landmark} iconBg="bg-[#4048c0]" />
@@ -731,7 +731,7 @@ export default function DashboardPage() {
                   <tr className="bg-muted font-semibold">
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">Total</td>
                     <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(portfolioAnalytics.totalAccounts)}</td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmt(portfolioAnalytics.totalAmount)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₱{fmtAmt(portfolioAnalytics.totalAmount)}</td>
                     <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{fmt(portfolioAnalytics.totalPayments)}</td>
                     <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">100.0%</td>
                   </tr>

@@ -13,6 +13,7 @@ import {
   getTransactions,
   listUploads,
   getUpload,
+  getAccountsSummary,
   getAuditLog,
   getUnifiedAuditLog,
 } from "@/lib/api";
@@ -21,6 +22,7 @@ import {
 export const queryKeys = {
   uploads: (token: string) => ["uploads", token] as const,
   uploadRecords: (token: string, sessionId: string) => ["upload-records", sessionId, token] as const,
+  accountsSummary: (token: string, sessionId: string) => ["accounts-summary", sessionId, token] as const,
   dashboard: (token: string, sessionId: string, dateFrom?: string, dateTo?: string) =>
     ["dashboard", sessionId, token, dateFrom, dateTo] as const,
   transactions: (
@@ -110,6 +112,19 @@ export function useUploadRecords(token: string | null, sessionId: string | null,
   return useQuery({
     queryKey: queryKeys.uploadRecords(token!, sessionId!),
     queryFn: () => getUpload(token!, sessionId!),
+    enabled: !!token && !!sessionId && sessionValidated,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+}
+
+/** Fetch server-side account aggregates — memory-safe for any dataset size */
+export function useAccountsSummary(token: string | null, sessionId: string | null, sessionValidated = true) {
+  return useQuery({
+    queryKey: queryKeys.accountsSummary(token!, sessionId!),
+    queryFn: () => getAccountsSummary(token!, sessionId!),
     enabled: !!token && !!sessionId && sessionValidated,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,

@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
 import { DynamicChart } from "@/components/DynamicChart";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
-import { useUploadRecords } from "@/lib/queries";
+import { useUploadRecords, useAccountsSummary } from "@/lib/queries";
 import type { PaymentRecord } from "@/types/data";
 
 function fmt(n: number): string {
@@ -22,11 +22,20 @@ export default function AccountsPage() {
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const rowsPerPage = 25;
 
-  // When data context is null but sessionId is set, fetch records from API (cached via TanStack Query)
-  const { data: uploadDetail, isLoading: apiLoading } = useUploadRecords(
-    token, data ? null : sessionId, sessionValidated
+  // When data context is null but sessionId is set:
+  // - Use server-side account aggregation (memory-safe for any dataset size)
+  // - Falls back to useUploadRecords only when records_truncated is false (small datasets)
+  const useApiPath = !data && !!sessionId;
+  const { data: accountsSummary, isLoading: summaryLoading } = useAccountsSummary(
+    token, useApiPath ? sessionId : null, sessionValidated
   );
-  const apiPayments: PaymentRecord[] | null = uploadDetail
+  // Also fetch upload detail (capped at 10k records) for small-dataset date filtering
+  const { data: uploadDetail, isLoading: detailLoading } = useUploadRecords(
+    token, (useApiPath && accountsSummary && !accountsSummary.accounts.length) ? sessionId : null, sessionValidated
+  );
+  const apiLoading = summaryLoading || detailLoading;
+
+  const apiPayments: PaymentRecord[] | null = uploadDetail && !uploadDetail.records_truncated
     ? uploadDetail.records.map((r) => ({
         id: r.id,
         bank: r.bank,
@@ -38,15 +47,27 @@ export default function AccountsPage() {
       }))
     : null;
 
-  // Filter payments by date range first
+  // Filter payments by date range first (only for in-memory / small-dataset paths)
   const sourcePayments = data?.payments ?? apiPayments ?? [];
   const payments = useMemo(() => {
     if (sourcePayments.length === 0) return [];
     return filterByDateRange(sourcePayments, dateRange, (p) => p.paymentDate, customRange);
   }, [sourcePayments, dateRange, customRange]);
 
-  // Account-level analytics (aggregate by debtor_id/account)
+  // Account-level analytics:
+  // - When server-side aggregation is available (large datasets), use it directly.
+  // - Otherwise fall back to client-side aggregation from in-memory / API records.
   const accountData = useMemo(() => {
+    if (useApiPath && accountsSummary?.accounts.length) {
+      // Server path: aggregation was done in SQL, no date filter applied
+      return accountsSummary.accounts.map((a) => ({
+        account: a.account,
+        totalAmount: a.total_amount,
+        paymentCount: a.payment_count,
+        bankCount: a.bank_count,
+        banks: a.banks,
+      }));
+    }
     if (payments.length === 0) return [];
     const map = new Map<
       string,
@@ -70,9 +91,9 @@ export default function AccountsPage() {
         banks: [...d.banks].join(", "),
       }))
       .sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [payments]);
+  }, [useApiPath, accountsSummary, payments]);
 
-  if (!data && !apiPayments) {
+  if (!data && !accountsSummary && !apiPayments) {
     if (apiLoading) {
       return (
         <div className="px-4 sm:px-8 py-8 min-h-screen">
@@ -111,7 +132,7 @@ export default function AccountsPage() {
   const metrics = [
     {
       label: "Total Accounts",
-      value: fmt(data?.totalAccounts ?? accountData.length),
+      value: fmt(data?.totalAccounts ?? accountsSummary?.total_accounts ?? accountData.length),
       icon: Users,
       iconBg: "bg-[#4a55d1]",
       info: "Unique accounts in dataset",

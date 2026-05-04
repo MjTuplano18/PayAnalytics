@@ -8,6 +8,7 @@ entire sheet into memory — critical for the 512 MB RAM budget.
 import csv
 import io
 import re
+import uuid
 from typing import Iterator
 
 from app.schemas.upload import PaymentRecordIn
@@ -117,7 +118,7 @@ def _row_to_record(
 
     return PaymentRecordIn(
         bank=str(_get("bank") or "Unknown"),
-        account=str(_get("account") or ""),
+        account=str(_get("account") or "") or f"NO-ACCT-{uuid.uuid4().hex[:8].upper()}",
         touchpoint=str(_get("touchpoint") or "NO TOUCHPOINT"),
         payment_date=_format_date(_get("payment_date")),
         payment_amount=_safe_float(_get("payment_amount")),

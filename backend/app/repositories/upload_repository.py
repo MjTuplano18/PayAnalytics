@@ -1,6 +1,6 @@
 import logging
 from decimal import Decimal
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Iterator
 
 from sqlalchemy import delete as sql_delete, func, select, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,6 +58,77 @@ class UploadRepository:
             )
             if on_progress:
                 await on_progress(upload.id, file_name, min(i + BATCH, total), total)
+        await self.session.commit()
+        await self.session.refresh(upload)
+        return upload
+
+    async def create_session_streaming(
+        self,
+        user_id: str,
+        file_name: str,
+        records: Iterator[PaymentRecordIn],
+        max_records: int = 100_000,
+        on_progress: ProgressCallback = None,
+    ) -> UploadSession:
+        """Memory-efficient variant: accepts a generator and inserts in batches of 2000.
+
+        Only 2000 records are held in Python memory at once — suitable for 100k+
+        row files on the 512 MB Render free tier.
+        """
+        # Use 1 as a placeholder for total_records to satisfy the DB check constraint
+        # (ck_upload_sessions_total_records_positive requires total_records > 0).
+        # The real value is patched in via UPDATE before the transaction commits.
+        upload = UploadSession(
+            user_id=user_id,
+            file_name=file_name,
+            total_records=1,   # placeholder
+            total_amount=0.0,
+        )
+        self.session.add(upload)
+        await self.session.flush()  # get the id before bulk insert
+
+        BATCH = 2000
+        batch: list[dict] = []
+        total_records = 0
+        total_amount = Decimal("0")
+
+        for record in records:
+            total_records += 1
+            if total_records > max_records:
+                raise ValueError(
+                    f"Upload contains more than {max_records:,} records. "
+                    "Please split your file into smaller chunks."
+                )
+            total_amount += Decimal(str(record.payment_amount))
+            batch.append(
+                {
+                    "session_id": upload.id,
+                    "bank": record.bank,
+                    "account": record.account,
+                    "touchpoint": record.touchpoint,
+                    "payment_date": record.payment_date,
+                    "payment_amount": record.payment_amount,
+                    "environment": record.environment,
+                    "month": record.month,
+                }
+            )
+            if len(batch) >= BATCH:
+                await self.session.execute(PaymentRecord.__table__.insert(), batch)
+                batch = []
+                if on_progress:
+                    await on_progress(upload.id, file_name, total_records, 0)
+
+        if batch:
+            await self.session.execute(PaymentRecord.__table__.insert(), batch)
+
+        # Rollback empty uploads before they hit the constraint on commit
+        if total_records == 0:
+            await self.session.rollback()
+            raise ValueError("The uploaded file contains no data rows.")
+
+        # Patch the session row with real totals now that we know them
+        upload.total_records = total_records
+        upload.total_amount = float(total_amount)
         await self.session.commit()
         await self.session.refresh(upload)
         return upload
@@ -436,6 +507,67 @@ class UploadRepository:
             .order_by(PaymentRecord.payment_date.desc())
         )
         return list(result.scalars().all())
+
+    async def get_records_limited(
+        self, session_id: str, user_id: str, limit: int
+    ) -> list[PaymentRecord]:
+        """Fetch up to *limit* records for the GET /{session_id} detail endpoint.
+
+        Avoids the OOM that occurs when 100k-row sessions are eagerly loaded via
+        selectinload on Render's 512 MB free tier.
+        """
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return []
+        result = await self.session.execute(
+            select(PaymentRecord)
+            .where(PaymentRecord.session_id == session_id)
+            .order_by(PaymentRecord.payment_date.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def get_accounts_summary(self, session_id: str, user_id: str) -> list[dict]:
+        """Return per-account aggregates computed fully in SQL.
+
+        Uses GROUP BY so that no record rows are loaded into Python memory —
+        safe for sessions of any size on the 512 MB Render free tier.
+        """
+        session_check = await self.session.execute(
+            select(UploadSession.id).where(
+                UploadSession.id == session_id,
+                UploadSession.user_id == user_id,
+            )
+        )
+        if not session_check.scalar_one_or_none():
+            return []
+        rows = await self.session.execute(
+            select(
+                PaymentRecord.account,
+                func.sum(PaymentRecord.payment_amount).label("total_amount"),
+                func.count(PaymentRecord.id).label("payment_count"),
+                func.count(func.distinct(PaymentRecord.bank)).label("bank_count"),
+                func.string_agg(func.distinct(PaymentRecord.bank), cast(", ", String)).label("banks"),
+            )
+            .where(PaymentRecord.session_id == session_id)
+            .group_by(PaymentRecord.account)
+            .order_by(func.sum(PaymentRecord.payment_amount).desc())
+        )
+        return [
+            {
+                "account": r.account,
+                "total_amount": float(r.total_amount or 0),
+                "payment_count": r.payment_count,
+                "bank_count": r.bank_count,
+                "banks": r.banks or "",
+            }
+            for r in rows.all()
+        ]
 
     async def get_dashboard_summary(self, session_id: str, user_id: str, date_from: str | None = None, date_to: str | None = None) -> dict | None:
         # Verify session ownership

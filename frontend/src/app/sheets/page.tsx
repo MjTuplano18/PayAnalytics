@@ -17,7 +17,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import {
   createAuditLog,
-  getUpload,
+  exportAllRecords,
   createTransaction,
   updateTransaction,
   bulkDeleteTransactions,
@@ -166,6 +166,9 @@ export default function SheetsPage() {
 
   const [rows, setRows] = useState<SheetRow[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const needsFullLoadRef = useRef<{ total: number } | null>(null);
+  const [fullLoadTrigger, setFullLoadTrigger] = useState(0);
   const gridRef = useRef<AgGridReact<SheetRow>>(null);
   const gridApiRef = useRef<GridApi<SheetRow> | null>(null);
   const skipNextDataEffect = useRef(false);
@@ -421,6 +424,10 @@ export default function SheetsPage() {
   useEffect(() => {
     if (!uploadDetail) return;
     if (paymentsHaveIds) return; // DataContext already has IDs
+    // Capture truncation info before uploadDetail disappears
+    if (uploadDetail.records_truncated) {
+      needsFullLoadRef.current = { total: uploadDetail.total_records };
+    }
     const newRows = uploadDetail.records.map((r) => ({
       id: r.id,
       bank: r.bank,
@@ -432,8 +439,49 @@ export default function SheetsPage() {
     }));
     setRows(newRows);
     syncToContext(newRows);
+    // Trigger full-load after initial rows are set
+    if (uploadDetail.records_truncated) {
+      setFullLoadTrigger((n) => n + 1);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploadDetail]);
+
+  /* ---- Load ALL rows when session has more than 10k records ---- */
+  useEffect(() => {
+    if (!fullLoadTrigger || !needsFullLoadRef.current || !sessionId || !token) return;
+
+    const totalRecords = needsFullLoadRef.current.total;
+    needsFullLoadRef.current = null; // prevent re-runs
+    let cancelled = false;
+
+    const fetchAll = async () => {
+      setLoadProgress({ loaded: 0, total: totalRecords });
+      try {
+        const records = await exportAllRecords(token, sessionId);
+        if (cancelled) return;
+        const allRows: SheetRow[] = records.map((r) => ({
+          id: r.id,
+          bank: r.bank,
+          paymentDate: r.payment_date ?? "",
+          paymentAmount: r.payment_amount,
+          account: r.account,
+          touchpoint: r.touchpoint ?? "",
+          environment: r.environment ?? "",
+        }));
+        if (!cancelled) {
+          setLoadProgress({ loaded: allRows.length, total: totalRecords });
+          setRows(allRows);
+          syncToContext(allRows);
+        }
+      } finally {
+        if (!cancelled) setLoadProgress(null);
+      }
+    };
+
+    fetchAll();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullLoadTrigger]);
 
   /* ---- Cell edit handler ---- */
   const onCellValueChanged = useCallback(
@@ -766,6 +814,21 @@ export default function SheetsPage() {
 
   return (
     <div className="px-4 sm:px-8 py-6 min-h-screen flex flex-col">
+      {/* Loading progress banner for large sessions */}
+      {loadProgress && (
+        <div className="mb-4 rounded-lg border border-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-700 px-4 py-3 text-sm text-blue-800 dark:text-blue-300">
+          <div className="flex items-center justify-between mb-1">
+            <span>Loading all records… <strong>{loadProgress.loaded.toLocaleString()}</strong> / <strong>{loadProgress.total.toLocaleString()}</strong></span>
+            <span>{Math.round((loadProgress.loaded / loadProgress.total) * 100)}%</span>
+          </div>
+          <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-1.5">
+            <div
+              className="bg-blue-500 h-1.5 rounded-full transition-all"
+              style={{ width: `${Math.round((loadProgress.loaded / loadProgress.total) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
       {/* Header + Toolbar */}
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
