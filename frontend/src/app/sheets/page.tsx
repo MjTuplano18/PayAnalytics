@@ -38,6 +38,14 @@ import { useQueryClient } from "@tanstack/react-query";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
+/**
+ * Module-level set of session IDs for which the full dataset has been loaded
+ * into DataContext in this tab session. Persists across page navigation
+ * (preventing redundant full-loads on back-navigation) and resets on page
+ * refresh (in sync with DataContext, so the full-load re-runs cleanly).
+ */
+const completedFullLoads = new Set<string>();
+
 /* ------------------------------------------------------------------ */
 /*  Custom AG Grid theme matching M3 Expressive design                */
 /* ------------------------------------------------------------------ */
@@ -158,10 +166,13 @@ export default function SheetsPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  // Use cached TanStack Query data for backend session (avoids re-fetch on every navigation)
+  // Use cached TanStack Query data for backend session (avoids re-fetch on every navigation).
+  // dataIsComplete: true once a full-load (or session with ≤10k records) has completed.
+  // Uses a module-level Set — no race condition with sessions cache loading timing.
   const paymentsHaveIds = !!(data?.payments?.length && data.payments.some((p) => p.id));
+  const dataIsComplete = !!(paymentsHaveIds && sessionId && completedFullLoads.has(sessionId));
   const { data: uploadDetail, isLoading: uploadLoading } = useUploadRecords(
-    token, (!data || !paymentsHaveIds) ? sessionId : null, sessionValidated
+    token, (!data || !dataIsComplete) ? sessionId : null, sessionValidated
   );
 
   const [rows, setRows] = useState<SheetRow[]>([]);
@@ -423,7 +434,7 @@ export default function SheetsPage() {
   /* ---- Load rows from backend for persisted sessions (cached via TanStack Query) ---- */
   useEffect(() => {
     if (!uploadDetail) return;
-    if (paymentsHaveIds) return; // DataContext already has IDs
+    if (dataIsComplete) return; // DataContext already has all records for this session
     // Capture truncation info before uploadDetail disappears
     if (uploadDetail.records_truncated) {
       needsFullLoadRef.current = { total: uploadDetail.total_records };
@@ -439,9 +450,12 @@ export default function SheetsPage() {
     }));
     setRows(newRows);
     syncToContext(newRows);
-    // Trigger full-load after initial rows are set
     if (uploadDetail.records_truncated) {
+      // Trigger full-load — dataset exceeds 10k inline cap
       setFullLoadTrigger((n) => n + 1);
+    } else {
+      // All records fit in the inline response — mark complete immediately
+      if (sessionId) completedFullLoads.add(sessionId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploadDetail]);
@@ -472,6 +486,14 @@ export default function SheetsPage() {
           setLoadProgress({ loaded: allRows.length, total: totalRecords });
           setRows(allRows);
           syncToContext(allRows);
+          // Mark this session as fully loaded so back-navigation skips the full-load.
+          if (sessionId) completedFullLoads.add(sessionId);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          toast.error(
+            `Failed to load all records: ${err instanceof Error ? err.message : "Network error"}. Showing first 10,000 rows.`
+          );
         }
       } finally {
         if (!cancelled) setLoadProgress(null);
@@ -814,21 +836,6 @@ export default function SheetsPage() {
 
   return (
     <div className="px-4 sm:px-8 py-6 min-h-screen flex flex-col">
-      {/* Loading progress banner for large sessions */}
-      {loadProgress && (
-        <div className="mb-4 rounded-lg border border-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-700 px-4 py-3 text-sm text-blue-800 dark:text-blue-300">
-          <div className="flex items-center justify-between mb-1">
-            <span>Loading all records… <strong>{loadProgress.loaded.toLocaleString()}</strong> / <strong>{loadProgress.total.toLocaleString()}</strong></span>
-            <span>{Math.round((loadProgress.loaded / loadProgress.total) * 100)}%</span>
-          </div>
-          <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-1.5">
-            <div
-              className="bg-blue-500 h-1.5 rounded-full transition-all"
-              style={{ width: `${Math.round((loadProgress.loaded / loadProgress.total) * 100)}%` }}
-            />
-          </div>
-        </div>
-      )}
       {/* Header + Toolbar */}
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -870,6 +877,8 @@ export default function SheetsPage() {
             variant="outline"
             className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
             onClick={deleteSelected}
+            disabled={!!loadProgress}
+            title={loadProgress ? "Wait for all records to finish loading before deleting" : undefined}
           >
             <Trash2 className="h-4 w-4" /> Delete Selected
           </Button>
@@ -910,6 +919,32 @@ export default function SheetsPage() {
             <div className="flex flex-col items-center gap-3">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               <span className="text-sm font-medium text-muted-foreground">Deleting rows…</span>
+            </div>
+          </div>
+        )}
+        {loadProgress && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg">
+            <div className="flex flex-col items-center gap-4 bg-card border border-border rounded-2xl px-8 py-8 shadow-lg min-w-[260px]">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <div className="text-center">
+                <p className="text-base font-semibold">Loading all records…</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {loadProgress.total.toLocaleString()} total rows
+                </p>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: loadProgress.total > 0
+                      ? `${Math.min(100, (loadProgress.loaded / loadProgress.total) * 100)}%`
+                      : "10%",
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Please wait while your data is being loaded
+              </p>
             </div>
           </div>
         )}

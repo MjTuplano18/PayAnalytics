@@ -532,11 +532,22 @@ class UploadRepository:
         )
         return list(result.scalars().all())
 
-    async def get_accounts_summary(self, session_id: str, user_id: str) -> list[dict]:
-        """Return per-account aggregates computed fully in SQL.
+    async def get_accounts_summary(
+        self,
+        session_id: str,
+        user_id: str,
+        search: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> tuple[int, list[dict]]:
+        """Return paginated, filtered per-account aggregates computed fully in SQL.
 
         Uses GROUP BY so that no record rows are loaded into Python memory —
         safe for sessions of any size on the 512 MB Render free tier.
+
+        Returns (total_accounts, page_of_accounts).
         """
         session_check = await self.session.execute(
             select(UploadSession.id).where(
@@ -545,8 +556,16 @@ class UploadRepository:
             )
         )
         if not session_check.scalar_one_or_none():
-            return []
-        rows = await self.session.execute(
+            return 0, []
+
+        base_conditions = [PaymentRecord.session_id == session_id]
+        if date_from:
+            base_conditions.append(PaymentRecord.payment_date >= date_from)
+        if date_to:
+            base_conditions.append(PaymentRecord.payment_date <= date_to)
+
+        # Build the grouped subquery first, then apply HAVING-style search on the account name
+        agg_query = (
             select(
                 PaymentRecord.account,
                 func.sum(PaymentRecord.payment_amount).label("total_amount"),
@@ -554,11 +573,28 @@ class UploadRepository:
                 func.count(func.distinct(PaymentRecord.bank)).label("bank_count"),
                 func.string_agg(func.distinct(PaymentRecord.bank), cast(", ", String)).label("banks"),
             )
-            .where(PaymentRecord.session_id == session_id)
+            .where(*base_conditions)
             .group_by(PaymentRecord.account)
-            .order_by(func.sum(PaymentRecord.payment_amount).desc())
         )
-        return [
+
+        if search:
+            safe_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            agg_query = agg_query.having(
+                PaymentRecord.account.ilike(f"%{safe_search}%")
+            )
+
+        # Total count of matching account groups
+        count_sub = agg_query.subquery()
+        count_result = await self.session.execute(
+            select(func.count()).select_from(count_sub)
+        )
+        total_accounts = count_result.scalar_one()
+
+        # Paginated results ordered by total_amount desc
+        offset = (page - 1) * page_size
+        agg_query = agg_query.order_by(func.sum(PaymentRecord.payment_amount).desc()).offset(offset).limit(page_size)
+        rows = await self.session.execute(agg_query)
+        return total_accounts, [
             {
                 "account": r.account,
                 "total_amount": float(r.total_amount or 0),

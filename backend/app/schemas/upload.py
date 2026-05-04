@@ -70,6 +70,8 @@ class AccountsSummaryResponse(BaseModel):
     session_id: str
     total_accounts: int
     total_records: int
+    page: int
+    page_size: int
     accounts: list[AccountSummary]
 
 

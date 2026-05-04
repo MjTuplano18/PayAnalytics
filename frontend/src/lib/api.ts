@@ -215,6 +215,8 @@ export interface AccountsSummaryResponse {
   session_id: string;
   total_accounts: number;
   total_records: number;
+  page: number;
+  page_size: number;
   accounts: AccountSummaryEntry[];
 }
 
@@ -281,8 +283,19 @@ export function getUpload(token: string, sessionId: string) {
   return apiFetch<UploadSessionDetail>(`/api/v1/uploads/${sessionId}`, { token });
 }
 
-export function getAccountsSummary(token: string, sessionId: string) {
-  return apiFetch<AccountsSummaryResponse>(`/api/v1/uploads/${sessionId}/accounts-summary`, { token });
+export function getAccountsSummary(
+  token: string,
+  sessionId: string,
+  params: { search?: string; date_from?: string; date_to?: string; page?: number; page_size?: number } = {}
+) {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set("search", params.search);
+  if (params.date_from) qs.set("date_from", params.date_from);
+  if (params.date_to) qs.set("date_to", params.date_to);
+  if (params.page) qs.set("page", String(params.page));
+  if (params.page_size) qs.set("page_size", String(params.page_size));
+  const query = qs.toString() ? `?${qs}` : "";
+  return apiFetch<AccountsSummaryResponse>(`/api/v1/uploads/${sessionId}/accounts-summary${query}`, { token });
 }
 
 export function getTransactions(

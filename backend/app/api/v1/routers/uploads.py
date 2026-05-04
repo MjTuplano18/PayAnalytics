@@ -245,23 +245,42 @@ async def get_upload(
 @router.get("/{session_id}/accounts-summary", response_model=AccountsSummaryResponse)
 async def get_accounts_summary(
     session_id: str,
+    search: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    page: int = 1,
+    page_size: int = 25,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> AccountsSummaryResponse:
-    """Return per-account aggregates computed fully in SQL.
+    """Return paginated, filtered per-account aggregates computed fully in SQL.
 
     Memory-safe for any dataset size — no record rows are loaded into Python.
     Used by the Customers page to show account-level analytics.
     """
+    if page < 1:
+        page = 1
+    if page_size < 1 or page_size > 200:
+        raise HTTPException(status_code=422, detail="page_size must be between 1 and 200.")
     repo = UploadRepository(db)
     session = await repo.get_session_metadata(session_id=session_id, user_id=current_user.id)
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Upload session not found.")
-    rows = await repo.get_accounts_summary(session_id=session_id, user_id=current_user.id)
+    total_accounts, rows = await repo.get_accounts_summary(
+        session_id=session_id,
+        user_id=current_user.id,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        page_size=page_size,
+    )
     return AccountsSummaryResponse(
         session_id=session_id,
-        total_accounts=len(rows),
+        total_accounts=total_accounts,
         total_records=session.total_records,
+        page=page,
+        page_size=page_size,
         accounts=[AccountSummary(**r) for r in rows],
     )
 

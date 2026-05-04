@@ -22,7 +22,11 @@ import {
 export const queryKeys = {
   uploads: (token: string) => ["uploads", token] as const,
   uploadRecords: (token: string, sessionId: string) => ["upload-records", sessionId, token] as const,
-  accountsSummary: (token: string, sessionId: string) => ["accounts-summary", sessionId, token] as const,
+  accountsSummary: (
+    token: string,
+    sessionId: string,
+    filters: { search?: string; date_from?: string; date_to?: string; page?: number; page_size?: number }
+  ) => ["accounts-summary", sessionId, filters, token] as const,
   dashboard: (token: string, sessionId: string, dateFrom?: string, dateTo?: string) =>
     ["dashboard", sessionId, token, dateFrom, dateTo] as const,
   transactions: (
@@ -120,16 +124,22 @@ export function useUploadRecords(token: string | null, sessionId: string | null,
   });
 }
 
-/** Fetch server-side account aggregates — memory-safe for any dataset size */
-export function useAccountsSummary(token: string | null, sessionId: string | null, sessionValidated = true) {
+/** Fetch server-side account aggregates — paginated and filtered, memory-safe for any dataset size */
+export function useAccountsSummary(
+  token: string | null,
+  sessionId: string | null,
+  sessionValidated = true,
+  filters: { search?: string; date_from?: string; date_to?: string; page?: number; page_size?: number } = {}
+) {
   return useQuery({
-    queryKey: queryKeys.accountsSummary(token!, sessionId!),
-    queryFn: () => getAccountsSummary(token!, sessionId!),
+    queryKey: queryKeys.accountsSummary(token!, sessionId!, filters),
+    queryFn: () => getAccountsSummary(token!, sessionId!, filters),
     enabled: !!token && !!sessionId && sessionValidated,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    placeholderData: keepPreviousData,
   });
 }
 

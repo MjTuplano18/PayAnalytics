@@ -1,82 +1,75 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Users, DollarSign, FileText, Info } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Users, DollarSign, FileText, Info, Search } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { DynamicChart } from "@/components/DynamicChart";
-import { DateFilter, DateRange, CustomDateRange, filterByDateRange } from "@/components/DateFilter";
-import { useUploadRecords, useAccountsSummary } from "@/lib/queries";
+import { DateFilter, DateRange, CustomDateRange, filterByDateRange, dateRangeToBounds } from "@/components/DateFilter";
+import { useAccountsSummary } from "@/lib/queries";
 import type { PaymentRecord } from "@/types/data";
 
 function fmt(n: number): string {
   return n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+const PAGE_SIZE = 25;
+
 export default function AccountsPage() {
   const { data, sessionId, sessionValidated } = useData();
   const { token } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
-  const rowsPerPage = 25;
 
-  // When data context is null but sessionId is set:
-  // - Use server-side account aggregation (memory-safe for any dataset size)
-  // - Falls back to useUploadRecords only when records_truncated is false (small datasets)
-  const useApiPath = !data && !!sessionId;
+  // Debounce search: wait 400 ms after the user stops typing
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 400);
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, [searchQuery]);
+
+  // Server-side path: sessionId is set → always use server-side pagination
+  const useApiPath = !!sessionId;
+  const dateBounds = dateRangeToBounds(dateRange, customRange);
   const { data: accountsSummary, isLoading: summaryLoading } = useAccountsSummary(
-    token, useApiPath ? sessionId : null, sessionValidated
-  );
-  // Also fetch upload detail (capped at 10k records) for small-dataset date filtering
-  const { data: uploadDetail, isLoading: detailLoading } = useUploadRecords(
-    token, (useApiPath && accountsSummary && !accountsSummary.accounts.length) ? sessionId : null, sessionValidated
-  );
-  const apiLoading = summaryLoading || detailLoading;
-
-  const apiPayments: PaymentRecord[] | null = uploadDetail && !uploadDetail.records_truncated
-    ? uploadDetail.records.map((r) => ({
-        id: r.id,
-        bank: r.bank,
-        account: r.account,
-        touchpoint: r.touchpoint ?? "",
-        paymentDate: r.payment_date ?? "",
-        paymentAmount: r.payment_amount,
-        environment: r.environment ?? undefined,
-      }))
-    : null;
-
-  // Filter payments by date range first (only for in-memory / small-dataset paths)
-  const sourcePayments = data?.payments ?? apiPayments ?? [];
-  const payments = useMemo(() => {
-    if (sourcePayments.length === 0) return [];
-    return filterByDateRange(sourcePayments, dateRange, (p) => p.paymentDate, customRange);
-  }, [sourcePayments, dateRange, customRange]);
-
-  // Account-level analytics:
-  // - When server-side aggregation is available (large datasets), use it directly.
-  // - Otherwise fall back to client-side aggregation from in-memory / API records.
-  const accountData = useMemo(() => {
-    if (useApiPath && accountsSummary?.accounts.length) {
-      // Server path: aggregation was done in SQL, no date filter applied
-      return accountsSummary.accounts.map((a) => ({
-        account: a.account,
-        totalAmount: a.total_amount,
-        paymentCount: a.payment_count,
-        bankCount: a.bank_count,
-        banks: a.banks,
-      }));
+    token,
+    useApiPath ? sessionId : null,
+    sessionValidated,
+    {
+      search: debouncedSearch || undefined,
+      date_from: dateBounds.date_from,
+      date_to: dateBounds.date_to,
+      page: currentPage,
+      page_size: PAGE_SIZE,
     }
-    if (payments.length === 0) return [];
-    const map = new Map<
-      string,
-      { totalAmount: number; paymentCount: number; banks: Set<string> }
-    >();
-    for (const p of payments) {
-      if (!map.has(p.account)) {
-        map.set(p.account, { totalAmount: 0, paymentCount: 0, banks: new Set() });
-      }
+  );
+
+  // In-memory fallback (when no sessionId — data loaded from localStorage)
+  const inMemoryPayments: PaymentRecord[] = useMemo(() => {
+    if (!data || useApiPath) return [];
+    return filterByDateRange(data.payments, dateRange, (p) => p.paymentDate, customRange);
+  }, [data, useApiPath, dateRange, customRange]);
+
+  const inMemoryAccountData = useMemo(() => {
+    if (useApiPath || inMemoryPayments.length === 0) return [];
+    const q = debouncedSearch.toLowerCase();
+    const filtered = q
+      ? inMemoryPayments.filter((p) => p.account.toLowerCase().includes(q))
+      : inMemoryPayments;
+    const map = new Map<string, { totalAmount: number; paymentCount: number; banks: Set<string> }>();
+    for (const p of filtered) {
+      if (!map.has(p.account)) map.set(p.account, { totalAmount: 0, paymentCount: 0, banks: new Set() });
       const entry = map.get(p.account)!;
       entry.totalAmount += p.paymentAmount;
       entry.paymentCount++;
@@ -91,18 +84,48 @@ export default function AccountsPage() {
         banks: [...d.banks].join(", "),
       }))
       .sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [useApiPath, accountsSummary, payments]);
+  }, [useApiPath, inMemoryPayments, debouncedSearch]);
 
-  if (!data && !accountsSummary && !apiPayments) {
-    if (apiLoading) {
-      return (
-        <div className="px-4 sm:px-8 py-8 min-h-screen">
-          <div className="p-12 rounded-lg text-center bg-card border border-border">
-            <p className="text-gray-600 dark:text-gray-400">Loading account data…</p>
-          </div>
+  // Unified display values
+  const pageRows = useApiPath
+    ? (accountsSummary?.accounts ?? []).map((a) => ({
+        account: a.account,
+        totalAmount: a.total_amount,
+        paymentCount: a.payment_count,
+        bankCount: a.bank_count,
+        banks: a.banks,
+      }))
+    : inMemoryAccountData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const totalAccounts = useApiPath
+    ? (accountsSummary?.total_accounts ?? 0)
+    : inMemoryAccountData.length;
+
+  const totalPages = Math.max(1, Math.ceil(totalAccounts / PAGE_SIZE));
+  const start = (currentPage - 1) * PAGE_SIZE;
+
+  const isLoading = useApiPath ? summaryLoading : false;
+
+  // KPI metrics — computed over the full dataset (no page filter)
+  const allApiAccounts = accountsSummary?.accounts ?? [];
+  const avgPayments = allApiAccounts.length > 0
+    ? allApiAccounts.reduce((s, a) => s + a.payment_count, 0) / allApiAccounts.length
+    : (inMemoryAccountData.length > 0 ? inMemoryAccountData.reduce((s, a) => s + a.paymentCount, 0) / inMemoryAccountData.length : 0);
+  const avgAmount = allApiAccounts.length > 0
+    ? allApiAccounts.reduce((s, a) => s + a.total_amount, 0) / allApiAccounts.length
+    : (inMemoryAccountData.length > 0 ? inMemoryAccountData.reduce((s, a) => s + a.totalAmount, 0) / inMemoryAccountData.length : 0);
+
+  if (!data && !accountsSummary && isLoading) {
+    return (
+      <div className="px-4 sm:px-8 py-8 min-h-screen">
+        <div className="p-12 rounded-lg text-center bg-card border border-border">
+          <p className="text-gray-600 dark:text-gray-400">Loading account data…</p>
         </div>
-      );
-    }
+      </div>
+    );
+  }
+
+  if (!data && !accountsSummary && !isLoading) {
     return (
       <div className="px-4 sm:px-8 py-8 min-h-screen">
         <div className="p-12 rounded-lg text-center bg-card border border-border">
@@ -119,20 +142,10 @@ export default function AccountsPage() {
     );
   }
 
-  const avgPayments =
-    accountData.length > 0
-      ? accountData.reduce((s, a) => s + a.paymentCount, 0) / accountData.length
-      : 0;
-
-  const avgAmount =
-    accountData.length > 0
-      ? accountData.reduce((s, a) => s + a.totalAmount, 0) / accountData.length
-      : 0;
-
   const metrics = [
     {
       label: "Total Accounts",
-      value: fmt(data?.totalAccounts ?? accountsSummary?.total_accounts ?? accountData.length),
+      value: fmt(data?.totalAccounts ?? accountsSummary?.total_accounts ?? totalAccounts),
       icon: Users,
       iconBg: "bg-[#4a55d1]",
       info: "Unique accounts in dataset",
@@ -152,6 +165,16 @@ export default function AccountsPage() {
       info: "Average payment amount per account",
     },
   ];
+
+  const chartData = pageRows.slice(0, 10).map((a) => ({ account: a.account, amount: a.totalAmount }));
+
+  const pageNums: number[] = [];
+  let ps = Math.max(1, currentPage - 2);
+  let pe = Math.min(totalPages, ps + 4);
+  ps = Math.max(1, pe - 4);
+  for (let i = ps; i <= pe; i++) pageNums.push(i);
+
+  const btnClass = "px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors";
 
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
@@ -213,10 +236,7 @@ export default function AccountsPage() {
           <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Top 10 Accounts by Amount</h3>
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Top 10 debtor accounts ranked by total payment amount collected</p>
           <DynamicChart
-            data={accountData.slice(0, 10).map((a) => ({
-              account: a.account,
-              amount: a.totalAmount,
-            }))}
+            data={chartData}
             type="bar"
             dataKey="amount"
             xAxisKey="account"
@@ -226,113 +246,99 @@ export default function AccountsPage() {
       </div>
 
       {/* Account Details Table */}
-      {(() => {
-        const totalPages = Math.max(1, Math.ceil(accountData.length / rowsPerPage));
-        const start = (currentPage - 1) * rowsPerPage;
-        const pageRows = accountData.slice(start, start + rowsPerPage);
-        const pageNums: number[] = [];
-        let ps = Math.max(1, currentPage - 2);
-        let pe = Math.min(totalPages, ps + 4);
-        ps = Math.max(1, pe - 4);
-        for (let i = ps; i <= pe; i++) pageNums.push(i);
-
-        return (
-          <div className="rounded-lg border bg-card border-border overflow-x-auto">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Account Details
-              </h3>
-            </div>
-            <table className="w-full min-w-[600px]">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Account
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Total Amount
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Payments
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Banks
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {pageRows.map((a) => (
-                  <tr
-                    key={a.account}
-                    className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200"
-                  >
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                      {a.account}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right text-green-600 dark:text-green-400 font-medium">
-                      ₱{fmt(a.totalAmount)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
-                      {fmt(a.paymentCount)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-[300px] truncate">
-                      {a.banks}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Showing {fmt(start + 1)}&ndash;{fmt(Math.min(start + rowsPerPage, accountData.length))} of {fmt(accountData.length)} accounts
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  First
-                </button>
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Prev
-                </button>
-                {pageNums.map((pg) => (
-                  <button
-                    key={pg}
-                    onClick={() => setCurrentPage(pg)}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${
-                      pg === currentPage
-                        ? "bg-[#4a55d1] text-white border-[#4a55d1] shadow-sm"
-                        : "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2]"
-                    }`}
-                  >
-                    {pg}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-                <button
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  className="px-2.5 py-1.5 text-sm font-medium rounded-md border bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-500 text-gray-800 dark:text-gray-100 hover:bg-[#5B66E2]/5 hover:border-[#5B66E2] hover:text-[#5B66E2] dark:hover:bg-[#5B66E2]/20 dark:hover:border-[#5B66E2] dark:hover:text-[#8B96F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Last
-                </button>
-              </div>
-            </div>
+      <div className="rounded-lg border bg-card border-border overflow-x-auto">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Account Details
+          </h3>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Search accounts…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 text-sm"
+            />
           </div>
-        );
-      })()}
+        </div>
+        <table className="w-full min-w-[600px]">
+          <thead className="bg-muted">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                Account
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                Total Amount
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                Payments
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                Banks
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            {isLoading ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                  Loading…
+                </td>
+              </tr>
+            ) : pageRows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No accounts found.
+                </td>
+              </tr>
+            ) : (
+              pageRows.map((a) => (
+                <tr
+                  key={a.account}
+                  className="hover:bg-[#5B66E2]/5 dark:hover:bg-[#5B66E2]/10 transition-colors duration-200"
+                >
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                    {a.account}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right text-green-600 dark:text-green-400 font-medium">
+                    ₱{fmt(a.totalAmount)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                    {fmt(a.paymentCount)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-[300px] truncate">
+                    {a.banks}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+        <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Showing {totalAccounts === 0 ? 0 : fmt(start + 1)}&ndash;{fmt(Math.min(start + PAGE_SIZE, totalAccounts))} of {fmt(totalAccounts)} accounts
+          </p>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className={btnClass}>First</button>
+            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className={btnClass}>Prev</button>
+            {pageNums.map((pg) => (
+              <button
+                key={pg}
+                onClick={() => setCurrentPage(pg)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${
+                  pg === currentPage
+                    ? "bg-[#4a55d1] text-white border-[#4a55d1] shadow-sm"
+                    : btnClass
+                }`}
+              >
+                {pg}
+              </button>
+            ))}
+            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className={btnClass}>Next</button>
+            <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className={btnClass}>Last</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

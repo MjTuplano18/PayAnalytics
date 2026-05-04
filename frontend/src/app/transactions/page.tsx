@@ -8,7 +8,6 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateFilter, DateRange, CustomDateRange, filterByDateRange, dateRangeToBounds } from "@/components/DateFilter";
 import { getTransactions, getDashboardSummary, deleteTransaction, deleteTransactionsByDateRange, getUpload, deleteUpload, createTransaction, updateTransaction, type PaymentRecordOut } from "@/lib/api";
@@ -712,13 +711,6 @@ export default function TransactionsPage() {
 
         {/* Table */}
         <div className="rounded-lg border bg-card border-border overflow-x-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          {apiLoading ? (
-            <div className="p-4">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full mb-2 rounded-md" />
-              ))}
-            </div>
-          ) : (
           <table className="w-full min-w-[850px]">
             <thead className="bg-muted">
               <tr>
@@ -774,7 +766,6 @@ export default function TransactionsPage() {
               })}
             </tbody>
           </table>
-          )}
           {/* Pagination Controls */}
           <div className="px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-500 dark:text-gray-400">
