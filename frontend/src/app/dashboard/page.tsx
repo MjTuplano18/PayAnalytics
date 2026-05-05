@@ -254,13 +254,16 @@ export default function DashboardPage() {
     // Fallback to apiSummary when no in-memory data — filter banks by selected environment/bank using environment_map.
     // apiSummary is already date-filtered from the API call.
     if (src.length === 0 && apiSummary) {
-      // Determine which banks are visible given the selected environment/bank filters
+      // Determine which banks are visible given the selected environment/bank/touchpoint filters
       let visibleBanks = apiSummary.banks;
-      if (selectedEnvironments.size > 0 && apiSummary.environment_map) {
+      if ((selectedEnvironments.size > 0 || selectedTouchpoints.size > 0) && apiSummary.environment_map) {
         const bankSet = new Set<string>();
         for (const envEntry of apiSummary.environment_map) {
-          if (selectedEnvironments.has(envEntry.environment)) {
-            envEntry.banks.forEach((b) => bankSet.add(b));
+          const envMatch = selectedEnvironments.size === 0 || selectedEnvironments.has(envEntry.environment);
+          if (!envMatch) continue;
+          for (const [bank, tps] of Object.entries(envEntry.touchpoints_by_bank)) {
+            const tpMatch = selectedTouchpoints.size === 0 || tps.some((tp) => selectedTouchpoints.has(tp));
+            if (tpMatch) bankSet.add(bank);
           }
         }
         visibleBanks = visibleBanks.filter((b) => bankSet.has(b.bank));
@@ -290,17 +293,20 @@ export default function DashboardPage() {
       .map(([bank, d]) => { const bt = d.amounts.reduce((s, n) => s + Math.round(n * 100), 0) / 100; return { bank, accountCount: d.accounts.size, totalAmount: bt, debtorSum: d.paymentCount, percentage: totalAmount > 0 ? (bt / totalAmount) * 100 : 0, paymentCount: d.paymentCount }; })
       .sort((a, b) => b.totalAmount - a.totalAmount);
     return { bankAnalytics, totalAmount, totalAccounts: allAccounts.size, totalPayments: src.length };
-  }, [portfolioFiltered, apiSummary, selectedEnvironments, selectedBanks, fa]);
+  }, [portfolioFiltered, apiSummary, selectedEnvironments, selectedBanks, selectedTouchpoints, fa]);
 
   // ── Channels tab data ──
   const allTouchpoints = useMemo(() => {
-    if (selectedBanks.size > 0) {
-      // Cascade: only show touchpoints that exist for the selected bank(s)
+    if (selectedEnvironments.size > 0 || selectedBanks.size > 0) {
+      // Cascade: only show touchpoints that exist for the selected environments and/or banks
       if (apiSummary?.environment_map) {
         const tpSet = new Set<string>();
         for (const envEntry of apiSummary.environment_map) {
+          const envMatch = selectedEnvironments.size === 0 || selectedEnvironments.has(envEntry.environment);
+          if (!envMatch) continue;
           for (const [bank, tps] of Object.entries(envEntry.touchpoints_by_bank)) {
-            if (selectedBanks.has(bank)) tps.forEach((tp) => tpSet.add(tp));
+            const bankMatch = selectedBanks.size === 0 || selectedBanks.has(bank);
+            if (bankMatch) tps.forEach((tp) => tpSet.add(tp));
           }
         }
         return Array.from(tpSet).sort();
@@ -308,7 +314,11 @@ export default function DashboardPage() {
       if (data) {
         const tpSet = new Set<string>();
         data.payments
-          .filter((p) => selectedBanks.has(p.bank))
+          .filter((p) => {
+            const envMatch = selectedEnvironments.size === 0 || selectedEnvironments.has(p.environment || "Unknown");
+            const bankMatch = selectedBanks.size === 0 || selectedBanks.has(p.bank);
+            return envMatch && bankMatch;
+          })
           .forEach((p) => tpSet.add(p.touchpoint || "Unknown"));
         return Array.from(tpSet).sort();
       }
@@ -317,7 +327,7 @@ export default function DashboardPage() {
     if (apiSummary) return apiSummary.touchpoints.map((t) => t.touchpoint);
     if (!data) return [];
     return [...new Set(data.payments.map((p) => p.touchpoint || "Unknown"))].sort();
-  }, [apiSummary, data, selectedBanks]);
+  }, [apiSummary, data, selectedEnvironments, selectedBanks]);
 
   const channelAnalytics = useMemo(() => {
     let base = payments;
@@ -486,8 +496,9 @@ export default function DashboardPage() {
                         n.has(env) ? n.delete(env) : n.add(env);
                         return n;
                       });
-                      // Clear banks that may not exist in the new env selection
+                      // Clear banks and touchpoints that may not exist in the new env selection
                       setSelectedBanks(new Set());
+                      setSelectedTouchpoints(new Set());
                     }} className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-muted/50 transition-colors">
                       <span className={`flex items-center justify-center h-4 w-4 mr-2 rounded border ${selectedEnvironments.has(env) ? "bg-[#5B66E2] border-[#5B66E2]" : "border-gray-300 dark:border-gray-600"}`}>{selectedEnvironments.has(env) && <Check className="h-3 w-3 text-white" />}</span>
                       {env}
