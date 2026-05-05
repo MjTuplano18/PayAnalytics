@@ -3,7 +3,7 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSidebar } from "@/context/SidebarContext";
-import { DollarSign, Users, FileText, Landmark, Waypoints, Hash, BarChart3, ChevronDown, Check, Globe, Info, TrendingUp, Building2, Radio } from "lucide-react";
+import { DollarSign, Users, FileText, Landmark, Waypoints, Hash, BarChart3, ChevronDown, Check, Globe, Info, TrendingUp, Building2, Radio, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useData } from "@/context/DataContext";
@@ -41,20 +41,22 @@ export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customRange, setCustomRange] = useState<CustomDateRange | undefined>(undefined);
   const dateBounds = useMemo(() => dateRangeToBounds(dateRange, customRange), [dateRange, customRange]);
-  const { data: apiSummary, isLoading: apiLoading, error: apiError } = useDashboard(token, sessionId, sessionValidated, dateBounds.date_from, dateBounds.date_to);
+  const { data: apiSummary, isLoading: apiLoading, isFetching: apiFetching, error: apiError } = useDashboard(token, sessionId, sessionValidated, dateBounds.date_from, dateBounds.date_to);
   // isFetching is true during background refreshes; isLoading is true only when
   // there is no cached data yet. Use showSkeleton to prevent skeleton flash on
   // re-navigation when data is already in the TanStack Query cache.
   const showSkeleton = apiLoading && !apiSummary;
+  const [dateFilterLoading, setDateFilterLoading] = useState(false);
+  useEffect(() => { if (!apiFetching) setDateFilterLoading(false); }, [apiFetching]);
 
   const handleUploadNav = () => {
     setIsCollapsed(true);
     router.push("/upload");
   };
 
-  // Auto-clear stale session on 404 or 500 (e.g. after DB migration / new database)
+  // Auto-clear stale session only on 404 (session genuinely deleted). Ignore 500s — they are transient server errors.
   useEffect(() => {
-    if (apiError && (apiError.message.includes("404") || apiError.message.includes("Not Found") || apiError.message.includes("500") || apiError.message.includes("Internal Server Error"))) {
+    if (apiError && (apiError.message.includes("404") || apiError.message.includes("Not Found"))) {
       setSessionId(null);
     }
   }, [apiError, setSessionId]);
@@ -165,15 +167,8 @@ export default function DashboardPage() {
       if (map.size === 0) return [];
 
       const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-      const peakMonth = Array.from(map.entries()).sort(([, a], [, b]) => b - a)[0][0];
-      const [py, pm] = peakMonth.split("-").map(Number);
-      const peakNum = py * 12 + pm;
 
       return sorted
-        .filter(([raw]) => {
-          const [y, m] = raw.split("-").map(Number);
-          return Math.abs(y * 12 + m - peakNum) <= 6;
-        })
         .map(([raw, amount]) => {
           const parts = raw.split("-");
           const label = new Date(Number(parts[0]), Number(parts[1]) - 1, 1)
@@ -197,9 +192,10 @@ export default function DashboardPage() {
 
   // ── Portfolio tab data ──
   const allEnvironments = useMemo(() => {
+    // Prefer in-memory data — avoids phantom options when date filter scopes the dataset
+    if (data) return [...new Set(data.payments.map((p) => p.environment).filter(Boolean) as string[])].sort();
     if (apiSummary) return apiSummary.environments;
-    if (!data) return [];
-    return [...new Set(data.payments.map((p) => p.environment).filter(Boolean) as string[])].sort();
+    return [];
   }, [apiSummary, data]);
 
   // Banks filtered by selected environments + touchpoints (cascading)
@@ -247,14 +243,39 @@ export default function DashboardPage() {
 
   const portfolioAnalytics = useMemo(() => {
     const src = portfolioFiltered;
-    // In-memory data loaded but filter returns no results — show zeros (don't fall through to API data)
-    if (src.length === 0 && data !== null && isFiltered && selectedEnvironments.size === 0 && selectedBanks.size === 0) {
+    // In-memory data loaded but filter returns no results — show zeros (never fall back to API when data is present)
+    if (src.length === 0 && data !== null) {
       return { bankAnalytics: [] as typeof fa.bankAnalytics, totalAmount: 0, totalAccounts: 0, totalPayments: 0 };
     }
     // Fallback to apiSummary when no in-memory data — filter banks by selected environment/bank using environment_map.
     // apiSummary is already date-filtered from the API call.
     if (src.length === 0 && apiSummary) {
-      // Determine which banks are visible given the selected environment/bank/touchpoint filters
+      // Use bank_touchpoint_matrix for accurate filtering when touchpoints or environments are selected.
+      const matrix = apiSummary.bank_touchpoint_matrix ?? [];
+      if (matrix.length > 0) {
+        // Filter the matrix by all three dimensions
+        let filtered = matrix;
+        if (selectedEnvironments.size > 0) filtered = filtered.filter((r) => selectedEnvironments.has(r.environment || "Unknown"));
+        if (selectedBanks.size > 0) filtered = filtered.filter((r) => selectedBanks.has(r.bank));
+        if (selectedTouchpoints.size > 0) filtered = filtered.filter((r) => selectedTouchpoints.has(r.touchpoint || "Unknown"));
+        // Aggregate by bank
+        const bankMap = new Map<string, { amount: number; count: number; accountCount: number }>();
+        for (const row of filtered) {
+          if (!bankMap.has(row.bank)) bankMap.set(row.bank, { amount: 0, count: 0, accountCount: 0 });
+          const b = bankMap.get(row.bank)!;
+          b.amount += row.total_amount;
+          b.count += row.count;
+          b.accountCount += row.account_count;
+        }
+        const filteredTotal = Array.from(bankMap.values()).reduce((s, b) => s + b.amount, 0);
+        const bankAnalytics = Array.from(bankMap.entries())
+          .map(([bank, d]) => ({ bank, accountCount: d.accountCount, totalAmount: d.amount, debtorSum: d.count, percentage: filteredTotal > 0 ? (d.amount / filteredTotal) * 100 : 0, paymentCount: d.count }))
+          .sort((a, b) => b.totalAmount - a.totalAmount);
+        const filteredPayments = filtered.reduce((s, r) => s + r.count, 0);
+        const filteredAccounts = filtered.reduce((s, r) => s + r.account_count, 0);
+        return { bankAnalytics, totalAmount: filteredTotal, totalAccounts: filteredAccounts, totalPayments: filteredPayments };
+      }
+      // Fallback to bank-level totals when matrix not available (old API responses)
       let visibleBanks = apiSummary.banks;
       if ((selectedEnvironments.size > 0 || selectedTouchpoints.size > 0) && apiSummary.environment_map) {
         const bankSet = new Set<string>();
@@ -341,7 +362,25 @@ export default function DashboardPage() {
     // Fallback to apiSummary when no in-memory data — filter by selected environments + touchpoints.
     // apiSummary is already date-filtered from the API call.
     if (src.length === 0 && apiSummary) {
-      // Build allowed touchpoint set when environments or banks are selected
+      // Use bank_touchpoint_matrix for accurate env+bank filtering of touchpoint amounts
+      const matrix = apiSummary.bank_touchpoint_matrix ?? [];
+      if (matrix.length > 0) {
+        let filtered = matrix;
+        if (selectedEnvironments.size > 0) filtered = filtered.filter((r) => selectedEnvironments.has(r.environment || "Unknown"));
+        if (selectedBanks.size > 0) filtered = filtered.filter((r) => selectedBanks.has(r.bank));
+        if (selectedTouchpoints.size > 0) filtered = filtered.filter((r) => selectedTouchpoints.has(r.touchpoint || "Unknown"));
+        const tpMap = new Map<string, { count: number; amount: number }>();
+        for (const row of filtered) {
+          const tp = row.touchpoint || "Unknown";
+          if (!tpMap.has(tp)) tpMap.set(tp, { count: 0, amount: 0 });
+          const t = tpMap.get(tp)!; t.count += row.count; t.amount += row.total_amount;
+        }
+        const filteredTotal = Array.from(tpMap.values()).reduce((s, t) => s + t.amount, 0);
+        return Array.from(tpMap.entries())
+          .map(([touchpoint, d]) => ({ touchpoint, count: d.count, totalAmount: d.amount, percentage: filteredTotal > 0 ? (d.amount / filteredTotal) * 100 : 0 }))
+          .sort((a, b) => b.count - a.count);
+      }
+      // Fallback to touchpoint-level totals (old API responses without matrix)
       let allowedTouchpoints: Set<string> | null = null;
       if ((selectedEnvironments.size > 0 || selectedBanks.size > 0) && apiSummary.environment_map) {
         allowedTouchpoints = new Set<string>();
@@ -469,6 +508,16 @@ export default function DashboardPage() {
 
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
+      {/* ── Date filter loading overlay ── */}
+      {dateFilterLoading && apiFetching && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-4 border border-gray-200 dark:border-gray-700">
+            <Loader2 className="animate-spin h-10 w-10 text-[#5B66E2]" />
+            <p className="text-sm font-semibold text-gray-700 dark:text-gray-200 tracking-wide">Applying date filter…</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Fetching updated records</p>
+          </div>
+        </div>
+      )}
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div>
@@ -554,7 +603,7 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-          <DateFilter value={dateRange} onChange={(r, c) => { setDateRange(r); setCustomRange(c); }} customRange={customRange} dataStartDate={dataStartDate} />
+          <DateFilter value={dateRange} onChange={(r, c) => { setDateRange(r); setCustomRange(c); setDateFilterLoading(true); }} customRange={customRange} dataStartDate={dataStartDate} />
         </div>
       </div>
 

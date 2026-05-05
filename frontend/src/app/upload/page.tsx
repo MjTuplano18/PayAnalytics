@@ -394,8 +394,7 @@ export default function UploadPage() {
       (f) =>
         f.name.endsWith(".xlsx") ||
         f.name.endsWith(".xls") ||
-        f.name.endsWith(".csv") ||
-        f.name.endsWith(".json")
+        f.name.endsWith(".csv")
     );
     if (files.length === 0) {
       setError("Please upload valid files (.xlsx, .xls, .csv)");
@@ -419,8 +418,7 @@ export default function UploadPage() {
       (f) =>
         f.name.endsWith(".xlsx") ||
         f.name.endsWith(".xls") ||
-        f.name.endsWith(".csv") ||
-        f.name.endsWith(".json")
+        f.name.endsWith(".csv")
     );
     if (uploadMode === 'fast') {
       if (files.length > 1) {
@@ -475,7 +473,7 @@ export default function UploadPage() {
 
   const handleMergeFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []).filter(
-      (f) => f.name.endsWith(".xlsx") || f.name.endsWith(".xls") || f.name.endsWith(".json")
+      (f) => f.name.endsWith(".xlsx") || f.name.endsWith(".xls") || f.name.endsWith(".csv")
     );
     if (files.length > 0) setMergeFiles((prev) => [...prev, ...files]);
     if (mergeInputRef.current) mergeInputRef.current.value = "";
@@ -812,7 +810,7 @@ export default function UploadPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".xlsx,.xls,.csv,.json"
+              accept=".xlsx,.xls,.csv"
               multiple={uploadMode !== 'fast'}
               onChange={handleFileSelect}
               className="hidden"
@@ -920,7 +918,7 @@ export default function UploadPage() {
                 <input
                   ref={mergeInputRef}
                   type="file"
-                  accept=".xlsx,.xls,.json"
+                  accept=".xlsx,.xls,.csv"
                   multiple
                   onChange={handleMergeFiles}
                   className="hidden"

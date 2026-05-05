@@ -871,6 +871,17 @@ async def undo_audit_entry(
         await repo._update_session_totals(session_id)
 
     elif entry.action == "record_bulk_delete":
+        # Detect date-range deletes that were not snapshotted (no individual records stored)
+        if "records" not in snapshot:
+            date_from = snapshot.get("date_from", "unknown")
+            date_to = snapshot.get("date_to", "unknown")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Undo is not available for date-range deletions ({date_from} to {date_to}). "
+                    "Individual records were not snapshotted and cannot be automatically restored."
+                ),
+            )
         # Restore bulk deleted records
         records_data = snapshot.get("records", [])
         session_id = snapshot.get("session_id", entry.session_id)

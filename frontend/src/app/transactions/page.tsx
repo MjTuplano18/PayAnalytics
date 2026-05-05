@@ -67,9 +67,9 @@ export default function TransactionsPage() {
   };
   const { data: txPage, isFetching: apiLoading, error: txError } = useTransactions(token, sessionId, apiFilters, sessionValidated);
 
-  // Auto-clear stale session on 404 or 500 (e.g. after DB migration / new database)
+  // Auto-clear stale session only on 404 (session genuinely deleted). Ignore 500s — they are transient server errors.
   useEffect(() => {
-    if (txError && (txError.message.includes("404") || txError.message.includes("Not Found") || txError.message.includes("500") || txError.message.includes("Internal Server Error"))) {
+    if (txError && (txError.message.includes("404") || txError.message.includes("Not Found"))) {
       setSessionId(null);
     }
   }, [txError, setSessionId]);

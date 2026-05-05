@@ -403,25 +403,17 @@ class UploadRepository:
         )
         if not session_check.scalar_one_or_none():
             return 0
-        # Count records to delete
-        count_result = await self.session.execute(
-            select(func.count(PaymentRecord.id)).where(
-                PaymentRecord.session_id == session_id,
-                PaymentRecord.payment_date >= date_from,
-                PaymentRecord.payment_date <= date_to,
-            )
-        )
-        count = count_result.scalar() or 0
-        if count == 0:
-            return 0
-        # Delete
-        await self.session.execute(
+        # Delete and use the actual rowcount (avoids race conditions with pre-delete COUNT)
+        result = await self.session.execute(
             sql_delete(PaymentRecord).where(
                 PaymentRecord.session_id == session_id,
                 PaymentRecord.payment_date >= date_from,
                 PaymentRecord.payment_date <= date_to,
             )
         )
+        count = result.rowcount
+        if count == 0:
+            return 0
         # Update session totals
         await self._update_session_totals(session_id)
         await self.session.commit()
@@ -770,6 +762,32 @@ class UploadRepository:
             for row in monthly_rows.all()
         ]
 
+        # Per-(environment, bank, touchpoint) breakdown — lets the frontend compute
+        # correctly filtered totals when in API-fallback mode (no in-memory data).
+        ebt_rows = await self.session.execute(
+            select(
+                PaymentRecord.environment,
+                PaymentRecord.bank,
+                PaymentRecord.touchpoint,
+                func.count(PaymentRecord.id).label("count"),
+                func.count(func.distinct(PaymentRecord.account)).label("account_count"),
+                func.sum(PaymentRecord.payment_amount).label("total_amount"),
+            )
+            .where(PaymentRecord.session_id == session_id, *date_conditions)
+            .group_by(PaymentRecord.environment, PaymentRecord.bank, PaymentRecord.touchpoint)
+        )
+        bank_touchpoint_matrix = [
+            {
+                "environment": row.environment or "",
+                "bank": row.bank,
+                "touchpoint": row.touchpoint or "Unknown",
+                "count": row.count,
+                "account_count": row.account_count,
+                "total_amount": float(row.total_amount or 0),
+            }
+            for row in ebt_rows.all()
+        ]
+
         return {
             "total_payments": total_payments or 0,
             "total_amount": total_amount,
@@ -781,5 +799,6 @@ class UploadRepository:
             "environments": environments,
             "environment_map": environment_map,
             "monthly_trend": monthly_trend,
+            "bank_touchpoint_matrix": bank_touchpoint_matrix,
             "session_id": session_id,
         }

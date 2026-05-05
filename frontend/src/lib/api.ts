@@ -249,6 +249,15 @@ export interface EnvironmentCampaignMap {
   touchpoints_by_bank: Record<string, string[]>;
 }
 
+export interface BankTouchpointCell {
+  environment: string;
+  bank: string;
+  touchpoint: string;
+  count: number;
+  account_count: number;
+  total_amount: number;
+}
+
 export interface DashboardSummary {
   total_payments: number;
   total_amount: number;
@@ -261,6 +270,7 @@ export interface DashboardSummary {
   months: string[];
   environment_map: EnvironmentCampaignMap[];
   monthly_trend: { month: string; amount: number }[];
+  bank_touchpoint_matrix: BankTouchpointCell[];
   session_id: string | null;
 }
 

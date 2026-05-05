@@ -110,6 +110,16 @@ class MonthlyTrendPoint(BaseModel):
     amount: float
 
 
+class BankTouchpointCell(BaseModel):
+    """Aggregated stats for a single (environment, bank, touchpoint) combination."""
+    environment: str
+    bank: str
+    touchpoint: str
+    count: int
+    account_count: int
+    total_amount: float
+
+
 class DashboardSummary(BaseModel):
     total_payments: int
     total_amount: float
@@ -122,6 +132,7 @@ class DashboardSummary(BaseModel):
     months: list[str] = []
     environment_map: list[EnvironmentCampaignMap] = []
     monthly_trend: list[MonthlyTrendPoint] = []
+    bank_touchpoint_matrix: list[BankTouchpointCell] = []
     session_id: str | None = None
 
 
