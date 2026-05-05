@@ -237,6 +237,33 @@ class UploadRepository:
         await self.session.commit()
         return True
 
+    async def prune_old_sessions(self, user_id: str, keep: int = 5) -> int:
+        """Delete sessions beyond the most recent `keep` for a user.
+
+        Uses a subquery to identify the oldest sessions efficiently without
+        loading full ORM objects. The DB-level ON DELETE CASCADE on payment_records
+        ensures child rows are removed automatically.
+        Returns the number of sessions deleted.
+        """
+        # Fetch IDs of sessions to keep (most recent `keep`)
+        keep_result = await self.session.execute(
+            select(UploadSession.id)
+            .where(UploadSession.user_id == user_id)
+            .order_by(UploadSession.uploaded_at.desc())
+            .limit(keep)
+        )
+        keep_ids = list(keep_result.scalars().all())
+
+        # Delete sessions NOT in the keep list
+        del_result = await self.session.execute(
+            sql_delete(UploadSession).where(
+                UploadSession.user_id == user_id,
+                UploadSession.id.not_in(keep_ids),
+            )
+        )
+        await self.session.commit()
+        return del_result.rowcount
+
     async def delete_transaction(self, record_id: str, session_id: str, user_id: str) -> bool:
         """Delete a single payment record. Returns True if deleted."""
         # Verify session ownership

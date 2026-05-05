@@ -69,6 +69,8 @@ async def create_upload(
         record_count=session.total_records,
         total_amount=session.total_amount,
     )
+    # Keep only the 5 most recent sessions per user; delete older ones
+    await repo.prune_old_sessions(user_id=current_user.id, keep=5)
     # Notify all SSE-connected clients so their uploads list auto-refreshes
     await broadcast_new_upload(session.id, session.file_name)
     return UploadSessionOut.model_validate(session)
@@ -142,6 +144,8 @@ async def upload_file(
         record_count=session.total_records,
         total_amount=session.total_amount,
     )
+    # Keep only the 5 most recent sessions per user; delete older ones
+    await repo.prune_old_sessions(user_id=current_user.id, keep=5)
     await broadcast_new_upload(session.id, session.file_name)
     return UploadSessionOut.model_validate(session)
 

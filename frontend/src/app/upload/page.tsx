@@ -685,8 +685,60 @@ export default function UploadPage() {
     setMergeFileEntries([]);
   };
 
+  const circleRadius = 40;
+  const circleCircumference = 2 * Math.PI * circleRadius;
+
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
+      {/* Circular loading popup overlay */}
+      {uploading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-10 flex flex-col items-center gap-6 min-w-[260px]">
+            <div className="relative w-28 h-28">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 96 96">
+                {/* Background track */}
+                <circle
+                  cx="48" cy="48" r={circleRadius}
+                  fill="none"
+                  stroke="#e2e8f0"
+                  strokeWidth="8"
+                  className="dark:stroke-gray-700"
+                />
+                {/* Progress arc */}
+                <circle
+                  cx="48" cy="48" r={circleRadius}
+                  fill="none"
+                  stroke="#4a55d1"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={circleCircumference}
+                  strokeDashoffset={circleCircumference * (1 - uploadProgress / 100)}
+                  className="transition-all duration-700 ease-out"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xl font-bold text-[#4a55d1]">{Math.round(uploadProgress)}%</span>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-base font-semibold text-gray-900 dark:text-white">
+                {uploadPhase === "parsing" && "Reading file..."}
+                {uploadPhase === "saving" && "Uploading to server..."}
+                {uploadPhase === "done" && "Done!"}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {uploadPhase === "parsing" && "Parsing your data"}
+                {uploadPhase === "done" && "Upload complete"}
+              </p>
+              {(uploadPhase === "parsing" || uploadPhase === "saving") && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 max-w-[200px]">
+                  Large files may take a little longer to upload
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mb-8">
         <h1 className="text-2xl font-semibold mb-2 text-gray-900 dark:text-white">
           Upload Data
@@ -751,26 +803,12 @@ export default function UploadPage() {
                 ? 'Drop a single file to import directly to your dashboard. For larger files or to filter by date, enable the Controlled Upload toggle.'
                 : 'Preview your data and choose a date range before importing. You can also drop multiple files to merge them into one dataset.'}
             </p>
-            {uploading && uploadProgress > 0 ? (
-              <div className="relative w-full h-11 rounded-lg overflow-hidden bg-[#4a55d1]/20 border border-[#4a55d1]/30">
-                <div
-                  className="absolute inset-y-0 left-0 bg-[#4a55d1] transition-all duration-700 ease-out"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-                <span className="relative z-10 flex items-center justify-center h-full text-sm font-medium text-white">
-                  {uploadPhase === "parsing" && `Reading file... ${Math.round(uploadProgress)}%`}
-                  {uploadPhase === "saving" && `Uploading... ${Math.round(uploadProgress)}%`}
-                  {uploadPhase === "done" && "Done!"}
-                </span>
-              </div>
-            ) : (
-              <Button
-                className="bg-[#4a55d1] hover:bg-[#4048c0] text-white w-full"
-                disabled={merging}
-              >
-                {merging ? "Merging..." : "Browse Files"}
-              </Button>
-            )}
+            <Button
+              className="bg-[#4a55d1] hover:bg-[#4048c0] text-white w-full"
+              disabled={merging || uploading}
+            >
+              {merging ? "Merging..." : uploading ? "Uploading..." : "Browse Files"}
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
