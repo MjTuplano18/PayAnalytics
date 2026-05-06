@@ -11,11 +11,12 @@ import {
   setUserAdmin,
   deleteUser,
   changePassword,
+  adminUpdateUser,
   type UserResponse,
   type UnifiedAuditLogEntry,
 } from "@/lib/api";
 import { useUnifiedAuditLog } from "@/lib/queries";
-import { Eye, EyeOff, Plus, Shield, Lock, ClipboardList, Users, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Plus, Shield, Lock, ClipboardList, Users, Trash2, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -227,6 +228,76 @@ function UserManagementSection({
   const [togglingAdmin, setTogglingAdmin] = useState<string | null>(null);
   const [deletingUser, setDeletingUser] = useState<string | null>(null);
 
+  // Edit user modal
+  const [editingUser, setEditingUser] = useState<UserResponse | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editConfirmPassword, setEditConfirmPassword] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  function openEditModal(u: UserResponse) {
+    setEditingUser(u);
+    setEditName(u.full_name);
+    setEditEmail(u.email);
+    setEditPassword("");
+    setEditConfirmPassword("");
+    setShowEditPassword(false);
+  }
+
+  function closeEditModal() {
+    setEditingUser(null);
+  }
+
+  async function handleEditUser(e: React.FormEvent) {
+    e.preventDefault();
+    if (!token || !editingUser) return;
+
+    if (editPassword && editPassword.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    if (editPassword && !/[A-Z]/.test(editPassword)) {
+      toast.error("Password must contain at least one uppercase letter.");
+      return;
+    }
+    if (editPassword && !/[a-z]/.test(editPassword)) {
+      toast.error("Password must contain at least one lowercase letter.");
+      return;
+    }
+    if (editPassword && !/[0-9]/.test(editPassword)) {
+      toast.error("Password must contain at least one digit.");
+      return;
+    }
+    if (editPassword && editPassword !== editConfirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+
+    const updates: { full_name?: string; email?: string; password?: string } = {};
+    if (editName.trim() !== editingUser.full_name) updates.full_name = editName.trim();
+    if (editEmail.trim().toLowerCase() !== editingUser.email) updates.email = editEmail.trim();
+    if (editPassword) updates.password = editPassword;
+
+    if (Object.keys(updates).length === 0) {
+      closeEditModal();
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const updated = await adminUpdateUser(token, editingUser.id, updates);
+      setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? updated : u)));
+      toast.success(`Updated ${updated.full_name}.`);
+      closeEditModal();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update user.");
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
   // New user form
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
@@ -309,6 +380,7 @@ function UserManagementSection({
   if (loadError === "Admin access required.") return null;
 
   return (
+    <>
     <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -479,27 +551,50 @@ function UserManagementSection({
                   {new Date(u.created_at).toLocaleDateString()}
                 </td>
                 <td className="py-3 text-right">
+                  <div className="flex items-center justify-end gap-2">
                   {u.id === currentUserId || u.email.toLowerCase() === "payanalytics86@gmail.com" ? (
-                    <button
-                      type="button"
-                      disabled
-                      className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-400 opacity-60 cursor-not-allowed"
-                      title="This account cannot be deleted"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        disabled
+                        className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-400 opacity-60 cursor-not-allowed"
+                        title="This account cannot be edited"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-400 opacity-60 cursor-not-allowed"
+                        title="This account cannot be deleted"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    </>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteUser(u)}
-                      disabled={deletingUser === u.id}
-                      className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/20 disabled:cursor-wait disabled:opacity-60"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      {deletingUser === u.id ? "Deleting..." : "Delete"}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(u)}
+                        className="inline-flex items-center gap-1 rounded-md border border-[#5B66E2]/40 bg-[#5B66E2]/10 px-2.5 py-1.5 text-xs font-medium text-[#5B66E2] transition-colors hover:bg-[#5B66E2]/20"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteUser(u)}
+                        disabled={deletingUser === u.id}
+                        className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/20 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {deletingUser === u.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </>
                   )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -518,6 +613,121 @@ function UserManagementSection({
         )}
       </div>
     </Card>
+
+    {/* Edit User Modal */}
+    {editingUser && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={closeEditModal}
+        />
+        {/* Dialog */}
+        <div className="relative z-10 w-full max-w-md rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] text-xs font-semibold text-white">
+                {editingUser.full_name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Edit User</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{editingUser.email}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={closeEditModal}
+              className="rounded-md p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleEditUser} className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm text-gray-700 dark:text-gray-300">Full Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                required
+                placeholder="John Doe"
+                className="bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus-visible:border-[#5B66E2] focus-visible:ring-[#5B66E2]/30"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm text-gray-700 dark:text-gray-300">Email</Label>
+              <Input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                required
+                placeholder="user@example.com"
+                className="bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus-visible:border-[#5B66E2] focus-visible:ring-[#5B66E2]/30"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-sm text-gray-700 dark:text-gray-300">
+                New Password
+                <span className="ml-1.5 text-xs text-gray-400 font-normal">(leave blank to keep current)</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  type={showEditPassword ? "text" : "password"}
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="Min. 8 chars, upper, lower, digit"
+                  className="pr-10 bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-[#5B66E2] focus-visible:ring-[#5B66E2]/30"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEditPassword(!showEditPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
+                >
+                  {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            {editPassword && (
+              <div className="space-y-1.5">
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Confirm New Password</Label>
+                <Input
+                  type="password"
+                  value={editConfirmPassword}
+                  onChange={(e) => setEditConfirmPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:border-[#5B66E2] focus-visible:ring-[#5B66E2]/30"
+                />
+              </div>
+            )}
+
+            {/* Footer buttons */}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={closeEditModal}
+                className="rounded-md border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isUpdating}
+                className="rounded-md bg-gradient-to-r from-[#5B66E2] to-[#8B96F2] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {isUpdating ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

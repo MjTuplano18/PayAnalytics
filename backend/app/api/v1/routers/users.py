@@ -7,7 +7,7 @@ from app.api.v1.dependencies.auth import get_current_user, require_admin
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import ChangePasswordRequest, SetAdminRequest, UserCreate, UserResponse
+from app.schemas.user import ChangePasswordRequest, SetAdminRequest, UserCreate, UserResponse, UserUpdate
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -63,6 +63,38 @@ async def set_user_admin(
             detail="The original admin account's privileges cannot be revoked.",
         )
     user.is_superuser = payload.is_superuser
+    await db.commit()
+    await db.refresh(user)
+    return UserResponse.model_validate(user)
+
+
+@router.patch("/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: str,
+    payload: UserUpdate,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> UserResponse:
+    """Update a user's name, email, or reset their password (admin only)."""
+    service = AuthService(db)
+    user = await service.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    if payload.full_name is not None:
+        user.full_name = payload.full_name
+    if payload.email is not None:
+        existing = await service._repo.get_by_email(payload.email.lower())
+        if existing and existing.id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email already exists.",
+            )
+        user.email = payload.email.lower()
+    if payload.password is not None:
+        from app.core.security import hash_password
+        user.hashed_password = hash_password(payload.password)
+
     await db.commit()
     await db.refresh(user)
     return UserResponse.model_validate(user)

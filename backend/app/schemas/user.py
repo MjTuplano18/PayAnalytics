@@ -42,14 +42,31 @@ class UserResponse(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    email: EmailStr | None = None
     full_name: str | None = None
     password: str | None = None
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, v: str | None) -> str | None:
+        if v is not None:
+            v = v.strip()
+            if not v:
+                raise ValueError("Full name cannot be empty")
+        return v
 
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str | None) -> str | None:
-        if v is not None and len(v) < 8:
-            raise ValueError("Password must be at least 8 characters long")
+        if v is not None:
+            if len(v) < 8:
+                raise ValueError("Password must be at least 8 characters long")
+            if not any(c.isupper() for c in v):
+                raise ValueError("Password must contain at least one uppercase letter")
+            if not any(c.islower() for c in v):
+                raise ValueError("Password must contain at least one lowercase letter")
+            if not any(c.isdigit() for c in v):
+                raise ValueError("Password must contain at least one digit")
         return v
 
 

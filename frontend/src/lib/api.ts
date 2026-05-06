@@ -167,6 +167,18 @@ export function setUserAdmin(token: string, userId: string, isAdmin: boolean) {
   });
 }
 
+export function adminUpdateUser(
+  token: string,
+  userId: string,
+  data: { full_name?: string; email?: string; password?: string }
+) {
+  return apiFetch<UserResponse>(`/api/v1/users/${userId}`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify(data),
+  });
+}
+
 export function deleteUser(token: string, userId: string) {
   return apiFetch<void>(`/api/v1/users/${userId}`, {
     method: "DELETE",
