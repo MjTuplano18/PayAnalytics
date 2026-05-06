@@ -810,33 +810,48 @@ export default function SheetsPage() {
 
   /* ---- Loading state (fetching from backend) ---- */
   if (uploadLoading || (rows.length === 0 && sessionId && !data)) {
-    const fakeColumns = ["Bank", "Payment Date", "Amount", "Account", "Touchpoint", "Environment"];
-    const fakeRows = Array.from({ length: 18 }, (_, i) => i);
+    const skelCols = 6;
+    const skelRows = Array.from({ length: 20 }, (_, i) => i);
     return (
       <div className="px-4 sm:px-8 py-6 min-h-screen flex flex-col relative">
-        {/* Blurred fake spreadsheet */}
-        <div className="blur-sm pointer-events-none select-none opacity-60 flex-1 flex flex-col">
-          <div className="mb-4">
-            <h1 className="text-2xl font-semibold">Sheets</h1>
-            <p className="text-sm text-muted-foreground">Loading…</p>
+        {/* Page shell (blurred + non-interactive) */}
+        <div className="pointer-events-none select-none flex-1 flex flex-col">
+          {/* Header + Toolbar */}
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold">Sheets</h1>
+              <p className="text-sm text-muted-foreground">
+                {fileName || "Sheet"} &mdash; loading records…
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 opacity-40">
+              <div className="h-8 w-8 rounded-full bg-muted" />
+              <div className="h-8 w-8 rounded-full bg-muted" />
+              <div className="w-px h-6 bg-border mx-1" />
+              <div className="h-9 w-20 rounded-lg bg-muted" />
+              <div className="h-9 w-32 rounded-lg bg-muted" />
+              <div className="w-px h-6 bg-border mx-1" />
+              <div className="h-9 w-24 rounded-lg bg-muted" />
+            </div>
           </div>
-          <div className="rounded-2xl border border-border overflow-hidden flex-1">
+          {/* Grid skeleton */}
+          <div className="flex-1 rounded-2xl border border-border overflow-hidden blur-sm opacity-60">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-muted">
-                  {fakeColumns.map((col) => (
-                    <th key={col} className="px-3 py-2 text-left font-semibold text-foreground border-b border-border whitespace-nowrap">
-                      {col}
+                  {Array.from({ length: skelCols }).map((_, j) => (
+                    <th key={j} className="px-3 py-2 border-b border-border">
+                      <div className="h-4 rounded bg-muted-foreground/30" style={{ width: `${50 + (j * 17) % 35}%` }} />
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {fakeRows.map((i) => (
+                {skelRows.map((i) => (
                   <tr key={i} className={i % 2 === 0 ? "bg-card" : "bg-muted/20"}>
-                    {fakeColumns.map((col, j) => (
+                    {Array.from({ length: skelCols }).map((_, j) => (
                       <td key={j} className="px-3 py-2 border-b border-border">
-                        <div className="h-4 rounded bg-muted-foreground/20" style={{ width: `${55 + ((i * 7 + j * 13) % 40)}%` }} />
+                        <div className="h-4 rounded bg-muted-foreground/15" style={{ width: `${45 + ((i * 11 + j * 7) % 45)}%` }} />
                       </td>
                     ))}
                   </tr>
@@ -845,13 +860,16 @@ export default function SheetsPage() {
             </table>
           </div>
         </div>
-        {/* Loading popup overlay */}
+        {/* Centered loading popup — matches loadProgress style */}
         <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="flex flex-col items-center gap-4 bg-card border border-border rounded-2xl px-10 py-8 shadow-2xl min-w-[280px]">
+          <div className="flex flex-col items-center gap-4 bg-card border border-border rounded-2xl px-8 py-8 shadow-lg min-w-[260px]">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
             <div className="text-center">
-              <p className="text-base font-semibold">Loading spreadsheet data</p>
-              <p className="text-sm text-muted-foreground mt-1">Please wait a moment…</p>
+              <p className="text-base font-semibold">Loading all records…</p>
+              <p className="text-sm text-muted-foreground mt-1">Please wait while your data is being loaded</p>
+            </div>
+            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div className="bg-primary/30 h-2 rounded-full w-1/4 animate-pulse" />
             </div>
           </div>
         </div>
