@@ -12,8 +12,12 @@ import {
   FileText,
   Settings2,
   Check,
+  DollarSign,
+  Hash,
+  Landmark,
 } from "lucide-react";
-import { ReportBuilder } from "@/components/ReportBuilder";
+import { Card } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -23,7 +27,7 @@ import {
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { exportToExcel, exportToCSV, exportToJSON, EXPORT_FIELDS, type ExportOptions } from "@/utils/exportUtils";
-import { getDashboardSummary, exportAllRecords } from "@/lib/api";
+import { exportAllRecords } from "@/lib/api";
 import { useDashboard } from "@/lib/queries";
 import { toast } from "sonner";
 import type { DataRow } from "@/types/data";
@@ -40,7 +44,6 @@ export default function ReportsPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bankPage, setBankPage] = useState(1);
-  const [activeTab, setActiveTab] = useState<"export" | "builder">("export");
   const bankRowsPerPage = 15;
 
   // Export field selection
@@ -157,23 +160,14 @@ export default function ReportsPage() {
     percentage: b.percentage,
     paymentCount: b.payment_count,
   })) ?? [];
-  const reportTouchpointAnalytics = data?.touchpointAnalytics ?? apiSummary?.touchpoints.map((t) => ({
-    touchpoint: t.touchpoint,
-    count: t.count,
-    totalAmount: t.total_amount,
-    percentage: t.percentage,
-  })) ?? [];
-
   return (
     <div className="px-4 sm:px-8 py-8 min-h-screen">
-      {/* Print-only header with filename — only for Export tab (Builder has its own) */}
-      {activeTab === "export" && (
-        <div className="hidden print:block mb-4 border-b border-gray-300 pb-3">
-          <h1 className="text-lg font-bold text-black">PayAnalytics — Financial Report</h1>
-          {fileName && <p className="text-sm text-gray-600 mt-1">{fileName}</p>}
-          <p className="text-xs text-gray-400 mt-0.5">{new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
-        </div>
-      )}
+      {/* Print-only header */}
+      <div className="hidden print:block mb-4 border-b border-gray-300 pb-3">
+        <h1 className="text-lg font-bold text-black">PayAnalytics — Financial Report</h1>
+        {fileName && <p className="text-sm text-gray-600 mt-1">{fileName}</p>}
+        <p className="text-xs text-gray-400 mt-0.5">{new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+      </div>
 
       <div className="mb-6">
         <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
@@ -185,7 +179,6 @@ export default function ReportsPage() {
               Generate and export payment reports
             </p>
           </div>
-          {activeTab === "export" && (
           <div className="flex gap-2">
             <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
               <PopoverTrigger asChild>
@@ -252,52 +245,40 @@ export default function ReportsPage() {
               </PopoverContent>
             </Popover>
           </div>
-          )}
         </div>
-
-        {/* Tabs – same style as dashboard */}
-        <div className="print:hidden flex gap-0 border-b border-gray-200 dark:border-gray-700 mb-6">
-          {(["export", "builder"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-3 text-sm font-medium transition-colors -mb-px ${
-                activeTab === tab
-                  ? "border-b-2 border-[#5B66E2] text-[#5B66E2] bg-[#5B66E2]/5"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              }`}
-            >
-              {tab === "export" ? "Export" : "Report Builder"}
-            </button>
-          ))}
-        </div>
-
-        {activeTab === "builder" && (data || apiSummary) ? (
-          <ReportBuilder
-            payments={data?.payments ?? []}
-            bankAnalytics={reportBankAnalytics}
-            touchpointAnalytics={reportTouchpointAnalytics}
-            totalAmount={totalAmount}
-            totalAccounts={data?.totalAccounts ?? 0}
-            totalPayments={totalRecords}
-          />
-        ) : (
-        <>
 
         {/* Summary stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 animate-fade-in-up">
-          <div className="p-5 rounded-lg bg-card border border-border">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Records</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmt(totalRecords)}</p>
-          </div>
-          <div className="p-5 rounded-lg bg-card border border-border">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Amount</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">₱{fmt(totalAmount)}</p>
-          </div>
-          <div className="p-5 rounded-lg bg-card border border-border">
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Banks</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{fmt(bankCount)}</p>
-          </div>
+          <Card className="p-5 bg-card border-border hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-default">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <span className="text-sm font-semibold text-gray-900 dark:text-white block">Total Records</span>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Total payment rows</p>
+              </div>
+              <div className="p-2 bg-[#5B66E2] rounded-lg flex-shrink-0"><Hash className="w-4 h-4 text-white" /></div>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">{fmt(totalRecords)}</div>
+          </Card>
+          <Card className="p-5 bg-card border-border hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-default">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <span className="text-sm font-semibold text-gray-900 dark:text-white block">Total Amount</span>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Sum of all payments</p>
+              </div>
+              <div className="p-2 bg-[#5B66E2] rounded-lg flex-shrink-0"><DollarSign className="w-4 h-4 text-white" /></div>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">₱{fmt(totalAmount)}</div>
+          </Card>
+          <Card className="p-5 bg-card border-border hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-default">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <span className="text-sm font-semibold text-gray-900 dark:text-white block">Banks</span>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Distinct banks</p>
+              </div>
+              <div className="p-2 bg-[#4048c0] rounded-lg flex-shrink-0"><Landmark className="w-4 h-4 text-white" /></div>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">{fmt(bankCount)}</div>
+          </Card>
         </div>
 
         {/* Bank breakdown table */}
@@ -355,8 +336,6 @@ export default function ReportsPage() {
               </div>
             )}
           </div>
-        )}
-        </>
         )}
       </div>
     </div>

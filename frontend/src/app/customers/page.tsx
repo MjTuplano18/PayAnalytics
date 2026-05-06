@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Users, DollarSign, FileText, Info, Search } from "lucide-react";
+import { Users, DollarSign, FileText, Search } from "lucide-react";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
@@ -209,28 +209,16 @@ export default function AccountsPage() {
           return (
             <Card
               key={idx}
-              className="flex-1 overflow-hidden bg-card border-border gap-0 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-default"
+              className="p-5 bg-card border-border hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-default"
             >
-              <div className="h-1 bg-[#5B66E2]" />
-              <div className="flex flex-col h-[calc(100%-4px)] px-5 pt-3 pb-4 gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {m.label}:
-                  </span>
-                  <div className={`p-2 mt-1 mr-0.5 ${m.iconBg} rounded-lg`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white block">{m.label}</span>
+                  {m.info && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{m.info}</p>}
                 </div>
-                <div className="flex-1 flex items-center justify-center">
-                  <span className="inline-block px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-lg font-bold text-gray-900 dark:text-white">
-                    {m.value}
-                  </span>
-                </div>
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex items-center justify-between">
-                  <span className="text-xs text-gray-400 dark:text-gray-500">{m.info}</span>
-                  <Info className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
-                </div>
+                <div className={`p-2 ${m.iconBg} rounded-lg flex-shrink-0`}><Icon className="w-4 h-4 text-white" /></div>
               </div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white truncate">{m.value}</div>
             </Card>
           );
         })}
