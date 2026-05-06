@@ -53,6 +53,10 @@ class UserUpdate(BaseModel):
         return v
 
 
+class SetAdminRequest(BaseModel):
+    is_superuser: bool
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str

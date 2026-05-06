@@ -105,6 +105,9 @@ class AuthService:
     async def list_users(self) -> list[User]:
         return await self._repo.list_all()
 
+    async def get_user_by_id(self, user_id: str) -> User | None:
+        return await self._repo.get_by_id(user_id)
+
     async def change_password(
         self, user: User, current_password: str, new_password: str
     ) -> None:

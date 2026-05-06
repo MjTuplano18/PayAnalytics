@@ -8,12 +8,14 @@ import { useAuth } from "@/context/AuthContext";
 import {
   listUsers,
   createUser,
+  setUserAdmin,
+  deleteUser,
   changePassword,
   type UserResponse,
   type UnifiedAuditLogEntry,
 } from "@/lib/api";
 import { useUnifiedAuditLog } from "@/lib/queries";
-import { Eye, EyeOff, Plus, Shield, Lock, ClipboardList, Users } from "lucide-react";
+import { Eye, EyeOff, Plus, Shield, Lock, ClipboardList, Users, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -222,6 +224,8 @@ function UserManagementSection({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [togglingAdmin, setTogglingAdmin] = useState<string | null>(null);
+  const [deletingUser, setDeletingUser] = useState<string | null>(null);
 
   // New user form
   const [email, setEmail] = useState("");
@@ -238,6 +242,20 @@ function UserManagementSection({
       )
       .finally(() => setIsLoadingUsers(false));
   }, [token]);
+
+  async function handleToggleAdmin(userId: string, newValue: boolean) {
+    if (!token) return;
+    setTogglingAdmin(userId);
+    try {
+      const updated = await setUserAdmin(token, userId, newValue);
+      setUsers((prev) => prev.map((u) => (u.id === userId ? updated : u)));
+      toast.success(newValue ? "Admin access granted." : "Admin access revoked.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update admin status.");
+    } finally {
+      setTogglingAdmin(null);
+    }
+  }
 
   async function handleCreateUser(e: React.FormEvent) {
     e.preventDefault();
@@ -265,6 +283,25 @@ function UserManagementSection({
       toast.error(err instanceof Error ? err.message : "Failed to create user.");
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleDeleteUser(target: UserResponse) {
+    if (!token) return;
+    const confirmed = window.confirm(
+      `Delete user ${target.email}? This will permanently remove their account and uploaded data.`
+    );
+    if (!confirmed) return;
+
+    setDeletingUser(target.id);
+    try {
+      await deleteUser(token, target.id);
+      setUsers((prev) => prev.filter((u) => u.id !== target.id));
+      toast.success(`Deleted ${target.email}.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete user.");
+    } finally {
+      setDeletingUser(null);
     }
   }
 
@@ -372,7 +409,9 @@ function UserManagementSection({
               <th className="pb-3 font-medium">User</th>
               <th className="pb-3 font-medium">Email</th>
               <th className="pb-3 font-medium">Status</th>
+              <th className="pb-3 font-medium">Admin</th>
               <th className="pb-3 font-medium">Created</th>
+              <th className="pb-3 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -408,15 +447,66 @@ function UserManagementSection({
                     {u.is_active ? "Active" : "Inactive"}
                   </span>
                 </td>
+                <td className="py-3">
+                  {u.id === currentUserId || u.email.toLowerCase() === "payanalytics86@gmail.com" ? (
+                    <label className="flex items-center gap-2 w-fit opacity-50 cursor-not-allowed">
+                      <input
+                        type="checkbox"
+                        checked={u.is_superuser}
+                        disabled
+                        className="h-4 w-4 rounded accent-[#5B66E2] cursor-not-allowed"
+                      />
+                      {u.is_superuser && (
+                        <span className="text-xs text-[#8B96F2] font-medium">Admin</span>
+                      )}
+                    </label>
+                  ) : (
+                    <label className="flex items-center gap-2 cursor-pointer w-fit">
+                      <input
+                        type="checkbox"
+                        checked={u.is_superuser}
+                        disabled={togglingAdmin === u.id}
+                        onChange={(e) => handleToggleAdmin(u.id, e.target.checked)}
+                        className="h-4 w-4 rounded accent-[#5B66E2] cursor-pointer disabled:cursor-wait"
+                      />
+                      {u.is_superuser && (
+                        <span className="text-xs text-[#8B96F2] font-medium">Admin</span>
+                      )}
+                    </label>
+                  )}
+                </td>
                 <td className="py-3 text-gray-500 dark:text-gray-400">
                   {new Date(u.created_at).toLocaleDateString()}
+                </td>
+                <td className="py-3 text-right">
+                  {u.id === currentUserId || u.email.toLowerCase() === "payanalytics86@gmail.com" ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-400 opacity-60 cursor-not-allowed"
+                      title="This account cannot be deleted"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteUser(u)}
+                      disabled={deletingUser === u.id}
+                      className="inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/20 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      {deletingUser === u.id ? "Deleting..." : "Delete"}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
             {users.length === 0 && !loadError && (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={6}
                   className="py-8 text-center text-gray-400"
                 >
                   No users found.

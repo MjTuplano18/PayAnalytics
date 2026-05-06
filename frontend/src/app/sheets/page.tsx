@@ -178,6 +178,7 @@ export default function SheetsPage() {
   const [rows, setRows] = useState<SheetRow[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const [fullLoadDone, setFullLoadDone] = useState(false);
   const needsFullLoadRef = useRef<{ total: number } | null>(null);
   const [fullLoadTrigger, setFullLoadTrigger] = useState(0);
   const gridRef = useRef<AgGridReact<SheetRow>>(null);
@@ -496,7 +497,10 @@ export default function SheetsPage() {
           );
         }
       } finally {
-        if (!cancelled) setLoadProgress(null);
+        if (!cancelled) {
+          setLoadProgress(null);
+          setFullLoadDone(true);
+        }
       }
     };
 
@@ -808,88 +812,10 @@ export default function SheetsPage() {
     [rows]
   );
 
-  /* ---- Loading state (fetching from backend) ---- */
-  if (uploadLoading || (rows.length === 0 && sessionId && !data)) {
-    const skelCols = 6;
-    const skelRows = Array.from({ length: 20 }, (_, i) => i);
-    return (
-      <div className="px-4 sm:px-8 py-6 min-h-screen flex flex-col relative">
-        {/* Page shell (blurred + non-interactive) */}
-        <div className="pointer-events-none select-none flex-1 flex flex-col">
-          {/* Header + Toolbar */}
-          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold">Sheets</h1>
-              <p className="text-sm text-muted-foreground">
-                {fileName || "Sheet"} &mdash; loading records…
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 opacity-40">
-              <div className="h-8 w-8 rounded-full bg-muted" />
-              <div className="h-8 w-8 rounded-full bg-muted" />
-              <div className="w-px h-6 bg-border mx-1" />
-              <div className="h-9 w-20 rounded-lg bg-muted" />
-              <div className="h-9 w-32 rounded-lg bg-muted" />
-              <div className="w-px h-6 bg-border mx-1" />
-              <div className="h-9 w-24 rounded-lg bg-muted" />
-            </div>
-          </div>
-          {/* Grid skeleton */}
-          <div className="flex-1 rounded-2xl border border-border overflow-hidden blur-sm opacity-60">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-muted">
-                  {Array.from({ length: skelCols }).map((_, j) => (
-                    <th key={j} className="px-3 py-2 border-b border-border">
-                      <div className="h-4 rounded bg-muted-foreground/30" style={{ width: `${50 + (j * 17) % 35}%` }} />
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {skelRows.map((i) => (
-                  <tr key={i} className={i % 2 === 0 ? "bg-card" : "bg-muted/20"}>
-                    {Array.from({ length: skelCols }).map((_, j) => (
-                      <td key={j} className="px-3 py-2 border-b border-border">
-                        <div className="h-4 rounded bg-muted-foreground/15" style={{ width: `${45 + ((i * 11 + j * 7) % 45)}%` }} />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {/* Centered loading popup — matches loadProgress style */}
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="flex flex-col items-center gap-4 bg-card border border-border rounded-2xl px-8 py-8 shadow-lg min-w-[260px]">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <div className="text-center">
-              <p className="text-base font-semibold">Loading all records…</p>
-              <p className="text-sm text-muted-foreground mt-1">Please wait while your data is being loaded</p>
-            </div>
-            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-              <div className="bg-primary/30 h-2 rounded-full w-1/4 animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /* ---- Empty state ---- */
-  if (!data && rows.length === 0) {
-    return (
-      <div className="px-4 sm:px-8 py-8 min-h-screen">
-        <div className="p-10 rounded-2xl text-center bg-card border border-border">
-          <h1 className="text-2xl font-semibold mb-2">Sheets</h1>
-          <p className="text-muted-foreground">
-            Upload data first to open it as a spreadsheet.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const isInitialLoading =
+    uploadLoading ||
+    (rows.length === 0 && sessionId && !data) ||
+    (fullLoadTrigger > 0 && !loadProgress && !dataIsComplete && !fullLoadDone);
 
   return (
     <div className="px-4 sm:px-8 py-6 min-h-screen flex flex-col">
@@ -898,7 +824,7 @@ export default function SheetsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Sheets</h1>
           <p className="text-sm text-muted-foreground">
-            {fileName || "Sheet"} &mdash; {rows.length.toLocaleString()} records
+            {fileName || "Sheet"}{(isInitialLoading || loadProgress) ? "" : ` \u2014 ${rows.length.toLocaleString()} records`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -971,37 +897,39 @@ export default function SheetsPage() {
 
       {/* AG Grid */}
       <div style={{ width: "100%", height: "calc(100vh - 240px)", position: "relative" }}>
-        {isDeleting && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm rounded-lg">
-            <div className="flex flex-col items-center gap-3">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-              <span className="text-sm font-medium text-muted-foreground">Deleting rows…</span>
-            </div>
-          </div>
-        )}
-        {loadProgress && (
+        {(isInitialLoading || loadProgress) && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg">
             <div className="flex flex-col items-center gap-4 bg-card border border-border rounded-2xl px-8 py-8 shadow-lg min-w-[260px]">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               <div className="text-center">
                 <p className="text-base font-semibold">Loading all records…</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {loadProgress.total.toLocaleString()} total rows
-                </p>
+                {loadProgress && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {loadProgress.total.toLocaleString()} total rows
+                  </p>
+                )}
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-primary h-2 rounded-full transition-all duration-300"
-                  style={{
-                    width: loadProgress.total > 0
-                      ? `${Math.min(100, (loadProgress.loaded / loadProgress.total) * 100)}%`
-                      : "10%",
-                  }}
-                />
+                {loadProgress && loadProgress.total > 0 && (
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(100, (loadProgress.loaded / loadProgress.total) * 100)}%`,
+                    }}
+                  />
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Please wait while your data is being loaded
               </p>
+            </div>
+          </div>
+        )}
+        {isDeleting && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm rounded-lg">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <span className="text-sm font-medium text-muted-foreground">Deleting rows…</span>
             </div>
           </div>
         )}

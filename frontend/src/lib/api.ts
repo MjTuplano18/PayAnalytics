@@ -159,6 +159,21 @@ export function createUser(
   });
 }
 
+export function setUserAdmin(token: string, userId: string, isAdmin: boolean) {
+  return apiFetch<UserResponse>(`/api/v1/users/${userId}/admin`, {
+    method: "PATCH",
+    token,
+    body: JSON.stringify({ is_superuser: isAdmin }),
+  });
+}
+
+export function deleteUser(token: string, userId: string) {
+  return apiFetch<void>(`/api/v1/users/${userId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function changePassword(
   token: string,
   data: { current_password: string; new_password: string }

@@ -37,5 +37,8 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 10
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
 
+    # Protected superadmin — this account's admin status cannot be revoked by other admins.
+    PROTECTED_ADMIN_EMAIL: str = "payanalytics86@gmail.com"
+
 
 settings = Settings()  # type: ignore[call-arg]
