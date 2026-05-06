@@ -810,11 +810,50 @@ export default function SheetsPage() {
 
   /* ---- Loading state (fetching from backend) ---- */
   if (uploadLoading || (rows.length === 0 && sessionId && !data)) {
+    const fakeColumns = ["Bank", "Payment Date", "Amount", "Account", "Touchpoint", "Environment"];
+    const fakeRows = Array.from({ length: 18 }, (_, i) => i);
     return (
-      <div className="px-4 sm:px-8 py-8 min-h-screen">
-        <div className="p-10 rounded-2xl text-center bg-card border border-border">
-          <h1 className="text-2xl font-semibold mb-2">Sheets</h1>
-          <p className="text-muted-foreground">Loading spreadsheet data...</p>
+      <div className="px-4 sm:px-8 py-6 min-h-screen flex flex-col relative">
+        {/* Blurred fake spreadsheet */}
+        <div className="blur-sm pointer-events-none select-none opacity-60 flex-1 flex flex-col">
+          <div className="mb-4">
+            <h1 className="text-2xl font-semibold">Sheets</h1>
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          </div>
+          <div className="rounded-2xl border border-border overflow-hidden flex-1">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-muted">
+                  {fakeColumns.map((col) => (
+                    <th key={col} className="px-3 py-2 text-left font-semibold text-foreground border-b border-border whitespace-nowrap">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {fakeRows.map((i) => (
+                  <tr key={i} className={i % 2 === 0 ? "bg-card" : "bg-muted/20"}>
+                    {fakeColumns.map((col, j) => (
+                      <td key={j} className="px-3 py-2 border-b border-border">
+                        <div className="h-4 rounded bg-muted-foreground/20" style={{ width: `${55 + ((i * 7 + j * 13) % 40)}%` }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {/* Loading popup overlay */}
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="flex flex-col items-center gap-4 bg-card border border-border rounded-2xl px-10 py-8 shadow-2xl min-w-[280px]">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <div className="text-center">
+              <p className="text-base font-semibold">Loading spreadsheet data</p>
+              <p className="text-sm text-muted-foreground mt-1">Please wait a moment…</p>
+            </div>
+          </div>
         </div>
       </div>
     );
