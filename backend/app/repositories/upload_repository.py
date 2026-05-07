@@ -745,17 +745,28 @@ class UploadRepository:
 
         # Monthly trend: sum of payment_amount grouped by year-month (first 7 chars of payment_date)
         from sqlalchemy import literal_column
-        month_expr = literal_column("LEFT(payment_records.payment_date, 7)")
+        from sqlalchemy import case, or_ as sa_or
+        # month key: prefer payment_date (first 7 chars), fall back to month column
+        # when it is already in YYYY-MM format (exactly 7 chars, e.g. "2026-01").
+        pd_month_expr = literal_column("LEFT(payment_records.payment_date, 7)")
+        month_key = func.coalesce(
+            case((func.length(PaymentRecord.payment_date) >= 7, pd_month_expr), else_=None),
+            case((func.length(PaymentRecord.month) == 7, PaymentRecord.month), else_=None),
+        )
         monthly_rows = await self.session.execute(
             select(
-                month_expr.label("month"),
+                month_key.label("month"),
                 func.sum(PaymentRecord.payment_amount).label("amount"),
             )
             .where(PaymentRecord.session_id == session_id, *date_conditions)
-            .where(PaymentRecord.payment_date.isnot(None))
-            .where(func.length(PaymentRecord.payment_date) >= 7)
-            .group_by(month_expr)
-            .order_by(month_expr)
+            .where(
+                sa_or(
+                    func.length(PaymentRecord.payment_date) >= 7,
+                    func.length(PaymentRecord.month) == 7,
+                )
+            )
+            .group_by(month_key)
+            .order_by(month_key)
         )
         monthly_trend = [
             {"month": row.month, "amount": float(row.amount or 0)}

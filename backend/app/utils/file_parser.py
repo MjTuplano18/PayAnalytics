@@ -18,7 +18,7 @@ _COL_PATTERNS: dict[str, list[str]] = {
     "bank": ["bank"],
     "account": ["debtor_id", "account", "debtor"],
     "touchpoint": ["tagging", "touchpoint", "tag"],
-    "payment_date": ["date_created", "leads_result_edate", "payment date", "edate"],
+    "payment_date": ["date_created", "leads_result_edate", "payment date", "edate", "transaction date", "trans_date", "value_date", "posting_date", "date_paid"],
     "payment_amount": ["leads_result_amount", "payment amount", "amount"],
     "environment": ["environment", "env"],
     "month": ["month"],
@@ -109,16 +109,23 @@ def _safe_float(value: object) -> float:
 
 def _row_to_record(
     values: list[object], col_map: dict[str, int | None]
-) -> PaymentRecordIn:
+) -> PaymentRecordIn | None:
     def _get(field: str) -> object:
         idx = col_map.get(field)
         if idx is None or idx >= len(values):
             return None
         return values[idx]
 
+    bank_raw = _get("bank")
+    account_raw = _get("account")
+
+    # Skip rows where both bank and account are empty (e.g. total/summary rows)
+    if not bank_raw and not account_raw:
+        return None
+
     return PaymentRecordIn(
-        bank=str(_get("bank") or "Unknown"),
-        account=str(_get("account") or "") or f"NO-ACCT-{uuid.uuid4().hex[:8].upper()}",
+        bank=str(bank_raw or "Unknown"),
+        account=str(account_raw or "") or f"NO-ACCT-{uuid.uuid4().hex[:8].upper()}",
         touchpoint=str(_get("touchpoint") or "NO TOUCHPOINT"),
         payment_date=_format_date(_get("payment_date")),
         payment_amount=_safe_float(_get("payment_amount")),
@@ -147,7 +154,9 @@ def stream_xlsx(file_bytes: bytes) -> Iterator[PaymentRecordIn]:
         # Skip completely empty rows
         if all(c is None for c in row):
             continue
-        yield _row_to_record(list(row), col_map)
+        record = _row_to_record(list(row), col_map)
+        if record is not None:
+            yield record
 
     wb.close()
 
@@ -163,4 +172,6 @@ def stream_csv(file_bytes: bytes) -> Iterator[PaymentRecordIn]:
             continue
         if not any(v.strip() for v in row_values):
             continue
-        yield _row_to_record(list(row_values), col_map)
+        record = _row_to_record(list(row_values), col_map)
+        if record is not None:
+            yield record

@@ -21,7 +21,7 @@ class PaymentRecordOut(PaymentRecordIn):
 
 
 MAX_RECORDS_PER_UPLOAD = 50_000  # Guard against OOM on 512 MB Render free tier (JSON body path)
-MAX_RECORDS_PER_FILE_UPLOAD = 200_000  # Streaming file path is memory-safe — much higher limit
+MAX_RECORDS_PER_FILE_UPLOAD = 500_000  # Streaming file path is memory-safe — much higher limit
 
 
 class UploadSessionCreate(BaseModel):

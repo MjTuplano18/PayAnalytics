@@ -477,6 +477,85 @@ export default function DashboardPage() {
     );
   }
 
+  function ChartSkeleton({ type, height }: { type: "line" | "bar" | "barh" | "donut" | "pie"; height: number }) {
+    if (type === "line") {
+      const h = height;
+      return (
+        <div className="animate-pulse w-full overflow-hidden rounded-xl" style={{ height }}>
+          <svg width="100%" height="100%" viewBox={`0 0 400 ${h}`} preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            {[0.2, 0.45, 0.7].map((r) => (
+              <line key={r} x1="36" y1={h * r} x2="396" y2={h * r} stroke="currentColor" strokeWidth="1" className="text-gray-200 dark:text-gray-700" strokeDasharray="4 4" />
+            ))}
+            <polygon
+              points={`36,${h * 0.88} 36,${h * 0.6} 100,${h * 0.42} 155,${h * 0.52} 210,${h * 0.28} 270,${h * 0.38} 330,${h * 0.18} 396,${h * 0.33} 396,${h * 0.88}`}
+              fill="currentColor"
+              className="text-gray-100 dark:text-gray-800"
+            />
+            <polyline
+              points={`36,${h * 0.6} 100,${h * 0.42} 155,${h * 0.52} 210,${h * 0.28} 270,${h * 0.38} 330,${h * 0.18} 396,${h * 0.33}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-gray-300 dark:text-gray-600"
+            />
+          </svg>
+        </div>
+      );
+    }
+    if (type === "bar") {
+      const barHeights = [0.55, 0.8, 0.45, 0.7, 0.6, 0.9, 0.5];
+      const n = barHeights.length, bw = 34;
+      const spacing = (360 - n * bw) / (n + 1);
+      const h = height;
+      return (
+        <div className="animate-pulse w-full overflow-hidden rounded-xl" style={{ height }}>
+          <svg width="100%" height="100%" viewBox={`0 0 400 ${h}`} preserveAspectRatio="none">
+            {barHeights.map((r, i) => {
+              const bh = h * 0.82 * r;
+              const x = 40 + spacing * (i + 1) + bw * i;
+              return <rect key={i} x={x} y={h * 0.88 - bh} width={bw} height={bh} rx="4" fill="currentColor" className="text-gray-200 dark:text-gray-700" />;
+            })}
+            <rect x="38" y={h * 0.88} width="360" height="2" rx="1" fill="currentColor" className="text-gray-200 dark:text-gray-700" />
+          </svg>
+        </div>
+      );
+    }
+    if (type === "barh") {
+      const widths = [0.82, 0.65, 0.9, 0.5, 0.72, 0.58, 0.78];
+      const h = height;
+      const rowH = Math.min(20, (h * 0.8) / widths.length - 4);
+      const gap = (h * 0.9) / widths.length;
+      return (
+        <div className="animate-pulse w-full overflow-hidden rounded-xl" style={{ height }}>
+          <svg width="100%" height="100%" viewBox={`0 0 400 ${h}`} preserveAspectRatio="none">
+            {widths.map((r, i) => {
+              const y = h * 0.05 + gap * i + (gap - rowH) / 2;
+              return <rect key={i} x="68" y={y} width={310 * r} height={rowH} rx="4" fill="currentColor" className="text-gray-200 dark:text-gray-700" />;
+            })}
+          </svg>
+        </div>
+      );
+    }
+    // donut or pie
+    const size = Math.min(height * 0.85, 180);
+    const outerR = size / 2 - 2;
+    const strokeW = type === "donut" ? outerR * 0.38 : 0;
+    const circleR = type === "donut" ? outerR - strokeW / 2 : outerR;
+    return (
+      <div className="animate-pulse w-full flex items-center justify-center" style={{ height }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {type === "pie" ? (
+            <circle cx={size / 2} cy={size / 2} r={outerR} fill="currentColor" className="text-gray-200 dark:text-gray-700" />
+          ) : (
+            <circle cx={size / 2} cy={size / 2} r={circleR} fill="none" stroke="currentColor" strokeWidth={strokeW} className="text-gray-200 dark:text-gray-700" />
+          )}
+        </svg>
+      </div>
+    );
+  }
+
   function SkeletonCard() {
     return (
       <Card className="p-5 bg-card border-border">
@@ -652,7 +731,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-gray-400 dark:text-gray-500">Total payment amount collected per month — shows growth or decline over time</p>
               </div>
             </div>
-            {showSkeleton ? <Skeleton className="h-[220px] w-full rounded-xl" /> : monthlyTrend.length === 0 ? (
+            {showSkeleton ? <ChartSkeleton type="line" height={220} /> : monthlyTrend.length === 0 ? (
               <div className="h-[220px] flex items-center justify-center text-sm text-gray-400">No date data available</div>
             ) : (
               <DynamicChart data={monthlyTrend} type="line" dataKey="amount" xAxisKey="month" height={220} />
@@ -690,7 +769,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Top 10 banks ranked by total amount collected</p>
                 </div>
               </div>
-              {showSkeleton ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (() => {
+              {showSkeleton ? <ChartSkeleton type="barh" height={320} /> : (() => {
                 const d = fa.bankAnalytics.slice(0, 10);
                 return <DynamicChart data={[...d].sort((a, b) => a.totalAmount - b.totalAmount).map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="barh" dataKey="amount" xAxisKey="bank" height={320} />;
               })()}
@@ -702,7 +781,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Distribution of transactions across the top 8 touchpoints by count</p>
                 </div>
               </div>
-              {showSkeleton ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (
+              {showSkeleton ? <ChartSkeleton type="donut" height={320} /> : (
                 <DynamicChart data={fa.touchpointAnalytics.slice(0, 8).map((t) => ({ touchpoint: t.touchpoint, count: t.count }))} type="donut" dataKey="count" xAxisKey="touchpoint" height={320} valueType="count" />
               )}
             </Card>
@@ -745,7 +824,7 @@ export default function DashboardPage() {
                   <option value="10">Top 10</option><option value="20">Top 20</option><option value="50">Top 50</option><option value="all">All</option>
                 </select>
               </div>
-              {showSkeleton ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (() => {
+              {showSkeleton ? <ChartSkeleton type="bar" height={320} /> : (() => {
                 const d = portfolioBankTopN === "all" ? portfolioAnalytics.bankAnalytics : portfolioAnalytics.bankAnalytics.slice(0, portfolioBankTopN);
                 const minWidth = Math.max(500, d.length * 28);
                 return <div className="overflow-x-auto rounded-xl"><div style={{ minWidth }}><DynamicChart data={d.map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="bar" dataKey="amount" xAxisKey="bank" height={320} /></div></div>;
@@ -758,7 +837,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Which banks collected the most — by total payment amount</p>
                 </div>
               </div>
-              {showSkeleton ? <Skeleton className="h-[320px] w-full rounded-xl" /> : (
+              {showSkeleton ? <ChartSkeleton type="pie" height={320} /> : (
                 <DynamicChart data={portfolioAnalytics.bankAnalytics.slice(0, 8).map((a) => ({ bank: a.bank, amount: a.totalAmount }))} type="pie" dataKey="amount" xAxisKey="bank" height={320} />
               )}
             </Card>
@@ -773,7 +852,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Number of payment transactions per bank — high count means high volume, not necessarily high value</p>
                 </div>
               </div>
-              {showSkeleton ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
+              {showSkeleton ? <ChartSkeleton type="barh" height={280} /> : (
                 <DynamicChart data={[...portfolioAnalytics.bankAnalytics].sort((a, b) => b.paymentCount - a.paymentCount).slice(0, 10).sort((a, b) => a.paymentCount - b.paymentCount).map((a) => ({ bank: a.bank, transactions: a.paymentCount }))} type="barh" dataKey="transactions" xAxisKey="bank" height={280} valueType="count" />
               )}
             </Card>
@@ -784,7 +863,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Each bank's percentage of total collected amount — all banks ranked</p>
                 </div>
               </div>
-              {showSkeleton ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (() => {
+              {showSkeleton ? <ChartSkeleton type="bar" height={280} /> : (() => {
                 const d = portfolioAnalytics.bankAnalytics.slice(0, portfolioBankTopN === "all" ? undefined : portfolioBankTopN);
                 const minWidth = Math.max(500, d.length * 28);
                 return <div className="overflow-x-auto rounded-xl"><div style={{ minWidth }}><DynamicChart data={d.map((a) => ({ bank: a.bank, percentage: Math.round(a.percentage * 10) / 10 }))} type="bar" dataKey="percentage" xAxisKey="bank" height={280} /></div></div>;
@@ -874,7 +953,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Inbound (IB) vs Outbound (OB) vs With Touchpoint vs Ghost Payment vs No Touchpoint — transaction count</p>
                 </div>
               </div>
-              {showSkeleton ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
+              {showSkeleton ? <ChartSkeleton type="bar" height={280} /> : (
                 <DynamicChart data={channelGroupData.map((g) => ({ group: g.group, count: g.count }))} type="bar" dataKey="count" xAxisKey="group" height={280} valueType="count" />
               )}
             </Card>
@@ -885,7 +964,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Total payment amount collected per touchpoint type — shows which strategy drives the most value</p>
                 </div>
               </div>
-              {showSkeleton ? <Skeleton className="h-[280px] w-full rounded-xl" /> : (
+              {showSkeleton ? <ChartSkeleton type="pie" height={280} /> : (
                 <DynamicChart data={channelGroupData.map((g) => ({ group: g.group, amount: g.amount }))} type="pie" dataKey="amount" xAxisKey="group" height={280} />
               )}
             </Card>
@@ -900,7 +979,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Total payment amount collected per individual touchpoint — ranked highest to lowest</p>
                 </div>
               </div>
-              {showSkeleton ? <Skeleton className="h-[300px] w-full rounded-xl" /> : (
+              {showSkeleton ? <ChartSkeleton type="barh" height={300} /> : (
                 <DynamicChart data={[...channelAnalytics].sort((a, b) => a.totalAmount - b.totalAmount).slice(0, 12).map((t) => ({ touchpoint: t.touchpoint, amount: t.totalAmount }))} type="barh" dataKey="amount" xAxisKey="touchpoint" height={300} />
               )}
             </Card>
@@ -911,7 +990,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 dark:text-gray-500">Top 8 individual touchpoints by total amount — shows which specific touchpoints generate the most collections</p>
                 </div>
               </div>
-              {showSkeleton ? <Skeleton className="h-[300px] w-full rounded-xl" /> : (
+              {showSkeleton ? <ChartSkeleton type="donut" height={300} /> : (
                 <DynamicChart data={channelAnalytics.slice(0, 8).map((t) => ({ touchpoint: t.touchpoint, amount: t.totalAmount }))} type="donut" dataKey="amount" xAxisKey="touchpoint" height={300} />
               )}
             </Card>
