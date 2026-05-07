@@ -473,7 +473,6 @@ export default function SheetsPage() {
       setLoadProgress({ loaded: 0, total: totalRecords });
       try {
         const records = await exportAllRecords(token, sessionId);
-        if (cancelled) return;
         const allRows: SheetRow[] = records.map((r) => ({
           id: r.id,
           bank: r.bank,
@@ -483,12 +482,15 @@ export default function SheetsPage() {
           touchpoint: r.touchpoint ?? "",
           environment: r.environment ?? "",
         }));
+        // Always sync context and mark complete — even if the component unmounted
+        // (user navigated away). This ensures the dashboard and other pages see
+        // the full dataset when they read from DataContext.
+        syncToContext(allRows);
+        if (sessionId) completedFullLoads.add(sessionId);
+        // Only update local component state if still mounted
         if (!cancelled) {
           setLoadProgress({ loaded: allRows.length, total: totalRecords });
           setRows(allRows);
-          syncToContext(allRows);
-          // Mark this session as fully loaded so back-navigation skips the full-load.
-          if (sessionId) completedFullLoads.add(sessionId);
         }
       } catch (err) {
         if (!cancelled) {
